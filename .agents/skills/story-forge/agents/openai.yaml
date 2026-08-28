@@ -1,0 +1,4 @@
+interface:
+  display_name: "Story Forge"
+  short_description: "Story quality, novel systems, critique, pacing"
+  default_prompt: "Use $story-forge to critique story quality, plan, draft, track, revise, and package a novel."

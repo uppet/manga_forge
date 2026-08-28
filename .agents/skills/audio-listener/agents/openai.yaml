@@ -1,0 +1,4 @@
+interface:
+  display_name: "Audio Listener"
+  short_description: "Listen, transcribe, and critique local audio files"
+  default_prompt: "Use $audio-listener to listen to this audio, transcribe it, and give a strict evidence-based score."
