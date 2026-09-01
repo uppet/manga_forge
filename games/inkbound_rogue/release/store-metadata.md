@@ -65,3 +65,24 @@ decide which ending the Grand Archive deserves.
 
 Action Roguelike, Roguelite, Pixel Graphics, 2D, Hack and Slash, Bullet Hell,
 Story Rich, Comic Book, Controller, Singleplayer.
+
+## Provisional Windows requirements for P1
+
+- Windows 10/11 64-bit
+- OpenGL 3.3-capable graphics
+- 4 GB RAM
+- 200 MB available storage
+- Keyboard/mouse or compatible XInput/SDL controller
+
+These are private-playtest targets, not final store minimum specifications.
+The integrated/older-GPU row in `p1-compatibility-matrix.md` must receive a real
+hardware pass before publishing final requirements.
+
+## Generative AI disclosure draft
+
+Pre-generated AI-assisted images are present: two character atlases and seven
+unlettered narrative backgrounds were created with OpenAI image generation
+under project direction. Gameplay, collision, animation timing, UI, dialogue,
+localization, progression, and choices are human-authored in the project. The
+runtime uses no live generative AI. The exact inventory and unresolved
+publisher sign-offs are in `ai-content-disclosure.md`.

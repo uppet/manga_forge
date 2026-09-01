@@ -43,6 +43,7 @@ resolve_godot() {{
   return 1
 }}
 GODOT=$(resolve_godot) || {{ echo 'Godot executable not found' >&2; exit 12; }}
+timeout() {{ command timeout --kill-after=10s "$@"; }}
 """.strip()
 
 
@@ -72,13 +73,47 @@ def sync(config: dict[str, Any], game: str) -> None:
     runtime_root = Path(config["wsl_runtime_root"])
     destination = runtime_root / "games" / game
     destination.parent.mkdir(parents=True, exist_ok=True)
+    pruned = 0
+    if destination.exists():
+        # Mirror source material without touching imported cache, exported
+        # builds, captures, or local playtest sessions. This prevents a deleted
+        # source resource lingering in a later all-resources export.
+        for target in sorted(destination.rglob("*"), key=lambda path: len(path.parts), reverse=True):
+            relative = target.relative_to(destination)
+            if not relative.parts or relative.parts[0] in {".godot", "build"}:
+                continue
+            if target.name.endswith(".import"):
+                source_resource = source / Path(str(relative)[: -len(".import")])
+                if source_resource.exists():
+                    continue
+            source_target = source / relative
+            if (target.is_file() or target.is_symlink()) and not source_target.exists():
+                target.unlink()
+                pruned += 1
+            elif target.is_dir() and not source_target.exists():
+                try:
+                    target.rmdir()
+                except OSError:
+                    pass
     shutil.copytree(
         source,
         destination,
         dirs_exist_ok=True,
         ignore=shutil.ignore_patterns(".godot", "build", "*.log"),
     )
-    print(f"synced {source} -> {destination}")
+    print(f"synced {source} -> {destination} (pruned_stale_source_files={pruned})")
+    game_root = posix_game_root(config, game)
+    command = godot_resolver(config) + f"""
+GAME='{game_root}'
+IMPORT_STATUS=0
+timeout 180s "$GODOT" --headless --path "$GAME" --import || IMPORT_STATUS=$?
+test "$IMPORT_STATUS" -eq 0 -o "$IMPORT_STATUS" -eq 1
+SOURCE_COUNT=$(find "$GAME/assets" -type f \( -name '*.png' -o -name '*.wav' \) | wc -l)
+IMPORT_COUNT=$(find "$GAME/assets" -type f -name '*.import' | wc -l)
+test "$IMPORT_COUNT" -eq "$SOURCE_COUNT"
+echo "godot_import_status=$IMPORT_STATUS imported_resources=$IMPORT_COUNT"
+"""
+    remote(config, command, 240)
 
 
 def remote(config: dict[str, Any], command: str, timeout: int, cwd: str | None = None) -> None:
@@ -103,7 +138,16 @@ def probe(config: dict[str, Any]) -> None:
 
 def process_status(config: dict[str, Any]) -> None:
     command = r"""
-powershell.exe -NoProfile -Command '$items = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "InkboundRogue.exe" -or $_.Name -like "Godot*.exe" } | Select-Object ProcessId, Name, CreationDate, CommandLine); [pscustomobject]@{ count = $items.Count; processes = $items } | ConvertTo-Json -Depth 4 -Compress'
+powershell.exe -NoProfile -Command '$now = Get-Date; $items = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "InkboundRogue.exe" -or $_.Name -like "Godot*.exe" } | ForEach-Object { [pscustomobject]@{ ProcessId = $_.ProcessId; Name = $_.Name; ElapsedSeconds = [math]::Round(($now - $_.CreationDate).TotalSeconds, 1); CpuSeconds = [math]::Round(($_.KernelModeTime + $_.UserModeTime) / 10000000, 1); WorkingSetMB = [math]::Round($_.WorkingSetSize / 1MB, 1); CommandLine = $_.CommandLine } }); [pscustomobject]@{ count = $items.Count; processes = $items } | ConvertTo-Json -Depth 4 -Compress'
+""".strip()
+    drive = config["windows_runtime_root"].split("\\", 1)[0] + "\\"
+    remote(config, command, 120, cwd=drive)
+
+
+def cleanup_tests(config: dict[str, Any], game: str) -> None:
+    project_token = safe_token(game, DEFAULT_GAME)
+    command = rf"""
+powershell.exe -NoProfile -Command '$items = @(Get-CimInstance Win32_Process | Where-Object {{ $_.Name -like "Godot*.exe" -and $_.CommandLine -like "*{project_token}*" -and $_.CommandLine -like "*--script res://tests/*" }}); foreach ($item in $items) {{ Stop-Process -Id $item.ProcessId -ErrorAction SilentlyContinue }}; Start-Sleep -Milliseconds 500; $remaining = @(Get-CimInstance Win32_Process | Where-Object {{ $_.Name -like "Godot*.exe" -and $_.CommandLine -like "*{project_token}*" -and $_.CommandLine -like "*--script res://tests/*" }}); [pscustomobject]@{{ stopped = $items.Count; remaining = $remaining.Count }} | ConvertTo-Json -Compress; if ($remaining.Count -gt 0) {{ exit 18 }}'
 """.strip()
     drive = config["windows_runtime_root"].split("\\", 1)[0] + "\\"
     remote(config, command, 120, cwd=drive)
@@ -131,6 +175,28 @@ def soak(config: dict[str, Any], game: str) -> None:
     command = godot_resolver(config) + f"""
 GAME='{game_root}'
 timeout 180s "$GODOT" --headless --path "$GAME" --script res://tests/soak_test.gd
+"""
+    remote(config, command, 240)
+
+
+def recorded_soak(config: dict[str, Any], game: str) -> None:
+    game_root = posix_game_root(config, game)
+    command = godot_resolver(config) + f"""
+set -e
+GAME='{game_root}'
+OUTPUT="$GAME/build/playtest/perf-audit"
+mkdir -p "$OUTPUT"
+OUTPUT_WIN=$(cygpath -w "$OUTPUT")
+export INKBOUND_PLAYTEST=1
+export INKBOUND_PLAYTEST_SESSION='PERF-SOAK'
+export INKBOUND_PLAYTEST_PARTICIPANT='automated'
+export INKBOUND_PLAYTEST_DIR="$OUTPUT_WIN"
+export INKBOUND_BUILD_ID='recorded-soak'
+export INKBOUND_GIT_COMMIT='automated'
+timeout 180s "$GODOT" --headless --path "$GAME" --script res://tests/soak_test.gd
+test -s "$OUTPUT/PERF-SOAK/summary.json"
+test -s "$OUTPUT/PERF-SOAK/performance.json"
+test ! -e "$OUTPUT/PERF-SOAK/incomplete.flag"
 """
     remote(config, command, 240)
 
@@ -424,6 +490,7 @@ timeout 120s "$GODOT" --headless --path "$GAME" --script res://tests/route_syste
 
 
 def export(config: dict[str, Any], game: str) -> None:
+    sync(config, game)
     game_root = posix_game_root(config, game)
     command = godot_resolver(config) + f"""
 set -e
@@ -441,8 +508,60 @@ cp \"$GAME/build/windows/InkboundRogue.exe\" \"$DEPOT/InkboundRogue.exe\"
 cp \"$GAME/build/windows/THIRD_PARTY_NOTICES.txt\" \"$DEPOT/THIRD_PARTY_NOTICES.txt\"
 cp \"$GAME/build/windows/version.json\" \"$DEPOT/version.json\"
 test \"$(find \"$DEPOT\" -mindepth 1 -maxdepth 1 | wc -l)\" -eq 3
+BOOT_STATUS=0
+export INKBOUND_BOOT_SMOKE=1
+timeout 30s \"$GAME/build/windows/InkboundRogue.exe\" || BOOT_STATUS=$?
+echo "export_boot_status=$BOOT_STATUS"
+test "$BOOT_STATUS" -eq 0
 """
     remote(config, command, 1200)
+    depot_root = Path(config["wsl_runtime_root"]) / "games" / game / "build" / "steam-depot"
+    subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "tools" / "game" / "release_audit.py"),
+            "--game-root",
+            str(REPO_ROOT / "games" / game),
+            "--depot-root",
+            str(depot_root),
+        ],
+        check=True,
+        cwd=REPO_ROOT,
+    )
+
+
+def release_audit(config: dict[str, Any], game: str) -> None:
+    subprocess.run(
+        [sys.executable, str(REPO_ROOT / "tools" / "game" / "generate_validation_assets.py"), "--check"],
+        check=True,
+        cwd=REPO_ROOT,
+    )
+    depot_root = Path(config["wsl_runtime_root"]) / "games" / game / "build" / "steam-depot"
+    command = [
+        sys.executable,
+        str(REPO_ROOT / "tools" / "game" / "release_audit.py"),
+        "--game-root",
+        str(REPO_ROOT / "games" / game),
+    ]
+    if depot_root.is_dir():
+        command.extend(["--depot-root", str(depot_root)])
+    subprocess.run(command, check=True, cwd=REPO_ROOT)
+
+
+def export_smoke(config: dict[str, Any], game: str) -> None:
+    game_root = posix_game_root(config, game)
+    command = godot_resolver(config) + f"""
+set -e
+GAME='{game_root}'
+TARGET="$GAME/build/windows/InkboundRogue.exe"
+test -s "$TARGET"
+BOOT_STATUS=0
+export INKBOUND_BOOT_SMOKE=1
+timeout 30s "$TARGET" || BOOT_STATUS=$?
+echo "export_boot_status=$BOOT_STATUS"
+test "$BOOT_STATUS" -eq 0
+"""
+    remote(config, command, 120)
 
 
 def run(config: dict[str, Any], game: str) -> None:
@@ -491,7 +610,6 @@ def build_identity(game: str) -> tuple[str, str]:
 def playtest(config: dict[str, Any], game: str, participant: str, reuse_build: bool = False) -> None:
     ensure_game_not_running(config)
     if not reuse_build:
-        sync(config, game)
         export(config, game)
     game_root = posix_game_root(config, game)
     commit, build_id = build_identity(game)
@@ -557,7 +675,7 @@ echo "gracefully restarted $TARGET"
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("probe", "process-status", "sync", "test", "save-test", "pause-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "capture-session", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-localization", "balance", "progression", "routes", "soak", "export", "playtest", "playtest-report", "restart", "run"))
+    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "test", "save-test", "pause-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "capture-session", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
     parser.add_argument("--game", default=DEFAULT_GAME)
     parser.add_argument("--participant", default="anonymous", help="anonymous facilitator-assigned playtest code")
     parser.add_argument("--reuse-build", action="store_true", help="launch the existing exported build without sync/export")
@@ -569,6 +687,8 @@ def main() -> int:
         probe(config)
     elif args.command == "process-status":
         process_status(config)
+    elif args.command == "cleanup-tests":
+        cleanup_tests(config, args.game)
     elif args.command == "test":
         test(config, args.game)
     elif args.command == "save-test":
@@ -642,6 +762,12 @@ timeout 120s "$GODOT" --headless --path "$GAME" --script res://tests/playtest_re
         routes(config, args.game)
     elif args.command == "soak":
         soak(config, args.game)
+    elif args.command == "recorded-soak":
+        recorded_soak(config, args.game)
+    elif args.command == "release-audit":
+        release_audit(config, args.game)
+    elif args.command == "export-smoke":
+        export_smoke(config, args.game)
     elif args.command == "export":
         export(config, args.game)
     elif args.command == "playtest":

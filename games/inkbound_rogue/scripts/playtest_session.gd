@@ -41,12 +41,18 @@ var survey_data: Dictionary = {}
 var last_game_snapshot: Dictionary = {}
 var pending_event_lines := 0
 var last_event_flush_msec := 0
+var boot_smoke_frame := -1
+var boot_smoke_attached := false
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_process(false)
 	set_process_unhandled_input(false)
+	if OS.get_environment("INKBOUND_BOOT_SMOKE") == "1":
+		boot_smoke_frame = 0
+		set_process(true)
+		return
 	if OS.get_environment("INKBOUND_PLAYTEST") == "1":
 		start_session({
 			"session_id": OS.get_environment("INKBOUND_PLAYTEST_SESSION"),
@@ -107,6 +113,10 @@ func start_session(options: Dictionary = {}) -> bool:
 
 
 func attach_game(game: Node) -> void:
+	if boot_smoke_frame >= 0 and is_instance_valid(game):
+		game_ref = weakref(game)
+		boot_smoke_attached = true
+		return
 	if not enabled or not is_instance_valid(game):
 		return
 	game_ref = weakref(game)
@@ -210,6 +220,19 @@ func debug_sample_now() -> void:
 
 
 func _process(delta: float) -> void:
+	if boot_smoke_frame >= 0:
+		if not boot_smoke_attached or not is_instance_valid(_game()):
+			return
+		boot_smoke_frame += 1
+		if boot_smoke_frame >= 120:
+			print("INKBOUND_EXPORTED_BOOT_OK version=%s renderer=%s frames=%d" % [
+				str(ProjectSettings.get_setting("application/config/version", "unknown")),
+				RenderingServer.get_video_adapter_name().left(120),
+				boot_smoke_frame,
+			])
+			boot_smoke_frame = -1
+			get_tree().quit(0)
+		return
 	if not enabled or finished:
 		return
 	frame_count += 1

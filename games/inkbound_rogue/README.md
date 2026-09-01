@@ -238,7 +238,14 @@ The Windows host workflow exposes the same gates through `host_game.py test`,
 `host_game.py cutscene-test`, `host_game.py manual-test`, `host_game.py localization-test`, `host_game.py cast-test`,
 `host_game.py audio-test`, `host_game.py combat-feel-test`, `host_game.py accessibility-test`, `host_game.py restoration-test`, `host_game.py proof-test`,
 `host_game.py daily-test`, `host_game.py persona-test`, `host_game.py routes`,
-`host_game.py playtest-recorder-test`, and `host_game.py soak`.
+`host_game.py playtest-recorder-test`, `host_game.py soak`, and
+`host_game.py recorded-soak`. `host_game.py release-audit` verifies complete
+asset provenance and, when present, the isolated three-file depot.
+All host-side timeouts escalate from termination to forced recovery after ten
+seconds so a failed Godot test cannot linger indefinitely. `host_game.py
+process-status` reports every game/Godot process with elapsed time, CPU, memory,
+and command line; `host_game.py cleanup-tests` terminates only this project's
+`res://tests/` processes and never matches an editor or exported game.
 `host_game.py capture-session` renders a ten-frame title, Armory, Story Archive,
 Save & Return, recovery/AOE, technique, relic-draft, Ink Art, Directive, and
 route-hazard readability gallery.
@@ -260,6 +267,12 @@ state across frozen frames, including background controller rejection, instead
 of only checking menu visibility. Release metadata, legal notices, version identity,
 and inert Steam depot templates live under `release/`; real App/Depot IDs are
 never stored in the repository.
+
+`asset-manifest.json` schema 3 integrity-hashes all 68 player-consumed PNG/WAV
+assets and distinguishes 59 deterministic procedural outputs from nine
+pre-generated AI-assisted images. `release/ai-content-disclosure.md` keeps the
+Steam survey draft and unresolved publisher sign-offs explicit; the shipped
+game performs no live AI generation.
 
 ## Local playtest recording
 

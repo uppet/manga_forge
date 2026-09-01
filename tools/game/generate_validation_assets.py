@@ -19,14 +19,35 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 GAME_ROOT = REPO_ROOT / "games" / "inkbound_rogue"
 IMAGE_ROOT = GAME_ROOT / "assets" / "generated"
 AUDIO_ROOT = GAME_ROOT / "assets" / "audio"
-CURATED_ASSETS = {
+AI_ASSISTED_ASSETS = {
     GAME_ROOT / "assets" / "characters" / "combat-cast-atlas-v1.png": {
         "id": "combat-cast-atlas-v1",
-        "origin": "project-directed-openai-image-tools",
+        "provenance_record": "games/inkbound_rogue/assets/characters/combat-cast-atlas-v1.provenance.md",
+        "prompt_record_status": "not-retained",
+        "derivation": "original combat-cast atlas",
     },
     GAME_ROOT / "assets" / "characters" / "nara-slash-atlas-v1.png": {
         "id": "nara-slash-atlas-v1",
-        "origin": "project-directed-openai-image-tools",
+        "provenance_record": "games/inkbound_rogue/assets/characters/nara-slash-atlas-v1.prompt.md",
+        "prompt_record_status": "complete",
+        "derivation": "identity-reference edit from combat-cast-atlas-v1",
+    },
+    **{
+        GAME_ROOT / "assets" / "cutscenes" / filename: {
+            "id": Path(filename).stem,
+            "provenance_record": "games/inkbound_rogue/assets/cutscenes/README.md",
+            "prompt_record_status": "shared-constraints-only",
+            "derivation": "project-directed narrative illustration",
+        }
+        for filename in (
+            "prologue.png",
+            "act1-mask-memory-v2.png",
+            "revelation.png",
+            "finale.png",
+            "ending-choice-v2.png",
+            "ending-keep-v2.png",
+            "ending-rewrite-v2.png",
+        )
     },
 }
 
@@ -790,47 +811,69 @@ def main() -> int:
     assets = build_assets()
     stale: list[str] = []
     for path, data in assets.items():
-        if not path.exists() or path.read_bytes() != data:
+        changed = not path.exists() or path.read_bytes() != data
+        if changed:
             stale.append(str(path.relative_to(REPO_ROOT)))
-        if not args.check:
+        if not args.check and changed:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
 
     curated_payloads: dict[Path, bytes] = {}
-    for path in CURATED_ASSETS:
+    for path in AI_ASSISTED_ASSETS:
         if not path.exists():
             stale.append(str(path.relative_to(REPO_ROOT)))
             continue
         curated_payloads[path] = path.read_bytes()
 
     manifest = {
-        "schema_version": 2,
+        "schema_version": 3,
         "generator": "tools/game/generate_validation_assets.py",
-        "license": "project-original",
+        "purpose": "Per-asset provenance and integrity inventory; not legal advice.",
+        "asset_count": len(assets) + len(curated_payloads),
         "assets": [
             {
-                "id": path.stem.replace("_", "-"),
+                "id": ("audio-" if path.suffix == ".wav" else "sprite-") + path.stem.replace("_", "-"),
                 "runtime_path": "res://" + path.relative_to(GAME_ROOT).as_posix(),
                 "sha256": hashlib.sha256(data).hexdigest(),
-                "origin": "deterministic-manga-forge",
+                "media_type": "audio" if path.suffix == ".wav" else "image",
+                "origin": "manga-forge-source-code",
+                "creation_method": "deterministic-procedural-generation",
+                "generative_ai": False,
+                "live_generation": False,
+                "provenance_record": "tools/game/generate_validation_assets.py",
+                "prompt_record_status": "not-applicable",
+                "derivation": "reproducible bytes generated from committed Python source",
+                "human_review_status": "runtime-and-regression-reviewed",
+                "rights_review_status": "project-authored-source",
             }
             for path, data in sorted(assets.items(), key=lambda item: str(item[0]))
         ]
         + [
             {
-                "id": CURATED_ASSETS[path]["id"],
+                "id": AI_ASSISTED_ASSETS[path]["id"],
                 "runtime_path": "res://" + path.relative_to(GAME_ROOT).as_posix(),
                 "sha256": hashlib.sha256(data).hexdigest(),
-                "origin": CURATED_ASSETS[path]["origin"],
+                "media_type": "image",
+                "origin": "openai-image-generation",
+                "creation_method": "pre-generated-ai-assisted",
+                "generative_ai": True,
+                "live_generation": False,
+                "provenance_record": AI_ASSISTED_ASSETS[path]["provenance_record"],
+                "prompt_record_status": AI_ASSISTED_ASSETS[path]["prompt_record_status"],
+                "derivation": AI_ASSISTED_ASSETS[path]["derivation"],
+                "human_review_status": "runtime-and-capture-reviewed",
+                "rights_review_status": "publisher-confirmation-required-before-commercial-release",
+                "source_commit": "33f8315",
             }
             for path, data in sorted(curated_payloads.items(), key=lambda item: str(item[0]))
         ],
     }
     manifest_path = GAME_ROOT / "asset-manifest.json"
     manifest_data = (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode()
-    if not manifest_path.exists() or manifest_path.read_bytes() != manifest_data:
+    manifest_changed = not manifest_path.exists() or manifest_path.read_bytes() != manifest_data
+    if manifest_changed:
         stale.append(str(manifest_path.relative_to(REPO_ROOT)))
-    if not args.check:
+    if not args.check and manifest_changed:
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_bytes(manifest_data)
 

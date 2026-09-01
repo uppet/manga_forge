@@ -3,7 +3,8 @@ extends SceneTree
 const Content = preload("res://scripts/content_db.gd")
 const TARGET_FRAMES := 1200
 const MAX_STRESS_ENEMIES := 72
-const MAX_SCENE_NODES := 1400
+const MAX_SCENE_NODES := 1000
+const MAX_STATIC_MEMORY_BYTES := 256.0 * 1024.0 * 1024.0
 const MIN_AVERAGE_FPS := 90.0
 
 var game: Node
@@ -23,6 +24,11 @@ func _initialize() -> void:
 		_fail("main scene did not load")
 		return
 	game = packed.instantiate()
+	if game.get_script() == null:
+		game.free()
+		game = null
+		_fail("main game script did not compile")
+		return
 	game.test_mode = true
 	game.debug_set_save_namespace("soak_test")
 	game.debug_clear_save_files()
@@ -150,8 +156,8 @@ func _finish() -> void:
 	if peak_nodes > MAX_SCENE_NODES:
 		_fail("scene node population exceeded the soak budget: %d" % peak_nodes)
 		return
-	if peak_memory_bytes > 1024.0 * 1024.0 * 1024.0:
-		_fail("static memory exceeded 1 GiB")
+	if peak_memory_bytes > MAX_STATIC_MEMORY_BYTES:
+		_fail("static memory exceeded the 256 MiB P1 budget")
 		return
 	if average_fps < MIN_AVERAGE_FPS:
 		_fail("average processing rate fell below %.0f fps: %.1f" % [MIN_AVERAGE_FPS, average_fps])

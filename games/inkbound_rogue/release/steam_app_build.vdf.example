@@ -1,7 +1,7 @@
 "appbuild"
 {
     "appid" "REPLACE_WITH_STEAM_APP_ID"
-    "desc" "Inkbound 0.22.1-alpha Windows playtest"
+    "desc" "Inkbound 0.23.0-alpha Windows playtest"
     "buildoutput" "..\\build\\steam-output"
     "contentroot" "..\\build\\steam-depot"
     "setlive" ""

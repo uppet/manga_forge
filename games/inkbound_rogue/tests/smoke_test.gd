@@ -464,6 +464,27 @@ func _run_smoke_test() -> void:
 	if not FileAccess.file_exists("res://asset-manifest.json"):
 		_fail("generated asset manifest is missing")
 		return
+	var manifest_file := FileAccess.open("res://asset-manifest.json", FileAccess.READ)
+	var manifest_data = JSON.parse_string(manifest_file.get_as_text()) if manifest_file != null else null
+	if not (manifest_data is Dictionary) or int(manifest_data.get("schema_version", 0)) != 3 or int(manifest_data.get("asset_count", 0)) != 68:
+		_fail("asset provenance manifest identity or coverage count drifted")
+		return
+	var ai_asset_count := 0
+	var live_ai_asset_count := 0
+	for asset_value in manifest_data.get("assets", []):
+		if not (asset_value is Dictionary):
+			_fail("asset provenance manifest contains a malformed entry")
+			return
+		var asset_entry: Dictionary = asset_value
+		for field in ["runtime_path", "sha256", "creation_method", "generative_ai", "live_generation", "provenance_record", "rights_review_status"]:
+			if not asset_entry.has(field) or str(asset_entry[field]).is_empty():
+				_fail("asset provenance entry lacks " + field)
+				return
+		ai_asset_count += 1 if asset_entry.get("generative_ai", false) == true else 0
+		live_ai_asset_count += 1 if asset_entry.get("live_generation", false) == true else 0
+	if ai_asset_count != 9 or live_ai_asset_count != 0:
+		_fail("pre-generated/live AI asset inventory drifted")
+		return
 	for runtime_asset in [
 		"res://assets/audio/music_archive.wav",
 		"res://assets/audio/music_bindery.wav",
