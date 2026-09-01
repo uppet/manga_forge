@@ -34,7 +34,11 @@ var level_label: Label
 var wave_label: Label
 var score_label: Label
 var dash_label: Label
+var ink_art_panel: ColorRect
 var ink_art_label: Label
+var ink_art_state_label: Label
+var ink_art_bar: ColorRect
+var ink_art_bar_fill: ColorRect
 var ink_art_name := "PALIMPSEST RING"
 var ink_art_source_name := "PALIMPSEST RING"
 var ink_art_remaining := 0.0
@@ -74,6 +78,7 @@ var relic_draft_visible := false
 var game_over_visible := false
 var using_gamepad := false
 var input_enabled := true
+var ui_gamepad_latches: Dictionary = {}
 var current_choices: Array[Dictionary] = []
 var current_relic_choices: Array[Dictionary] = []
 var shard_label: Label
@@ -86,8 +91,10 @@ var objective_source := ""
 var build_source := ""
 var directive_source: Dictionary = {}
 var last_result_summary: Dictionary = {}
-var boss_bar: ProgressBar
+var boss_bar: ColorRect
+var boss_bar_fill: ColorRect
 var boss_label: Label
+var boss_panel: ColorRect
 var directive_panel: ColorRect
 var directive_title: RichTextLabel
 var directive_progress: RichTextLabel
@@ -230,6 +237,28 @@ const REBIND_ACTIONS := [
 	["options", "OPTIONS"],
 ]
 
+const UI_GAMEPAD_ACTIONS := [
+	"move_up",
+	"move_down",
+	"move_left",
+	"move_right",
+	"attack",
+	"dash",
+	"pause",
+	"options",
+	"manual",
+	"restoration",
+	"proof_ledger",
+	"daily_chronicle",
+	"contract_prev",
+	"contract_next",
+	"restart",
+	"upgrade_1",
+	"upgrade_2",
+	"upgrade_3",
+	"upgrade_4",
+]
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -280,6 +309,21 @@ func _emit_input_ui_sound(event: InputEvent) -> void:
 		ui_sound_requested.emit("ui_confirm")
 
 
+func _consume_repeated_gamepad_ui_event(event: InputEvent) -> bool:
+	if not (event is InputEventJoypadButton or event is InputEventJoypadMotion):
+		return false
+	var repeated := false
+	for action in UI_GAMEPAD_ACTIONS:
+		if event.is_action_released(action):
+			ui_gamepad_latches.erase(action)
+		elif event.is_action_pressed(action):
+			if bool(ui_gamepad_latches.get(action, false)):
+				repeated = true
+			else:
+				ui_gamepad_latches[action] = true
+	return repeated
+
+
 func _build_hud() -> void:
 	var frame := ColorRect.new()
 	frame.position = Vector2(4, 4)
@@ -307,13 +351,56 @@ func _build_hud() -> void:
 	relic_label = _make_label("RELICS —", Vector2(12, 231), Vector2(225, 13), 8, GOLD)
 	build_label = _make_label("MARGINALIA", Vector2(243, 231), Vector2(225, 13), 8, PAPER)
 	build_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	ink_art_label = _make_label("E  PALIMPSEST RING  READY", Vector2(185, 216), Vector2(280, 13), 8, GOLD)
-	ink_art_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	boss_bar = _make_bar(Vector2(140, 63), Vector2(200, 7), CRIMSON)
-	boss_label = _make_label("", Vector2(140, 48), Vector2(200, 14), 9, WHITE)
-	boss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	boss_bar.visible = false
-	boss_label.visible = false
+	ink_art_panel = ColorRect.new()
+	ink_art_panel.position = Vector2(300, 201)
+	ink_art_panel.size = Vector2(168, 29)
+	ink_art_panel.color = Color(0.025, 0.02, 0.03, 0.92)
+	ink_art_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(ink_art_panel)
+	ink_art_label = _make_child_label(ink_art_panel, "E  ART · PALIMPSEST RING", Vector2(6, 0), Vector2(156, 13), 7, GOLD)
+	ink_art_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	ink_art_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	ink_art_label.clip_text = true
+	ink_art_state_label = _make_child_label(ink_art_panel, "READY", Vector2(6, 11), Vector2(156, 10), 6, GOLD)
+	ink_art_state_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	ink_art_state_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	ink_art_state_label.clip_text = true
+	ink_art_bar = ColorRect.new()
+	ink_art_bar.position = Vector2(6, 23)
+	ink_art_bar.size = Vector2(156, 3)
+	ink_art_bar.color = Color(0.12, 0.1, 0.13, 1)
+	ink_art_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ink_art_panel.add_child(ink_art_bar)
+	ink_art_bar_fill = ColorRect.new()
+	ink_art_bar_fill.size = ink_art_bar.size
+	ink_art_bar_fill.color = GOLD
+	ink_art_bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ink_art_bar.add_child(ink_art_bar_fill)
+
+	# Boss information belongs at the upper-right edge instead of floating across
+	# the centre of the playfield. This keeps telegraphs and the player readable.
+	boss_panel = ColorRect.new()
+	boss_panel.position = Vector2(334, 58)
+	boss_panel.size = Vector2(134, 27)
+	boss_panel.color = Color(0.025, 0.02, 0.03, 0.94)
+	boss_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	boss_panel.visible = false
+	add_child(boss_panel)
+	boss_label = _make_child_label(boss_panel, "", Vector2(5, 1), Vector2(124, 13), 7, WHITE)
+	boss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	boss_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	boss_label.clip_text = true
+	boss_bar = ColorRect.new()
+	boss_bar.position = Vector2(5, 17)
+	boss_bar.size = Vector2(124, 5)
+	boss_bar.color = Color(0.12, 0.1, 0.13, 1)
+	boss_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	boss_panel.add_child(boss_bar)
+	boss_bar_fill = ColorRect.new()
+	boss_bar_fill.size = boss_bar.size
+	boss_bar_fill.color = CRIMSON
+	boss_bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	boss_bar.add_child(boss_bar_fill)
 
 	directive_panel = ColorRect.new()
 	directive_panel.position = Vector2(10, 51)
@@ -997,6 +1084,10 @@ func _build_bindings() -> void:
 
 
 func _make_bar(at: Vector2, bar_size: Vector2, fill: Color) -> ProgressBar:
+	return _make_child_bar(self, at, bar_size, fill)
+
+
+func _make_child_bar(parent: Node, at: Vector2, bar_size: Vector2, fill: Color) -> ProgressBar:
 	var bar := ProgressBar.new()
 	bar.position = at
 	bar.size = bar_size
@@ -1010,7 +1101,7 @@ func _make_bar(at: Vector2, bar_size: Vector2, fill: Color) -> ProgressBar:
 	foreground.bg_color = fill
 	bar.add_theme_stylebox_override("background", background)
 	bar.add_theme_stylebox_override("fill", foreground)
-	add_child(bar)
+	parent.add_child(bar)
 	return bar
 
 
@@ -1089,7 +1180,7 @@ func set_health(current: float, maximum: float) -> void:
 func set_xp(current: int, needed: int, level: int) -> void:
 	xp_bar.max_value = needed
 	xp_bar.value = current
-	level_label.text = "LV %d" % level
+	level_label.text = ("等级 %d" if TranslationServer.get_locale().begins_with("zh") else "LV %d") % level
 
 
 func set_run_stats(wave: int, score: int, dash_ready: bool) -> void:
@@ -1106,12 +1197,17 @@ func set_ink_art(art_name_value: String, remaining: float, maximum: float) -> vo
 	ink_art_remaining = maxf(0.0, remaining)
 	ink_art_maximum = maxf(0.1, maximum)
 	var prompt := "B/○" if using_gamepad else "E"
+	var chinese := TranslationServer.get_locale().begins_with("zh")
+	var charge_ratio := clampf((ink_art_maximum - ink_art_remaining) / ink_art_maximum, 0.0, 1.0)
+	ink_art_bar_fill.size.x = ink_art_bar.size.x * charge_ratio
+	ink_art_label.text = ("%s  墨术 · %s" if chinese else "%s  ART · %s") % [prompt, ink_art_name]
 	if ink_art_remaining <= 0.01:
-		ink_art_label.text = "%s  %s  %s" % [prompt, ink_art_name, Localization.text("READY")]
-		ink_art_label.modulate = GOLD
+		ink_art_state_label.text = Localization.text("READY")
+		ink_art_state_label.modulate = GOLD
 	else:
-		ink_art_label.text = "%s  %s  %.1fS" % [prompt, ink_art_name, ink_art_remaining]
-		ink_art_label.modulate = Color(0.58, 0.55, 0.52, 1)
+		var charge_percent := int(round(charge_ratio * 100.0))
+		ink_art_state_label.text = ("冷却 %.1f 秒 · %d%%" if chinese else "COOLDOWN %.1fs · %d%%") % [ink_art_remaining, charge_percent]
+		ink_art_state_label.modulate = Color(0.72, 0.68, 0.62, 1)
 
 
 func show_upgrade(choices: Array[Dictionary]) -> void:
@@ -1426,6 +1522,8 @@ func set_input_mode(gamepad_active: bool) -> void:
 
 func set_input_enabled(enabled: bool) -> void:
 	input_enabled = enabled
+	if not enabled:
+		ui_gamepad_latches.clear()
 	if title_visible:
 		_refresh_daily_chronicle()
 
@@ -1447,7 +1545,7 @@ func set_relics(relic_ids: Array[String]) -> void:
 
 func set_objective(text_value: String) -> void:
 	objective_source = text_value
-	objective_label.text = Localization.text(text_value).to_upper()
+	objective_label.text = Localization.gameplay_text(text_value).to_upper()
 
 
 func set_page_directive(title: String, kind: String, current: float, target: float, reward_text: String, completed: bool = false, occupied: bool = false) -> void:
@@ -1506,13 +1604,11 @@ func _localized_build_summary(summary: String) -> String:
 
 func set_boss(name: String, current: float, maximum: float) -> void:
 	var visible_now := not name.is_empty() and maximum > 0.0
-	boss_bar.visible = visible_now
-	boss_label.visible = visible_now
+	boss_panel.visible = visible_now
 	if not visible_now:
 		return
-	boss_bar.max_value = maximum
-	boss_bar.value = current
-	boss_label.text = name.to_upper()
+	boss_bar_fill.size.x = boss_bar.size.x * clampf(current / maximum, 0.0, 1.0)
+	boss_label.text = Localization.text(name).to_upper()
 
 
 func show_title(meta: Dictionary) -> void:
@@ -2451,6 +2547,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not input_enabled:
 		return
 	if event is InputEventKey and event.echo:
+		return
+	# Analogue triggers and sticks emit motion repeatedly while held. UI actions
+	# are edge-triggered here and re-arm only after the physical control returns
+	# to neutral, preventing story/pause panels and selections from oscillating.
+	if _consume_repeated_gamepad_ui_event(event):
 		return
 	_emit_input_ui_sound(event)
 	if bindings_visible:

@@ -41,7 +41,7 @@ func _ready() -> void:
 	add_child(sprite)
 	if pickup_kind in ["bomb", "heal"]:
 		callout = Label.new()
-		callout.text = Localization.text("AOE") if pickup_kind == "bomb" else "+HP"
+		callout.text = Localization.text("AOE" if pickup_kind == "bomb" else "+HP")
 		callout.theme = Localization.ui_theme()
 		callout.position = Vector2(-16, -25)
 		callout.size = Vector2(32, 12)

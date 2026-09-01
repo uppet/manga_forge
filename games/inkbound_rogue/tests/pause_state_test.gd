@@ -88,6 +88,11 @@ func _advance_test(_delta: float) -> void:
 				if game.manually_paused or paused:
 					_fail("gamepad Start did not resume manual pause")
 					return
+				_send_pause_gamepad()
+				if game.manually_paused or paused:
+					_fail("held gamepad Start repeatedly toggled manual pause")
+					return
+				_send_pause_gamepad_release()
 				snapshot = _capture()
 				_next_phase()
 		2:
@@ -221,6 +226,13 @@ func _send_pause_gamepad() -> void:
 	var event := InputEventJoypadButton.new()
 	event.button_index = JOY_BUTTON_START
 	event.pressed = true
+	game.hud._unhandled_input(event)
+
+
+func _send_pause_gamepad_release() -> void:
+	var event := InputEventJoypadButton.new()
+	event.button_index = JOY_BUTTON_START
+	event.pressed = false
 	game.hud._unhandled_input(event)
 
 

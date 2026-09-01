@@ -1150,7 +1150,7 @@ func spawn_ink_art_line(from: Vector2, to: Vector2, color: Color) -> void:
 
 
 func spawn_word(at: Vector2, text_value: String, color: Color = PAPER) -> void:
-	var fx: ComicFX = FxScript.new().setup_word(at, Localization.text(text_value), color)
+	var fx: ComicFX = FxScript.new().setup_word(at, Localization.gameplay_text(text_value), color)
 	add_child(fx)
 
 
@@ -1417,11 +1417,20 @@ func _on_cutscene_finished(sequence_name: String) -> void:
 			else:
 				_offer_route(1)
 		"act1_reveal":
-			hud.set_objective("DAILY %s · Reach Page 8 and enter the Forbidden Bindery" % daily_id if daily_run else "PROOF %d · Reach Page 8 and enter the Forbidden Bindery" % proof_depth)
+			if TranslationServer.get_locale().begins_with("zh"):
+				hud.set_objective("每日 %s · 抵达第 8 页并进入禁忌装订所" % daily_id if daily_run else "校样 %d · 抵达第 8 页并进入禁忌装订所" % proof_depth)
+			else:
+				hud.set_objective("DAILY %s · Reach Page 8 and enter the Forbidden Bindery" % daily_id if daily_run else "PROOF %d · Reach Page 8 and enter the Forbidden Bindery" % proof_depth)
 		"act2_revelation":
-			hud.set_objective("DAILY %s · Reach Page 12 and face the First Author" % daily_id if daily_run else "PROOF %d · Reach Page 12 and face the First Author" % proof_depth)
+			if TranslationServer.get_locale().begins_with("zh"):
+				hud.set_objective("每日 %s · 抵达第 12 页并面对初代作者" % daily_id if daily_run else "校样 %d · 抵达第 12 页并面对初代作者" % proof_depth)
+			else:
+				hud.set_objective("DAILY %s · Reach Page 12 and face the First Author" % daily_id if daily_run else "PROOF %d · Reach Page 12 and face the First Author" % proof_depth)
 		"act3_confrontation":
-			hud.set_objective("DAILY %s · Defeat the First Author" % daily_id if daily_run else "PROOF %d · Defeat the First Author" % proof_depth)
+			if TranslationServer.get_locale().begins_with("zh"):
+				hud.set_objective("每日 %s · 击败初代作者" % daily_id if daily_run else "校样 %d · 击败初代作者" % proof_depth)
+			else:
+				hud.set_objective("DAILY %s · Defeat the First Author" % daily_id if daily_run else "PROOF %d · Defeat the First Author" % proof_depth)
 	if sequence_name == "act3_confrontation" and not pending_boss_kind.is_empty():
 		var boss_kind := pending_boss_kind
 		pending_boss_kind = ""

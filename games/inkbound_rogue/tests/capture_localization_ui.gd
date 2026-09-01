@@ -46,7 +46,19 @@ func _process(_delta: float) -> bool:
 	elif frames == 100:
 		if not _capture("inkbound-zh-story.png"):
 			return true
-		print("INKBOUND_LOCALIZATION_UI_OK locale=zh_CN captures=4 title=settings=upgrades=story font=system-fallback")
+		game.cutscene._hide()
+		paused = false
+		game.hud.set_input_mode(true)
+		game.hud.set_run_stats(4, 2180, true)
+		game.hud.set_objective("Reach Page 4 and confront the Red Editor")
+		game.hud.set_ink_art("PALIMPSEST RING", 3.6, 8.0)
+		game.hud.set_boss("THE RED EDITOR", 72.0, 100.0)
+		game.spawn_word(Vector2(0, -32), "RECOVERY DROP!", Color("fff8e0"))
+		paused = true
+	elif frames == 104:
+		if not _capture("inkbound-zh-combat-hud.png"):
+			return true
+		print("INKBOUND_LOCALIZATION_UI_OK locale=zh_CN captures=5 title=settings=upgrades=story=combat_hud font=system-fallback")
 		_cleanup(0)
 		return true
 	return false

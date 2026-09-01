@@ -1,6 +1,6 @@
 {
   "product": "Inkbound: Blade of the Blank Page",
-  "version": "0.22.0-alpha",
+  "version": "0.22.1-alpha",
   "save_schema": 12,
   "checkpoint_schema": 1,
   "platform": "windows-x86_64",

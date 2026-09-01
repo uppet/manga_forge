@@ -98,7 +98,11 @@ func _process(_delta: float) -> bool:
 			_prepare_route_hazard()
 		41:
 			_capture("inkbound-route-hazard.png")
-			print("INKBOUND_SESSION_CAPTURE_OK gallery=10 size=%dx%d" % [root.get_texture().get_width(), root.get_texture().get_height()])
+			paused = false
+			_prepare_boss_hud()
+		43:
+			_capture("inkbound-boss-hud.png")
+			print("INKBOUND_SESSION_CAPTURE_OK gallery=11 size=%dx%d" % [root.get_texture().get_width(), root.get_texture().get_height()])
 			paused = false
 			game.debug_clear_save_files()
 			game.free()
@@ -224,6 +228,34 @@ func _prepare_route_hazard() -> void:
 		enemy.speed = 0.0
 		enemy.contact_damage = 0.0
 	game.hud.set_objective("PRESS · TRIPLE VERDICT · READ ALL THREE STAMPS")
+	paused = true
+
+
+func _prepare_boss_hud() -> void:
+	game._expire_page_directive()
+	game.spawn_timer = 999.0
+	game.wave = 4
+	game.player.controls_enabled = false
+	game.player.global_position = Vector2(-62.0, 18.0)
+	game.hud.set_run_stats(4, 5210, true)
+	game.hud.set_objective("RED EDITOR · PAGE 4")
+	game.hud.set_ink_art("PALIMPSEST RING", 0.0, 8.0)
+	if is_instance_valid(game.route_hazard):
+		game.route_hazard.phase = "idle"
+		game.route_hazard.points.clear()
+		game.route_hazard.queue_redraw()
+	for enemy in get_nodes_in_group("enemies"):
+		if is_instance_valid(enemy) and enemy.get_parent() == game:
+			enemy.free()
+	for child in game.get_children():
+		if child.get_script() == ComicFXScript:
+			child.free()
+	var boss = game.debug_spawn_enemy("editor", Vector2(70.0, -2.0))
+	boss.max_health = 100.0
+	boss.health = 72.0
+	boss.speed = 0.0
+	boss.contact_damage = 0.0
+	game.hud.set_boss("THE RED EDITOR", boss.health, boss.max_health)
 	paused = true
 
 

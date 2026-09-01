@@ -108,10 +108,15 @@ func _run_smoke_test() -> void:
 	if not game.hud.can_process():
 		_fail("manual pause also disabled the always-responsive HUD")
 		return
+	var start_release := InputEventJoypadButton.new()
+	start_release.button_index = JOY_BUTTON_START
+	start_release.pressed = false
+	game.hud._unhandled_input(start_release)
 	game.hud._unhandled_input(start_event)
 	if game.manually_paused or paused:
 		_fail("Start did not resume the run")
 		return
+	game.hud._unhandled_input(start_release)
 	game.hud.show_manual(4)
 	if not game.manual_open or not game.hud.manual_visible or not paused or game.hud.FIELD_MANUAL_PAGES.size() != 5:
 		_fail("Field Manual did not enter its paused five-page modal state")

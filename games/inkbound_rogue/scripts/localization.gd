@@ -34,6 +34,13 @@ const ZH_CN := {
 	"EPIC": "史诗",
 	"LEGENDARY": "传说",
 	"CURRENT DRAFT": "当前构筑",
+	"DRAFT": "草稿",
+	"CHAPTER": "章节",
+	"TECHNIQUE": "技巧",
+	"Choose a stroke to continue.": "选择一笔以继续。",
+	"RELIC": "遗物",
+	"Choose a memory to bind into this draft.": "选择一段记忆装订进本局草稿。",
+	"RUN RELIC": "本局遗物",
 	"RESONANT": "共鸣",
 	"AWAKENS": "即将觉醒",
 	"BUILD AWAKENED": "构筑觉醒",
@@ -65,6 +72,17 @@ const ZH_CN := {
 	"DASH": "冲刺",
 	"INK ART": "墨术",
 	"PAUSE": "暂停",
+	"ART": "墨术",
+	"COOLDOWN": "冷却",
+	"INK": "墨迹",
+	"ELITES": "精英",
+	"HOLD": "坚守",
+	"ENTER": "进入",
+	"MASKS": "面具",
+	"REWARD": "奖励",
+	"ORDER FULFILLED": "指令已完成",
+	"AOE": "范围",
+	"+HP": "回血",
 	"MAKE THE FINAL MARK": "落下最后一笔",
 	"FIELD NOTES": "战地手记",
 	"THE FIRST CUT": "第一刀",
@@ -231,6 +249,7 @@ const ZH_CN := {
 	"Standing still briefly grants a damage aura": "短暂站立不动可获得伤害光环",
 	"THE FIRST DRAFT": "初稿",
 	"+0.5 damage and +5% critical chance": "+0.5 伤害，+5% 暴击率",
+	"+0.5 damage and +5% critical chance.": "+0.5 伤害，+5% 暴击率。",
 
 	# Weapons, routes and hazards.
 	"MARGINALIA BLADE": "页边之刃",
@@ -692,6 +711,40 @@ const ZH_CN := {
 	"WHISPER ANSWERS · WARD +1": "低语回应 · 护盾 +1",
 	"WHITE REVISION · RECOVER +2": "纯白修订 · 恢复 +2",
 	"FIELD RELIC · CHOOSE ONE MEMORY": "战地遗物 · 选择一段记忆",
+	"PANEL PAUSED\nESC TO CONTINUE": "战场已暂停\n按 ESC 继续",
+	"WASD MOVE  ·  MOUSE/J SLASH  ·  SPACE/K DASH  ·  E ART  ·  ESC PAUSE": "WASD 移动  ·  鼠标/J 斩击  ·  空格/K 冲刺  ·  E 墨术  ·  ESC 暂停",
+	"RELICS —": "遗物 —",
+	"↑↓ SELECT  ·  A/ENTER PLAY  ·  RT/ESC CLOSE": "↑↓ 选择  ·  A/回车 播放  ·  RT/ESC 关闭",
+	"Reach Page 4 and confront the Red Editor": "抵达第 4 页并迎战赤红编辑",
+	"DIRECTIVE COMPLETE!": "指令完成！",
+	"MISPRINT!": "错印！",
+	"RECOVERY DROP!": "恢复品掉落！",
+	"AOE: INK BOMB!": "范围道具：墨爆弹！",
+	"REDACTED!": "已删改！",
+	"ALL MARGINS CALL!": "页边尽数归来！",
+	"RED FRENZY!": "赤红狂热！",
+	"TIME REDACTED!": "时间已删改！",
+	"ECHO!": "回响！",
+	"INK+": "墨迹+",
+	"THE END?": "终章？",
+	"PERIOD!": "句点！",
+	"ZIP!": "咻！",
+	"ERRATA...": "勘误……",
+	"BEHIND YOU!": "身后！",
+	"SCRIBE!": "缮写！",
+	"SEAL!": "封印！",
+	"SPILL!": "泼墨！",
+	"BIND!": "装订！",
+	"REVISE!": "修订！",
+	"EDIT!": "编辑！",
+	"APPEND!": "追加！",
+	"CRIT!": "暴击！",
+	"KRAK!": "咔嚓！",
+	"PARRY!": "格挡！",
+	"SHIELD BROKEN!": "护盾破碎！",
+	"CENSORED!": "已审查！",
+	"SPLAT!": "啪！",
+	"BOOM!": "轰！",
 }
 
 static var _registered := false
@@ -726,6 +779,28 @@ static func apply_language(language_setting: String) -> String:
 
 static func text(source: Variant) -> String:
 	return TranslationServer.translate(str(source))
+
+
+static func gameplay_text(source: Variant) -> String:
+	var source_text := str(source)
+	var translated := text(source_text)
+	if translated != source_text or not TranslationServer.get_locale().begins_with("zh"):
+		return translated
+	if source_text.begins_with("PAGE ") and source_text.trim_prefix("PAGE ").is_valid_int():
+		return "第 %s 页" % source_text.trim_prefix("PAGE ")
+	if source_text.begins_with("MEMORY +"):
+		return "记忆 +%s" % source_text.trim_prefix("MEMORY +")
+	if source_text.begins_with("INK BOMB!  "):
+		return "墨爆弹！  %s" % source_text.trim_prefix("INK BOMB!  ")
+	if source_text.begins_with("RESTORE ") and source_text.ends_with("!"):
+		return "修复 %s！" % source_text.trim_prefix("RESTORE ").trim_suffix("!")
+	var hit_marker := source_text.rfind("!  ")
+	if hit_marker > 0:
+		var title := source_text.left(hit_marker)
+		var localized_title := text(title)
+		if localized_title != title:
+			return "%s！  %s" % [localized_title, source_text.substr(hit_marker + 3)]
+	return source_text
 
 
 static func format(source: String, values: Array) -> String:
