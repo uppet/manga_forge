@@ -240,7 +240,8 @@ The Windows host workflow exposes the same gates through `host_game.py test`,
 `host_game.py daily-test`, `host_game.py persona-test`, `host_game.py routes`,
 `host_game.py playtest-recorder-test`, `host_game.py soak`, and
 `host_game.py recorded-soak`. `host_game.py release-audit` verifies complete
-asset provenance and, when present, the isolated three-file depot.
+asset provenance and, when present, the isolated three-file Steam depot and
+four-file itch.io recorded-playtest bundle.
 All host-side timeouts escalate from termination to forced recovery after ten
 seconds so a failed Godot test cannot linger indefinitely. `host_game.py
 process-status` reports every game/Godot process with elapsed time, CPU, memory,
@@ -300,6 +301,8 @@ Start-Recorded-Playtest.cmd P-001 "D:\\InkboundPlaytestLogs"
 
 The launcher scopes all environment variables to itself and the child game; it
 does not modify the user's persistent Windows environment.
+The audited upload-ready bundle is `build/itch-windows/`; do not distribute the
+working `build/windows/` directory because it may retain internal captures.
 
 During play, `F6` marks a bug, `F7` a confusing moment, `F8` an unfair moment,
 and `F9` a highlight. A mark stores the previous 30 seconds of gameplay events,

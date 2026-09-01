@@ -15,6 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_GAME_ROOT = REPO_ROOT / "games" / "inkbound_rogue"
 RUNTIME_SUFFIXES = {".png", ".wav"}
 DEPOT_ALLOWLIST = {"InkboundRogue.exe", "THIRD_PARTY_NOTICES.txt", "version.json"}
+ITCH_ALLOWLIST = DEPOT_ALLOWLIST | {"Start-Recorded-Playtest.cmd"}
 REQUIRED_ASSET_FIELDS = {
     "id",
     "runtime_path",
@@ -210,10 +211,44 @@ def audit_depot(depot_root: Path, expected_version: str) -> tuple[list[str], dic
     return errors, summary
 
 
+def audit_itch_bundle(itch_root: Path, expected_version: str) -> tuple[list[str], dict[str, Any]]:
+    errors: list[str] = []
+    if not itch_root.is_dir():
+        return [f"itch bundle directory does not exist: {itch_root}"], {}
+    itch_files = {path.name for path in itch_root.iterdir() if path.is_file()}
+    itch_dirs = [path.name for path in itch_root.iterdir() if path.is_dir()]
+    if itch_files != ITCH_ALLOWLIST or itch_dirs:
+        errors.append(
+            "isolated itch bundle contents differ from allowlist: "
+            f"files={sorted(itch_files)} dirs={sorted(itch_dirs)}"
+        )
+    for name in ITCH_ALLOWLIST:
+        path = itch_root / name
+        if not path.is_file() or path.stat().st_size <= 0:
+            errors.append(f"itch payload is missing or empty: {name}")
+    executable = itch_root / "InkboundRogue.exe"
+    if executable.is_file():
+        with executable.open("rb") as handle:
+            if handle.read(2) != b"MZ":
+                errors.append("itch executable does not have a Windows PE signature")
+    itch_version = _read_json(itch_root / "version.json", errors)
+    if itch_version.get("version") != expected_version:
+        errors.append("itch version.json does not match source release identity")
+    launcher = itch_root / "Start-Recorded-Playtest.cmd"
+    if launcher.is_file() and b"\r\n" not in launcher.read_bytes():
+        errors.append("itch recorded-playtest launcher does not use Windows CRLF lines")
+    summary = {
+        "itch_files": len(itch_files),
+        "itch_bytes": sum((itch_root / name).stat().st_size for name in itch_files),
+    }
+    return errors, summary
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--game-root", type=Path, default=DEFAULT_GAME_ROOT)
     parser.add_argument("--depot-root", type=Path)
+    parser.add_argument("--itch-root", type=Path)
     args = parser.parse_args()
     game_root = args.game_root.resolve()
     errors, summary = audit_source(REPO_ROOT, game_root)
@@ -221,6 +256,10 @@ def main() -> int:
         depot_errors, depot_summary = audit_depot(args.depot_root.resolve(), str(summary.get("version", "")))
         errors.extend(depot_errors)
         summary.update(depot_summary)
+    if args.itch_root is not None:
+        itch_errors, itch_summary = audit_itch_bundle(args.itch_root.resolve(), str(summary.get("version", "")))
+        errors.extend(itch_errors)
+        summary.update(itch_summary)
     if errors:
         print("INKBOUND_RELEASE_AUDIT_FAIL")
         for error in errors:

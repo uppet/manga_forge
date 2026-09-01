@@ -582,6 +582,13 @@ cp \"$GAME/release/THIRD_PARTY_NOTICES.txt\" \"$GAME/build/windows/THIRD_PARTY_N
 cp \"$GAME/release/version.json\" \"$GAME/build/windows/version.json\"
 cp \"$GAME/release/Start-Recorded-Playtest.cmd\" \"$GAME/build/windows/Start-Recorded-Playtest.cmd\"
 test \"$(tr -cd '\\r' < \"$GAME/build/windows/Start-Recorded-Playtest.cmd\" | wc -c)\" -gt 20
+ITCH=\"$GAME/build/itch-windows\"
+mkdir -p \"$ITCH\"
+cp \"$GAME/build/windows/InkboundRogue.exe\" \"$ITCH/InkboundRogue.exe\"
+cp \"$GAME/build/windows/THIRD_PARTY_NOTICES.txt\" \"$ITCH/THIRD_PARTY_NOTICES.txt\"
+cp \"$GAME/build/windows/version.json\" \"$ITCH/version.json\"
+cp \"$GAME/build/windows/Start-Recorded-Playtest.cmd\" \"$ITCH/Start-Recorded-Playtest.cmd\"
+test \"$(find \"$ITCH\" -mindepth 1 -maxdepth 1 | wc -l)\" -eq 4
 DEPOT=\"$GAME/build/steam-depot\"
 mkdir -p \"$DEPOT\"
 rm -f \"$DEPOT/InkboundRogue.exe\" \"$DEPOT/THIRD_PARTY_NOTICES.txt\" \"$DEPOT/version.json\"
@@ -597,6 +604,7 @@ test "$BOOT_STATUS" -eq 0
 """
     remote(config, command, 1200)
     depot_root = Path(config["wsl_runtime_root"]) / "games" / game / "build" / "steam-depot"
+    itch_root = Path(config["wsl_runtime_root"]) / "games" / game / "build" / "itch-windows"
     subprocess.run(
         [
             sys.executable,
@@ -605,6 +613,8 @@ test "$BOOT_STATUS" -eq 0
             str(REPO_ROOT / "games" / game),
             "--depot-root",
             str(depot_root),
+            "--itch-root",
+            str(itch_root),
         ],
         check=True,
         cwd=REPO_ROOT,
@@ -618,6 +628,7 @@ def release_audit(config: dict[str, Any], game: str) -> None:
         cwd=REPO_ROOT,
     )
     depot_root = Path(config["wsl_runtime_root"]) / "games" / game / "build" / "steam-depot"
+    itch_root = Path(config["wsl_runtime_root"]) / "games" / game / "build" / "itch-windows"
     command = [
         sys.executable,
         str(REPO_ROOT / "tools" / "game" / "release_audit.py"),
@@ -626,6 +637,8 @@ def release_audit(config: dict[str, Any], game: str) -> None:
     ]
     if depot_root.is_dir():
         command.extend(["--depot-root", str(depot_root)])
+    if itch_root.is_dir():
+        command.extend(["--itch-root", str(itch_root)])
     subprocess.run(command, check=True, cwd=REPO_ROOT)
 
 
@@ -726,8 +739,8 @@ def recorded_launcher_test(config: dict[str, Any], game: str) -> None:
     command = f"""
 set -e
 GAME='{game_root}'
-LAUNCHER="$GAME/build/windows/Start-Recorded-Playtest.cmd"
-TARGET="$GAME/build/windows/InkboundRogue.exe"
+LAUNCHER="$GAME/build/itch-windows/Start-Recorded-Playtest.cmd"
+TARGET="$GAME/build/itch-windows/InkboundRogue.exe"
 RUN_ID=$(date -u +'%Y%m%dT%H%M%SZ')
 OUTPUT="$GAME/build/playtest/launcher-audit/$RUN_ID"
 test -s "$TARGET"

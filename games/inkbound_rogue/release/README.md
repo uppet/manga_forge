@@ -7,11 +7,13 @@ the exact Steam payload into the isolated `build/steam-depot/` directory:
 - `THIRD_PARTY_NOTICES.txt` — redistributable engine notice
 - `version.json` — product, build channel, and save-schema identity
 
-`build/windows/` additionally contains `Start-Recorded-Playtest.cmd`. Distribute
-that complete directory (or a ZIP of it) for itch.io P1 sessions so players can
-opt into local recording without configuring environment variables. The Steam
-depot intentionally excludes the launcher and remains restricted to the three
-files above.
+`build/itch-windows/` is the isolated four-file itch.io P1 payload: the three
+files above plus `Start-Recorded-Playtest.cmd`. Distribute that complete
+directory (or a ZIP of it) so players can opt into local recording without
+configuring environment variables. The working `build/windows/` directory may
+retain internal captures or historical executables and must not be uploaded.
+The Steam depot intentionally excludes the launcher and remains restricted to
+its three-file allowlist.
 
 Run `host_game.py recorded-launcher-test` after export. It drives the real CMD
 launcher and exported EXE through the 120-frame boot handshake, then requires a
