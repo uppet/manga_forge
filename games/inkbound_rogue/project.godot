@@ -1,0 +1,42 @@
+; Engine configuration file.
+; Edit through the Godot editor when possible.
+config_version=5
+
+[application]
+
+config/name="Inkbound: Blade of the Blank Page"
+config/description="A manga-pixel action roguelike about restoring the stories erased from the Grand Archive."
+config/version="0.22.0-alpha"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.2", "GL Compatibility")
+config/icon="res://assets/generated/icon.png"
+
+[display]
+
+window/size/viewport_width=480
+window/size/viewport_height=270
+window/size/window_width_override=960
+window/size/window_height_override=540
+window/stretch/mode="canvas_items"
+window/handheld/orientation=1
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+textures/canvas_textures/default_texture_filter=0
+2d/snap/snap_2d_transforms_to_pixel=true
+2d/snap/snap_2d_vertices_to_pixel=true
+environment/defaults/default_clear_color=Color(0.031, 0.027, 0.043, 1)
+
+[physics]
+
+common/physics_ticks_per_second=60
+
+[layer_names]
+
+2d_physics/layer_1="world"
+2d_physics/layer_2="player"
+2d_physics/layer_3="enemies"
+2d_physics/layer_4="hostile_projectiles"

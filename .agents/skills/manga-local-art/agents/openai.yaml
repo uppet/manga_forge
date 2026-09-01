@@ -1,0 +1,4 @@
+interface:
+  display_name: "Manga Local Art"
+  short_description: "Produce local manga game art on the Windows host"
+  default_prompt: "Use $manga-local-art to produce local manga-style game assets."

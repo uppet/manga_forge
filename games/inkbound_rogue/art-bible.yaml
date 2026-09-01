@@ -1,0 +1,37 @@
+schema_version: 2
+project_id: inkbound-rogue
+title: "Inkbound: Blade of the Blank Page"
+internal_resolution: [480, 270]
+pixel_grid: 16
+texture_filter: nearest
+palette:
+  deep_ink: "#08070B"
+  ink: "#141218"
+  paper: "#EFE2C4"
+  white: "#FFF8E0"
+  crimson: "#D33037"
+  dark_red: "#701820"
+  steel: "#96AAB0"
+  gold: "#F2B344"
+rules:
+  - "Reserve crimson for danger, Ink pickups, and impact emphasis."
+  - "Keep combat silhouettes readable at 32 logical pixels."
+  - "Use panel borders, halftones, speed lines, and short impact words."
+  - "Do not apply smoothing to pixel textures."
+  - "Generated replacements must retain pivot and collision metadata."
+combat_cast:
+  atlas: "res://assets/characters/combat-cast-atlas-v1.png"
+  layout: [4, 4]
+  cell_size: 313.5
+  source_size: [1254, 1254]
+  alpha: transparent
+  origin: project-directed-openai-image-tools
+  order:
+    - [player, mask, dasher, brute]
+    - [scribe, splitter, leech, warden]
+    - [censor, errata, archivist, blot]
+    - [duelist, editor, binder, author]
+  runtime_rules:
+    - "Use AtlasTexture regions with filter clipping; never allocate one texture per enemy instance."
+    - "Render ground shadows in each actor's draw pass to preserve the 1400-node stress budget."
+    - "Keep collisions and AI independent from visual scale and animation pose."

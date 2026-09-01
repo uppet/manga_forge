@@ -1,0 +1,4 @@
+interface:
+  display_name: "Manga Game Forge"
+  short_description: "Build, test, and ship manga-style Godot games"
+  default_prompt: "Use $manga-game-forge to build and validate a manga-style Godot game."

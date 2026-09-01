@@ -1,0 +1,373 @@
+{
+  "schema_version": 2,
+  "generator": "tools/game/generate_validation_assets.py",
+  "license": "project-original",
+  "assets": [
+    {
+      "id": "boss-down",
+      "runtime_path": "res://assets/audio/boss_down.wav",
+      "sha256": "155595a1440c051a2bfe48777ce665c640c3d4f2fbc4659813f82dff476deefd",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "boss-warning",
+      "runtime_path": "res://assets/audio/boss_warning.wav",
+      "sha256": "39610b1d4f3fac56456959a40fa7975316417aff826204cd5c867d25010a7c3d",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "dash",
+      "runtime_path": "res://assets/audio/dash.wav",
+      "sha256": "63363489443fa22ea33dfde84780beee86fc55478eff29dd7cdfdc701ee80c05",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "enemy-cast",
+      "runtime_path": "res://assets/audio/enemy_cast.wav",
+      "sha256": "e4df6c1d3645aa1455359aa6bc23c6db252c7be23f4af4e364ec429d5f96038f",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "enemy-dash",
+      "runtime_path": "res://assets/audio/enemy_dash.wav",
+      "sha256": "0019e9047c6dd0c9ed16200e6ea193443bc2ee077f8161011b4030e376c1faf0",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "heal",
+      "runtime_path": "res://assets/audio/heal.wav",
+      "sha256": "2b4232e45d45d4ed7ccc1b85b4354cd948014853938a23539294de865aed9eb3",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "hit",
+      "runtime_path": "res://assets/audio/hit.wav",
+      "sha256": "919e72910b2733b427a7695e5cd311aa3d80a7be5d7dff9d2dbe3f4ef73de61b",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "hurt",
+      "runtime_path": "res://assets/audio/hurt.wav",
+      "sha256": "93f5b4d3c184848ce130de12716265665a835a33488b3fab4a35aecdf35e97d6",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "ink-art",
+      "runtime_path": "res://assets/audio/ink_art.wav",
+      "sha256": "3dbacb111747dbc44613e1e71bf0017a78b7a5c16d5445d772161800a9cac5ba",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "ink-burst",
+      "runtime_path": "res://assets/audio/ink_burst.wav",
+      "sha256": "871e6f16849c969a9836db0fee37a9ec4ca66b88bdf5576fe14e59a815988c0b",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "level-up",
+      "runtime_path": "res://assets/audio/level_up.wav",
+      "sha256": "ea66ea69507154c5db4b5e28dcbb8cec8900224db665b337c4434d0c955ed237",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "music-archive",
+      "runtime_path": "res://assets/audio/music_archive.wav",
+      "sha256": "c9d302eacaab664702d60149da62be8ae99970c30da729116b1d784af6b477de",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "music-author",
+      "runtime_path": "res://assets/audio/music_author.wav",
+      "sha256": "75e9223e9b08de4501f084aedfc5da95b3f9c76dbee49f062cf9b1203260ed0a",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "music-binder",
+      "runtime_path": "res://assets/audio/music_binder.wav",
+      "sha256": "8de3b45084b08e2c66f7b917db4a35d05730deacf3617c9ec73e456ba4d8178b",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "music-bindery",
+      "runtime_path": "res://assets/audio/music_bindery.wav",
+      "sha256": "aeed8bf405f0bef0a00adfba0fc95ed127af1f1465b69a496b1c3f7a0cdf681e",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "music-editor",
+      "runtime_path": "res://assets/audio/music_editor.wav",
+      "sha256": "ae7e4ec6ba47ffabe12c230210a0cd965c4255589fa867eb198c9694fbee1245",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "music-finale",
+      "runtime_path": "res://assets/audio/music_finale.wav",
+      "sha256": "09ff57e55c6bbf902360d9d436612c6ffad3caebc34e2f0bd6086320b0509b74",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "parry",
+      "runtime_path": "res://assets/audio/parry.wav",
+      "sha256": "2ae534091985333be1700506fcc727b571f0e22f54a8721c4f8440ef51a67afd",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "pickup",
+      "runtime_path": "res://assets/audio/pickup.wav",
+      "sha256": "9a3e6dde406b78aba8385b78defbb987d7f745d2df2b9f09759b5fbe6d86224b",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "powerup",
+      "runtime_path": "res://assets/audio/powerup.wav",
+      "sha256": "d30b9bbce6d0eaa0b89acfa369a4e2c42d2656111a8f2a75c7d5a5949cf26c6a",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "relic",
+      "runtime_path": "res://assets/audio/relic.wav",
+      "sha256": "425c6d5a4018f1213a1d65344978ea66b21a9d5532ddd6a193c25f3593269e54",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "save",
+      "runtime_path": "res://assets/audio/save.wav",
+      "sha256": "4537c8d68be88a7e1c66a499cd8a369b5fce6c5da0bba9f56d28a9ef0d99caac",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "seal-cast",
+      "runtime_path": "res://assets/audio/seal_cast.wav",
+      "sha256": "ca6ac2eefcc1a130d8e2ab8bd5195ee8e730d526fee9b31a7361b5a395f3572e",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "shield",
+      "runtime_path": "res://assets/audio/shield.wav",
+      "sha256": "153b8aae9e3b53ddcfabb316b73d5e176cc764e7b6da2694c623dd3979dc5d23",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "slash",
+      "runtime_path": "res://assets/audio/slash.wav",
+      "sha256": "372e8246793799e18c582285c2869a4c8d74c3c6b0ef22e646921cc761508c9f",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "slash-heavy",
+      "runtime_path": "res://assets/audio/slash_heavy.wav",
+      "sha256": "a31d6f7db946c23cb544989b5ce7e5690e755a7b8f1ad82d139b3eb688749ddd",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "slash-light",
+      "runtime_path": "res://assets/audio/slash_light.wav",
+      "sha256": "25cbd64da392ef07fd3a161f4c21a9a04610a20dc7a03fa05ca541d232d2bdd7",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "teleport",
+      "runtime_path": "res://assets/audio/teleport.wav",
+      "sha256": "305073e95ba8004d5f39249fe4cdfc428c79ecd76033edfc98ba5a742af6ff35",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "ui-cancel",
+      "runtime_path": "res://assets/audio/ui_cancel.wav",
+      "sha256": "734d432d54ed01c5877d7f1f5e8d2618f4c07d8ff4bd13dab81d40157ff5a5bb",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "ui-confirm",
+      "runtime_path": "res://assets/audio/ui_confirm.wav",
+      "sha256": "464aad7a4fb9147e03d1c3a031edc70e99a5477cfda5ad5cf1e9a37379d88dca",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "ui-move",
+      "runtime_path": "res://assets/audio/ui_move.wav",
+      "sha256": "5f061c357804efc8a98d30d7a622698dd5b77d4928b7097f2e7d8d99151f20c1",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "archivist",
+      "runtime_path": "res://assets/generated/archivist.png",
+      "sha256": "0451c3db36546ddf6749df61f8b4513ab007d1a96e1ca997688be2dcbe0995b1",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "author",
+      "runtime_path": "res://assets/generated/author.png",
+      "sha256": "f716110eb3dd11a4b36b39e528316c31269272b086794b64796ca7bc635198dd",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "binder",
+      "runtime_path": "res://assets/generated/binder.png",
+      "sha256": "2b1c76c2912bfdf400e471770afb0e11dac732f5fcd4ff07635a711a38d7c371",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "blot",
+      "runtime_path": "res://assets/generated/blot.png",
+      "sha256": "0a0f0d244974a4d9a0209161d2ad28cc005232ba7139620c38b8264c6d265b3a",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "bomb",
+      "runtime_path": "res://assets/generated/bomb.png",
+      "sha256": "a8ac102f2fa35824f3abf3e87031327039e14e4f3829a5e485b35cf7a2abacff",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "boss",
+      "runtime_path": "res://assets/generated/boss.png",
+      "sha256": "c6c304ac9cf1f40b28266d499c03b0ce6f9201a70a223e46d98135ba12770b6e",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "brute",
+      "runtime_path": "res://assets/generated/brute.png",
+      "sha256": "16dddb3b74ff67f4dcc7f7c547c32893f65e8bb3c4d3b933fa1f7e3b0e46b0c2",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "censor",
+      "runtime_path": "res://assets/generated/censor.png",
+      "sha256": "19cdccf03d2a66d12e8f7156d5340303ced8d313ad8d4308e67aac64bcfda36d",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "dasher",
+      "runtime_path": "res://assets/generated/dasher.png",
+      "sha256": "7674ee3529a18540a5ea6a3e469254b68ae9bb6b4a4feb846606229b61e255a0",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "duelist",
+      "runtime_path": "res://assets/generated/duelist.png",
+      "sha256": "0b3a6c3c5d41bdbdf82cef88632cbc890ed628d4bf4408c82e59aee77d33c275",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "enemy",
+      "runtime_path": "res://assets/generated/enemy.png",
+      "sha256": "9f06e3926be261fbbf4a13aafec940266200022748c4977e637cd65e38e98f68",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "errata",
+      "runtime_path": "res://assets/generated/errata.png",
+      "sha256": "6af097ee401aa589b3c540680adc8e119bf6322cf4d26f521919720e560a0aed",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "floor",
+      "runtime_path": "res://assets/generated/floor.png",
+      "sha256": "e2df5dc2730aa10f7b7b2855dbe58691b4455504045ee267e5c425899c8942f6",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "frenzy",
+      "runtime_path": "res://assets/generated/frenzy.png",
+      "sha256": "fb1ece3910650e32106aecde188be3cefc4f191ce42c86e096095e2b8e6e41b3",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "health",
+      "runtime_path": "res://assets/generated/health.png",
+      "sha256": "f3eafdd38c92737628a4b4c4c5a5fc6e91abaa7f28dd0db4a45cff7c61701096",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "hourglass",
+      "runtime_path": "res://assets/generated/hourglass.png",
+      "sha256": "84d70010399268fa94f620e42e9c9e2da666e12423e1fee536cbc9991e8db8a3",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "icon",
+      "runtime_path": "res://assets/generated/icon.png",
+      "sha256": "bea60761483bbe7902513ef07f7fe676c1f9c3bcf6fc44c0c99f738de2abe87d",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "ink-orb",
+      "runtime_path": "res://assets/generated/ink_orb.png",
+      "sha256": "5244db262c7d25ab8d052e12e5afd3438746de34b73185860dbe5ebd048c08d8",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "leech",
+      "runtime_path": "res://assets/generated/leech.png",
+      "sha256": "b50d9b1a891ff351c810364d746efc9c28985cfcb1eeaec030162d157bfb2331",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "magnet",
+      "runtime_path": "res://assets/generated/magnet.png",
+      "sha256": "362cea1e7a6c95064faaf3a8812f47e1873e753c3cb9c575859a03246b2ec13e",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "player",
+      "runtime_path": "res://assets/generated/player.png",
+      "sha256": "4d12f8cfa5fd2dc9ead841fbab5af5e0faf051d8a08fe6d574210d9fdbb0fa3f",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "projectile",
+      "runtime_path": "res://assets/generated/projectile.png",
+      "sha256": "c6bf7fb29a9c6f4fb8910f713145e7443d8a92c8368367b1f67485d0ec50fe08",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "relic",
+      "runtime_path": "res://assets/generated/relic.png",
+      "sha256": "76dc33bc10a91cf0a7807b7f87fac9dea95018893084a41c59254a76c3a857fe",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "scribe",
+      "runtime_path": "res://assets/generated/scribe.png",
+      "sha256": "ec3fe4908ce4d00dddd2dce0675518d94c5ebbb5033a696dc74bef206a4bd9ea",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "shard",
+      "runtime_path": "res://assets/generated/shard.png",
+      "sha256": "3942fa3d803db2f2792de4194f7833a746cd347006b868821f16bf2b65c76c7b",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "splitter",
+      "runtime_path": "res://assets/generated/splitter.png",
+      "sha256": "84027324506afbfe1c20b253e72c72fe6d102797e8c8bd96ce134b09e398c985",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "ward",
+      "runtime_path": "res://assets/generated/ward.png",
+      "sha256": "e98020cc59307be0f3ec9fe8501c001b0233b11468e418342f8149fdab2f60bf",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "warden",
+      "runtime_path": "res://assets/generated/warden.png",
+      "sha256": "2d3e253369411e6fbf04bcc33480ee9c06a169dc4fb2d42c8d0da74115e0d43b",
+      "origin": "deterministic-manga-forge"
+    },
+    {
+      "id": "combat-cast-atlas-v1",
+      "runtime_path": "res://assets/characters/combat-cast-atlas-v1.png",
+      "sha256": "ebc05b4e8b72739b363d81e2839052dea8f74cfbdf400ae512d2f373a61c0629",
+      "origin": "project-directed-openai-image-tools"
+    },
+    {
+      "id": "nara-slash-atlas-v1",
+      "runtime_path": "res://assets/characters/nara-slash-atlas-v1.png",
+      "sha256": "63aab3f576d05dc5f44cb92eb407ebd653cf24b4763c8460044441b5a09518dc",
+      "origin": "project-directed-openai-image-tools"
+    }
+  ]
+}

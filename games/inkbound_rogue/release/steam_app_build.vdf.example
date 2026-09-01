@@ -1,0 +1,14 @@
+"appbuild"
+{
+    "appid" "REPLACE_WITH_STEAM_APP_ID"
+    "desc" "Inkbound 0.22.0-alpha Windows playtest"
+    "buildoutput" "..\\build\\steam-output"
+    "contentroot" "..\\build\\steam-depot"
+    "setlive" ""
+    "preview" "0"
+    "local" ""
+    "depots"
+    {
+        "REPLACE_WITH_WINDOWS_DEPOT_ID" "steam_depot_build.vdf.example"
+    }
+}

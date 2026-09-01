@@ -1,0 +1,12 @@
+{
+  "mcp_url": "http://127.0.0.1:3001/mcp",
+  "proxy": "http://172.19.96.1:10890",
+  "windows_shell": "S:\\Apps\\Git\\bin\\bash.exe",
+  "windows_runtime_root": "S:\\bld\\manga-forge-runtime",
+  "wsl_runtime_root": "/mnt/s/bld/manga-forge-runtime",
+  "godot_candidates": [
+    "/c/Users/Joyer/AppData/Local/Microsoft/WinGet/Links/godot.exe",
+    "/s/Apps/Godot/4.7.2/Godot_v4.7.2-stable_win64.exe",
+    "/s/Apps/Godot/Godot_v4.2.2-stable_win64.exe"
+  ]
+}
