@@ -363,7 +363,26 @@ func _ready() -> void:
 			hud.show_device_notice("ARCHIVE REQUIRES A NEWER GAME VERSION")
 		elif save_corrupt_detected:
 			hud.show_device_notice("DAMAGED ARCHIVE PRESERVED  ·  NEW PROFILE")
+	var recorder := _playtest_recorder()
+	if recorder != null:
+		recorder.attach_game(self)
 	_sync_pause_state()
+
+
+func _playtest_recorder() -> Node:
+	return get_node_or_null("/root/PlaytestSession")
+
+
+func record_playtest_event(kind: String, data: Dictionary = {}) -> void:
+	var recorder := _playtest_recorder()
+	if recorder != null and bool(recorder.get("enabled")):
+		recorder.record_event(kind, data)
+
+
+func request_playtest_survey(reason: String) -> void:
+	var recorder := _playtest_recorder()
+	if recorder != null and bool(recorder.get("enabled")):
+		recorder.request_survey(reason)
 
 
 func _notification(what: int) -> void:
@@ -377,6 +396,7 @@ func _set_application_focus(focused: bool) -> void:
 	if application_focused == focused:
 		return
 	application_focused = focused
+	record_playtest_event("focus_changed", {"focused": focused, "run_started": run_started, "wave": wave})
 	if is_instance_valid(hud):
 		hud.set_input_enabled(focused)
 	if is_instance_valid(cutscene):
@@ -407,6 +427,7 @@ func _process(delta: float) -> void:
 	if new_wave > wave:
 		_expire_page_directive()
 		wave = new_wave
+		record_playtest_event("page_started", {"page": wave, "health": player.health, "level": player.level, "kills": kills})
 		pending_page_encounter = true
 		highest_wave = maxi(highest_wave, wave)
 		_evaluate_achievements()
@@ -478,6 +499,7 @@ func _start_page_encounter(page: int) -> bool:
 		directive_completed = false
 		_clear_directive_zone()
 		hud.hide_page_directive()
+		record_playtest_event("boss_page_started", {"page": page})
 		return true
 	var chapter := _chapter_for_page(page)
 	_spawn_page_squad(chapter)
@@ -501,6 +523,12 @@ func _start_page_encounter(page: int) -> bool:
 		_spawn_directive_zone()
 	elif str(active_directive.get("kind", "")) == "elites":
 		_ensure_directive_elites(int(ceil(directive_target)))
+	record_playtest_event("page_directive_started", {
+		"page": page,
+		"directive": str(active_directive.get("id", "")),
+		"squad": active_squad_id,
+		"target": directive_target,
+	})
 	return true
 
 
@@ -637,6 +665,12 @@ func _complete_page_directive() -> bool:
 	if not test_mode:
 		_save_run()
 	_save_checkpoint("directive-" + str(active_directive.get("id", "complete")))
+	record_playtest_event("page_directive_completed", {
+		"page": wave,
+		"directive": str(active_directive.get("id", "")),
+		"reward": reward,
+		"elapsed": elapsed,
+	})
 	return true
 
 
@@ -718,6 +752,7 @@ func spawn_enemy(kind: String = "mask", at: Vector2 = Vector2.INF) -> InkboundEn
 		spawn_word(spawn_position + Vector2(0, -46), boss_name.to_upper(), CRIMSON)
 		play_sound("boss_warning")
 		play_music(_boss_music_id(kind))
+		record_playtest_event("boss_started", {"boss": kind, "page": wave, "health": enemy.max_health})
 	enemy.died.connect(_on_enemy_died)
 	return enemy
 
@@ -737,6 +772,14 @@ func _on_enemy_died(_enemy: Node, xp_value: int, death_position: Vector2, enemy_
 		spawn_word(death_position + Vector2(0, -24), "MISPRINT!", GOLD)
 	var is_boss := enemy_kind in BOSS_KINDS
 	var is_elite_enemy: bool = bool(_enemy.get("is_elite"))
+	record_playtest_event("enemy_defeated", {
+		"enemy": enemy_kind,
+		"elite": is_elite_enemy,
+		"boss": is_boss,
+		"page": wave,
+		"kill": kills,
+		"player_health": player.health,
+	})
 	if not is_boss:
 		_advance_page_directive("kills", 1.0)
 		if is_elite_enemy:
@@ -839,10 +882,10 @@ func available_hostile_projectile_slots() -> int:
 	return maxi(0, hostile_projectile_limit() - active_hostile_projectile_count())
 
 
-func spawn_projectile(at: Vector2, direction: Vector2, speed: float = 92.0) -> bool:
+func spawn_projectile(at: Vector2, direction: Vector2, speed: float = 92.0, source_id: String = "projectile") -> bool:
 	if available_hostile_projectile_slots() <= 0:
 		return false
-	var projectile: InkboundProjectile = ProjectileScript.new().setup(at, direction, player, speed)
+	var projectile: InkboundProjectile = ProjectileScript.new().setup(at, direction, player, speed, source_id)
 	add_child(projectile)
 	return true
 
@@ -868,6 +911,7 @@ func _roll_combat_pickup() -> String:
 
 
 func activate_combat_pickup(kind: String) -> void:
+	record_playtest_event("combat_pickup_activated", {"pickup": kind, "page": wave, "health": player.health})
 	match kind:
 		"bomb":
 			var hits := damage_nearby(player.global_position, 118.0, maxf(8.0, player.damage * 4.5), Vector2.ZERO)
@@ -944,6 +988,10 @@ func _open_relic_draft(source: String) -> bool:
 		return false
 	choosing_relic = true
 	hud.show_relic_draft(current_relic_choices, source)
+	var choice_ids: Array[String] = []
+	for choice in current_relic_choices:
+		choice_ids.append(str(choice.get("id", "")))
+	record_playtest_event("relic_draft_opened", {"source": source.left(64), "choices": choice_ids, "page": wave})
 	play_sound("relic", 0.92)
 	_sync_pause_state()
 	return true
@@ -1330,6 +1378,10 @@ func _on_level_up(_level: int) -> void:
 	current_choices = _pick_upgrades(3 + player.upgrade_choice_bonus)
 	play_sound("level_up", 1.0)
 	hud.show_upgrade(current_choices)
+	var choice_ids: Array[String] = []
+	for choice in current_choices:
+		choice_ids.append(str(choice.get("id", "")))
+	record_playtest_event("upgrade_draft_opened", {"level": player.level, "choices": choice_ids, "page": wave})
 	_sync_pause_state()
 
 
@@ -1399,11 +1451,13 @@ func _play_story(sequence_name: String) -> void:
 	if story_data.is_empty():
 		return
 	story_seen[sequence_name] = true
+	record_playtest_event("story_started", {"sequence": sequence_name, "replay": replaying_story, "page": wave})
 	cutscene.play(sequence_name, story_data)
 	_sync_pause_state()
 
 
 func _on_cutscene_finished(sequence_name: String) -> void:
+	record_playtest_event("story_finished", {"sequence": sequence_name, "replay": replaying_story, "page": wave})
 	if replaying_story:
 		replaying_story = false
 		hud.show_title(_meta_snapshot())
@@ -1447,6 +1501,7 @@ func _on_cutscene_finished(sequence_name: String) -> void:
 		if hud.has_method("show_victory"):
 			hud.show_victory(last_run_summary)
 		_sync_pause_state()
+		request_playtest_survey("victory")
 		return
 	if not _try_open_pending_relic_draft():
 		_sync_pause_state()
@@ -1454,6 +1509,7 @@ func _on_cutscene_finished(sequence_name: String) -> void:
 
 
 func _on_story_choice(sequence_name: String, choice_id: String) -> void:
+	record_playtest_event("story_choice", {"sequence": sequence_name, "choice": choice_id, "replay": replaying_story})
 	if replaying_story:
 		var ending_sequence := "ending_" + choice_id
 		if _story_is_unlocked(ending_sequence):
@@ -1597,6 +1653,15 @@ func _on_start_requested(selected_difficulty: String, selected_contract: String 
 		enemy.contact_damage *= difficulty_damage * contract_enemy_damage * proof_enemy_damage
 		enemy.speed *= difficulty_speed * contract_enemy_speed * proof_enemy_speed
 	run_started = true
+	record_playtest_event("run_started", {
+		"difficulty": difficulty_id,
+		"contract": contract_id,
+		"starting_weapon": starting_weapon_id,
+		"proof_depth": proof_depth,
+		"daily": daily_run,
+		"daily_id": daily_id,
+		"seed": run_seed,
+	})
 	_refresh_run_objective()
 	if test_mode:
 		_start_page_encounter(1)
@@ -1621,6 +1686,7 @@ func _begin_run_opening() -> void:
 
 func _on_manual_visibility_changed(visible_now: bool) -> void:
 	manual_open = visible_now
+	record_playtest_event("manual_visibility", {"visible": visible_now, "page": wave, "run_started": run_started})
 	if visible_now:
 		_sync_pause_state()
 		return
@@ -1793,6 +1859,7 @@ func _activate_route(route_id: String) -> bool:
 	spawn_word(player.global_position + Vector2(0, -48), str(data["name"]), GOLD)
 	var hazard_name := Localization.text(data.get("hazard_name", "LIVING MARGIN"))
 	hud.show_device_notice(("页边苏醒 · %s" if TranslationServer.get_locale().begins_with("zh") else "MARGIN AWAKENS · %s") % hazard_name)
+	record_playtest_event("route_selected", {"route": route_id, "chapter": int(data.get("chapter", 0)), "page": wave})
 	return true
 
 
@@ -1812,6 +1879,10 @@ func _begin_event(event_data: Dictionary) -> bool:
 		seen_events.append(event_id)
 	choosing_event = true
 	hud.show_event(current_event)
+	var option_ids: Array[String] = []
+	for option in current_event.get("options", []):
+		option_ids.append(str(option.get("route_id", option.get("effect", ""))))
+	record_playtest_event("event_opened", {"event": event_id, "options": option_ids, "page": wave})
 	_sync_pause_state()
 	return true
 
@@ -1823,6 +1894,14 @@ func _on_event_selected(index: int) -> void:
 	if index < 0 or index >= options.size():
 		return
 	var option: Dictionary = options[index]
+	record_playtest_event("event_selected", {
+		"event": str(current_event.get("id", "")),
+		"index": index,
+		"label": str(option.get("label", "")).left(80),
+		"effect": str(option.get("effect", "")),
+		"route": str(option.get("route_id", "")),
+		"page": wave,
+	})
 	var is_route_choice := str(option.get("effect", "")) == "route"
 	var selected_route_chapter := 0
 	if is_route_choice:
@@ -1974,6 +2053,7 @@ func _on_setting_adjusted(setting_id: String, direction: int) -> void:
 			settings[setting_id] = Localization.LANGUAGE_CHOICES[posmod(current_language + signi(direction), Localization.LANGUAGE_CHOICES.size())]
 	_apply_settings()
 	hud.set_settings(settings)
+	record_playtest_event("setting_changed", {"setting": setting_id, "value": settings.get(setting_id), "direction": signi(direction)})
 	_refresh_run_objective()
 	hud.refresh_localization()
 	if is_instance_valid(cutscene):
@@ -2469,12 +2549,14 @@ func _finalize_run() -> void:
 	recent_runs.push_front(last_run_summary.duplicate(true))
 	if recent_runs.size() > 10:
 		recent_runs.resize(10)
+	record_playtest_event("run_finalized", last_run_summary)
 
 
 func _on_upgrade_selected(index: int) -> void:
 	if index < 0 or index >= current_choices.size():
 		return
 	var choice := current_choices[index]
+	record_playtest_event("upgrade_selected", {"index": index, "upgrade": str(choice.get("id", "")), "level": player.level, "page": wave})
 	player.apply_upgrade(choice["id"])
 	_record_upgrade(choice["id"])
 	spawn_word(player.global_position + Vector2(0, -38), choice["name"], GOLD)
@@ -2491,6 +2573,7 @@ func _on_relic_selected(index: int) -> void:
 		return
 	var selected: Dictionary = current_relic_choices[index]
 	var relic_id := str(selected.get("id", ""))
+	record_playtest_event("relic_selected", {"index": index, "relic": relic_id, "page": wave})
 	current_relic_choices.clear()
 	choosing_relic = false
 	_grant_relic(relic_id)
@@ -2507,6 +2590,7 @@ func _toggle_pause() -> void:
 	if choosing_upgrade or choosing_relic or choosing_event or game_over or run_won or (is_instance_valid(cutscene) and cutscene.active):
 		return
 	manually_paused = not manually_paused
+	record_playtest_event("manual_pause", {"paused": manually_paused, "page": wave})
 	if not manually_paused:
 		focus_pause_engaged = false
 	_sync_pause_state()
@@ -2516,9 +2600,11 @@ func _on_save_return_requested() -> void:
 	if not run_started or not manually_paused or game_over or run_won:
 		return
 	if not _save_checkpoint("manual"):
+		record_playtest_event("save_return_failed", {"page": wave})
 		hud.show_device_notice("SAVE FAILED  ·  DRAFT STILL RUNNING")
 		return
 	_save_run()
+	record_playtest_event("save_return", {"page": wave, "elapsed": elapsed, "health": player.health})
 	play_sound("save")
 	if not test_mode:
 		await get_tree().create_timer(0.16, true, false, true).timeout
@@ -2552,6 +2638,7 @@ func _on_player_died() -> void:
 	spawn_word(player.global_position + Vector2(0, -32), "THE END?", CRIMSON)
 	hud.show_game_over(last_run_summary)
 	_sync_pause_state()
+	request_playtest_survey("defeat")
 
 
 func _restart() -> void:
@@ -2687,21 +2774,26 @@ func _input(event: InputEvent) -> void:
 
 
 func _set_input_mode(gamepad_active: bool) -> void:
+	var changed := using_gamepad != gamepad_active
 	using_gamepad = gamepad_active
 	if is_instance_valid(player):
 		player.using_gamepad = gamepad_active
 	if is_instance_valid(hud):
 		hud.set_input_mode(gamepad_active)
+	if changed:
+		record_playtest_event("input_mode_changed", {"mode": "gamepad" if gamepad_active else "keyboard_mouse"})
 
 
 func _on_joy_connection_changed(device: int, connected: bool) -> void:
 	if not application_focused:
 		return
 	if connected:
+		record_playtest_event("gamepad_connection", {"device": device, "connected": true, "name": Input.get_joy_name(device).left(80)})
 		_set_input_mode(true)
 		if is_instance_valid(hud):
 			hud.show_device_notice(("手柄已就绪  ·  P%d  ·  B / ○ 墨术" if TranslationServer.get_locale().begins_with("zh") else "GAMEPAD READY  ·  P%d  ·  B / CIRCLE INK ART") % (device + 1))
 	elif Input.get_connected_joypads().is_empty():
+		record_playtest_event("gamepad_connection", {"device": device, "connected": false})
 		_set_input_mode(false)
 		if is_instance_valid(hud):
 			hud.show_device_notice("GAMEPAD DISCONNECTED")
@@ -2888,6 +2980,7 @@ func _save_checkpoint(reason: String = "auto") -> bool:
 		_remove_file_if_present(temp_checkpoint_path)
 		return false
 	checkpoint_data = payload.duplicate(true)
+	record_playtest_event("checkpoint_saved", {"reason": reason, "page": wave, "elapsed": elapsed})
 	return true
 
 
@@ -2919,8 +3012,10 @@ func _on_continue_requested() -> void:
 	if checkpoint_data.is_empty():
 		_load_checkpoint()
 	if checkpoint_data.is_empty() or not _apply_checkpoint(checkpoint_data):
+		record_playtest_event("continue_failed")
 		hud.show_device_notice("SAVED DRAFT COULD NOT BE LOADED")
 		return
+	record_playtest_event("run_continued", {"page": wave, "elapsed": elapsed, "health": player.health, "weapon": player.weapon_form})
 
 
 func _restore_route_modifiers(route_id: String) -> void:

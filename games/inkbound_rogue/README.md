@@ -210,6 +210,7 @@ godot --headless --path . --script res://tests/proof_depth_test.gd
 godot --headless --path . --script res://tests/daily_chronicle_test.gd
 godot --headless --path . --script res://tests/balance_matrix_test.gd
 godot --headless --path . --script res://tests/player_persona_test.gd
+godot --headless --path . --script res://tests/playtest_recorder_test.gd
 godot --headless --path . --script res://tests/progression_test.gd
 godot --headless --path . --script res://tests/route_system_test.gd
 godot --headless --path . --script res://tests/soak_test.gd
@@ -222,7 +223,7 @@ The Windows host workflow exposes the same gates through `host_game.py test`,
 `host_game.py cutscene-test`, `host_game.py manual-test`, `host_game.py localization-test`, `host_game.py cast-test`,
 `host_game.py audio-test`, `host_game.py restoration-test`, `host_game.py proof-test`,
 `host_game.py daily-test`, `host_game.py persona-test`, `host_game.py routes`,
-and `host_game.py soak`.
+`host_game.py playtest-recorder-test`, and `host_game.py soak`.
 `host_game.py capture-session` renders a ten-frame title, Armory, Story Archive,
 Save & Return, recovery/AOE, technique, relic-draft, Ink Art, Directive, and
 route-hazard readability gallery.
@@ -244,3 +245,29 @@ state across frozen frames, including background controller rejection, instead
 of only checking menu visibility. Release metadata, legal notices, version identity,
 and inert Steam depot templates live under `release/`; real App/Depot IDs are
 never stored in the repository.
+
+## Local playtest recording
+
+The Windows launcher can prepare an exported build and start one anonymous,
+local-only playtest session:
+
+```bash
+python3 tools/windows/host_game.py playtest --participant P-001
+```
+
+During play, `F6` marks a bug, `F7` a confusing moment, `F8` an unfair moment,
+and `F9` a highlight. A mark stores the previous 30 seconds of gameplay events,
+the current run state, and a screenshot. Defeat or victory opens a bilingual
+six-rating exit card with an optional 280-character note. Nothing is uploaded;
+the build writes only pseudonymous gameplay data below
+`build/playtest/sessions/` in the Windows runtime copy.
+
+After the game closes, aggregate any complete and interrupted sessions with:
+
+```bash
+python3 tools/windows/host_game.py playtest-report
+```
+
+The resulting JSON and Markdown live under `build/playtest/reports/`. See
+`design/playtest-recorder.md` for privacy boundaries, facilitator procedure,
+artifact layout, and interpretation limits.

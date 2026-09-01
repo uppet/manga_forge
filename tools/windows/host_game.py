@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -102,6 +104,14 @@ def probe(config: dict[str, Any]) -> None:
 def process_status(config: dict[str, Any]) -> None:
     command = r"""
 powershell.exe -NoProfile -Command '$items = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "InkboundRogue.exe" -or $_.Name -like "Godot*.exe" } | Select-Object ProcessId, Name, CreationDate, CommandLine); [pscustomobject]@{ count = $items.Count; processes = $items } | ConvertTo-Json -Depth 4 -Compress'
+""".strip()
+    drive = config["windows_runtime_root"].split("\\", 1)[0] + "\\"
+    remote(config, command, 120, cwd=drive)
+
+
+def ensure_game_not_running(config: dict[str, Any]) -> None:
+    command = r"""
+powershell.exe -NoProfile -Command '$count = @(Get-Process -Name "InkboundRogue" -ErrorAction SilentlyContinue).Count; if ($count -gt 0) { Write-Error "InkboundRogue is already running; close it before preparing a playtest build"; exit 19 }'
 """.strip()
     drive = config["windows_runtime_root"].split("\\", 1)[0] + "\\"
     remote(config, command, 120, cwd=drive)
@@ -441,6 +451,77 @@ echo \"launched $TARGET\"
     remote(config, command, 120)
 
 
+def safe_token(value: str, fallback: str = "anonymous", maximum: int = 48) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9_-]+", "-", value.strip()).strip("-")
+    return (cleaned or fallback)[:maximum]
+
+
+def build_identity(game: str) -> tuple[str, str]:
+    commit = subprocess.check_output(
+        ["git", "rev-parse", "--short=12", "HEAD"], cwd=REPO_ROOT, text=True
+    ).strip()
+    dirty = bool(
+        subprocess.check_output(
+            ["git", "status", "--porcelain", "--untracked-files=normal"], cwd=REPO_ROOT, text=True
+        ).strip()
+    )
+    version_path = REPO_ROOT / "games" / game / "release" / "version.json"
+    version = str(json.loads(version_path.read_text(encoding="utf-8")).get("version", "dev"))
+    return commit + ("-dirty" if dirty else ""), safe_token(f"{version}-{commit}{'-dirty' if dirty else ''}", "dev", 80)
+
+
+def playtest(config: dict[str, Any], game: str, participant: str, reuse_build: bool = False) -> None:
+    ensure_game_not_running(config)
+    if not reuse_build:
+        sync(config, game)
+        export(config, game)
+    game_root = posix_game_root(config, game)
+    commit, build_id = build_identity(game)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")[:-3]
+    session_id = safe_token(f"PT-{timestamp}-{participant}", "PT-session", 48)
+    participant_code = safe_token(participant)
+    command = godot_resolver(config) + f"""
+set -e
+GAME='{game_root}'
+TARGET="$GAME/build/windows/InkboundRogue.exe"
+test -s "$TARGET"
+SESSION_ROOT="$GAME/build/playtest/sessions"
+mkdir -p "$SESSION_ROOT"
+TARGET_WIN=$(cygpath -w "$TARGET")
+WORK_WIN=$(cygpath -w "$GAME/build/windows")
+SESSION_ROOT_WIN=$(cygpath -w "$SESSION_ROOT")
+export INKBOUND_PLAYTEST=1
+export INKBOUND_PLAYTEST_SESSION='{session_id}'
+export INKBOUND_PLAYTEST_PARTICIPANT='{participant_code}'
+export INKBOUND_PLAYTEST_DIR="$SESSION_ROOT_WIN"
+export INKBOUND_BUILD_ID='{build_id}'
+export INKBOUND_GIT_COMMIT='{commit}'
+powershell.exe -NoProfile -Command "Start-Process -FilePath '$TARGET_WIN' -WorkingDirectory '$WORK_WIN' -ErrorAction Stop"
+echo "playtest_session={session_id}"
+echo "playtest_build={build_id}"
+echo "playtest_output=$SESSION_ROOT"
+"""
+    remote(config, command, 180)
+
+
+def playtest_report(config: dict[str, Any], game: str) -> None:
+    game_root = Path(config["wsl_runtime_root"]) / "games" / game
+    sessions = game_root / "build" / "playtest" / "sessions"
+    output_dir = game_root / "build" / "playtest" / "reports"
+    subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "tools" / "game" / "playtest_report.py"),
+            "--sessions",
+            str(sessions),
+            "--output-dir",
+            str(output_dir),
+        ],
+        check=True,
+        cwd=REPO_ROOT,
+    )
+
+
 def restart(config: dict[str, Any], game: str) -> None:
     game_root = posix_game_root(config, game)
     command = godot_resolver(config) + f"""
@@ -458,8 +539,10 @@ echo "gracefully restarted $TARGET"
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("probe", "process-status", "sync", "test", "save-test", "pause-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "restoration-test", "proof-test", "daily-test", "persona-test", "capture-session", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-localization", "balance", "progression", "routes", "soak", "export", "restart", "run"))
+    parser.add_argument("command", choices=("probe", "process-status", "sync", "test", "save-test", "pause-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "capture-session", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-localization", "balance", "progression", "routes", "soak", "export", "playtest", "playtest-report", "restart", "run"))
     parser.add_argument("--game", default=DEFAULT_GAME)
+    parser.add_argument("--participant", default="anonymous", help="anonymous facilitator-assigned playtest code")
+    parser.add_argument("--reuse-build", action="store_true", help="launch the existing exported build without sync/export")
     args = parser.parse_args()
     config = load_config()
     if args.command == "sync":
@@ -506,6 +589,13 @@ def main() -> int:
         daily_test(config, args.game)
     elif args.command == "persona-test":
         persona_test(config, args.game)
+    elif args.command == "playtest-recorder-test":
+        game_root = posix_game_root(config, args.game)
+        command = godot_resolver(config) + f"""
+GAME='{game_root}'
+timeout 120s "$GODOT" --headless --path "$GAME" --script res://tests/playtest_recorder_test.gd
+"""
+        remote(config, command, 180)
     elif args.command == "capture-session":
         capture_session(config, args.game)
     elif args.command == "capture-upgrades":
@@ -532,6 +622,10 @@ def main() -> int:
         soak(config, args.game)
     elif args.command == "export":
         export(config, args.game)
+    elif args.command == "playtest":
+        playtest(config, args.game, args.participant, args.reuse_build)
+    elif args.command == "playtest-report":
+        playtest_report(config, args.game)
     elif args.command == "restart":
         restart(config, args.game)
     else:

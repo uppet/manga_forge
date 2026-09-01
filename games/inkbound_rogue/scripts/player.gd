@@ -295,6 +295,8 @@ func start_dash(input_vector: Vector2 = Vector2.ZERO) -> bool:
 		game.spawn_word(global_position + Vector2(0, -22), "ZIP!", CRIMSON)
 	if game.has_method("vibrate"):
 		game.vibrate(0.08, 0.18, 0.08)
+	if game.has_method("record_playtest_event"):
+		game.record_playtest_event("dash", {"direction": dash_direction, "health": health, "weapon": weapon_form})
 	return true
 
 
@@ -369,6 +371,8 @@ func perform_attack(direction: Vector2, force: bool = false) -> bool:
 		combo_timeout = 1.1
 		if hit_count >= cleave:
 			break
+	if game.has_method("record_playtest_event"):
+		game.record_playtest_event("attack", {"weapon": weapon_form, "hits": hit_count, "direction": direction, "health": health})
 	return true
 
 
@@ -417,6 +421,8 @@ func perform_ink_art(direction: Vector2, force: bool = false) -> bool:
 			game.spawn_word(global_position + Vector2(0, -30), "MERCY +1", PAPER)
 	if ink_art_echo and game.has_method("queue_ink_art_echo"):
 		game.queue_ink_art_echo(str(profile["id"]), global_position, direction, art_damage * 0.45, art_radius * 0.92)
+	if game.has_method("record_playtest_event"):
+		game.record_playtest_event("ink_art", {"art": str(profile["id"]), "weapon": weapon_form, "hits": hit_count, "health": health})
 	_notify_ink_art_changed(true)
 	return true
 
@@ -436,9 +442,11 @@ func _notify_ink_art_changed(force: bool = false) -> void:
 		ink_art_changed.emit(art_name, ink_art_cooldown, ink_art_cooldown_total())
 
 
-func take_damage(amount: float, source_direction: Vector2 = Vector2.ZERO) -> bool:
+func take_damage(amount: float, source_direction: Vector2 = Vector2.ZERO, source_id: String = "unknown") -> bool:
 	if invulnerable_time > 0.0 or health <= 0.0:
 		return false
+	var health_before := health
+	var guard_before := guard
 	var incoming := amount * (1.0 - clampf(damage_reduction, 0.0, 0.72))
 	if guard > 0.0:
 		var absorbed := minf(guard, incoming)
@@ -458,6 +466,16 @@ func take_damage(amount: float, source_direction: Vector2 = Vector2.ZERO) -> boo
 	velocity += source_direction.normalized() * 120.0
 	health_changed.emit(health, max_health)
 	var game := get_parent()
+	if game.has_method("record_playtest_event"):
+		game.record_playtest_event("player_damaged", {
+			"source": source_id.left(64),
+			"raw_amount": amount,
+			"health_before": health_before,
+			"health_after": health,
+			"guard_before": guard_before,
+			"guard_after": guard,
+			"fatal": health <= 0.0,
+		})
 	if game.has_method("play_sound"):
 		game.play_sound("hurt", 0.9 + randf() * 0.12)
 	if game.has_method("impact"):
@@ -484,11 +502,15 @@ func gain_xp(amount: int) -> void:
 
 
 func heal(amount: float) -> void:
+	var health_before := health
 	var next_health := health + amount
 	if paper_heart and next_health > max_health:
 		guard = minf(max_health * 0.5, guard + next_health - max_health)
 	health = minf(max_health, next_health)
 	health_changed.emit(health, max_health)
+	var game := get_parent()
+	if game.has_method("record_playtest_event") and health > health_before:
+		game.record_playtest_event("player_healed", {"amount": health - health_before, "health_before": health_before, "health_after": health})
 
 
 func activate_frenzy(duration: float = 8.0) -> void:

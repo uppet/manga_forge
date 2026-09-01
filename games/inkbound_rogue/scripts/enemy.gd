@@ -332,7 +332,7 @@ func _physics_process(delta: float) -> void:
 	if distance < contact_range and contact_cooldown <= 0.0:
 		contact_cooldown = 0.72 if enemy_kind == "leech" else 0.86
 		if target.has_method("take_damage"):
-			var landed: bool = target.take_damage(contact_damage, direction)
+			var landed: bool = target.take_damage(contact_damage, direction, "contact:" + enemy_kind)
 			if landed and enemy_kind == "leech":
 				health = minf(max_health, health + contact_damage * 1.8)
 			if landed and is_elite and elite_affix == "vampiric":
@@ -496,28 +496,28 @@ func shoot_projectiles(direction: Vector2) -> void:
 		game.play_spatial_sound("enemy_cast", global_position, cast_pitch)
 	match enemy_kind:
 		"scribe":
-			game.spawn_projectile(global_position, direction, 126.0)
+			game.spawn_projectile(global_position, direction, 126.0, "projectile:" + enemy_kind)
 			game.spawn_word(global_position + Vector2(0, -22), "SCRIBE!", GOLD)
 		"warden":
 			for index in range(8):
-				game.spawn_projectile(global_position, Vector2.from_angle(TAU * float(index) / 8.0 + pattern_phase * 0.2), 82.0)
+				game.spawn_projectile(global_position, Vector2.from_angle(TAU * float(index) / 8.0 + pattern_phase * 0.2), 82.0, "projectile:" + enemy_kind)
 			game.spawn_word(global_position + Vector2(0, -28), "SEAL!", STEEL)
 		"blot":
 			for index in range(6):
-				game.spawn_projectile(global_position, Vector2.from_angle(TAU * float(index) / 6.0 + pattern_phase * 0.16), 58.0)
+				game.spawn_projectile(global_position, Vector2.from_angle(TAU * float(index) / 6.0 + pattern_phase * 0.16), 58.0, "projectile:" + enemy_kind)
 			game.spawn_word(global_position + Vector2(0, -26), "SPILL!", CRIMSON)
 		"binder":
 			for index in range(10):
-				game.spawn_projectile(global_position, Vector2.from_angle(TAU * float(index) / 10.0 + pattern_phase * 0.35), 92.0)
+				game.spawn_projectile(global_position, Vector2.from_angle(TAU * float(index) / 10.0 + pattern_phase * 0.35), 92.0, "projectile:" + enemy_kind)
 			game.spawn_word(global_position + Vector2(0, -34), "BIND!", GOLD)
 		"author":
 			for index in range(5):
 				var angle := pattern_phase * 0.9 + TAU * float(index) / 5.0
-				game.spawn_projectile(global_position, Vector2.from_angle(angle), 112.0 + index * 5.0)
+				game.spawn_projectile(global_position, Vector2.from_angle(angle), 112.0 + index * 5.0, "projectile:" + enemy_kind)
 			game.spawn_word(global_position + Vector2(0, -40), "REVISE!", CRIMSON)
 		_:
 			for offset_angle in [-0.36, 0.0, 0.36]:
-				game.spawn_projectile(global_position, direction.rotated(offset_angle), 104.0)
+				game.spawn_projectile(global_position, direction.rotated(offset_angle), 104.0, "projectile:" + enemy_kind)
 			game.spawn_word(global_position + Vector2(0, -30), "EDIT!", CRIMSON)
 
 
@@ -593,11 +593,11 @@ func die() -> void:
 		game.spawn_enemy("mask", global_position + Vector2(13, 0))
 	if enemy_kind == "blot" and game.has_method("spawn_projectile"):
 		for index in range(8):
-			game.spawn_projectile(global_position, Vector2.from_angle(TAU * float(index) / 8.0), 74.0)
+			game.spawn_projectile(global_position, Vector2.from_angle(TAU * float(index) / 8.0), 74.0, "projectile:blot-death")
 		if game.has_method("spawn_word"):
 			game.spawn_word(global_position + Vector2(0, -22), "SPLAT!", CRIMSON)
 	if is_elite and elite_affix == "volatile" and is_instance_valid(target) and global_position.distance_to(target.global_position) < 62.0:
-		target.take_damage(1.5, (target.global_position - global_position).normalized())
+		target.take_damage(1.5, (target.global_position - global_position).normalized(), "elite:volatile")
 		if game.has_method("spawn_word"):
 			game.spawn_word(global_position + Vector2(0, -18), "BOOM!", GOLD)
 	died.emit(self, xp_value, global_position, enemy_kind)

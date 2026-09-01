@@ -8,16 +8,18 @@ const HOSTILE_INK := Color("08070b")
 var direction := Vector2.RIGHT
 var speed := 92.0
 var damage := 1
+var source_id := "projectile"
 var target: Node2D
 var life := 0.0
 var sprite: Sprite2D
 
 
-func setup(at: Vector2, travel_direction: Vector2, player_target: Node2D, projectile_speed: float = 92.0) -> InkboundProjectile:
+func setup(at: Vector2, travel_direction: Vector2, player_target: Node2D, projectile_speed: float = 92.0, source: String = "projectile") -> InkboundProjectile:
 	global_position = at
 	direction = travel_direction.normalized()
 	target = player_target
 	speed = projectile_speed
+	source_id = source.left(64)
 	return self
 
 
@@ -39,7 +41,7 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 	if is_instance_valid(target) and global_position.distance_to(target.global_position) < 13.0:
 		if target.has_method("take_damage"):
-			target.take_damage(damage, direction)
+			target.take_damage(damage, direction, source_id)
 		queue_free()
 	elif life > 8.0 or absf(global_position.x) > 700.0 or absf(global_position.y) > 420.0:
 		queue_free()

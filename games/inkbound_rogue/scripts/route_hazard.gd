@@ -412,7 +412,7 @@ func _explode_cache() -> void:
 
 
 func _damage_player(amount: float, push_direction: Vector2) -> bool:
-	var landed: bool = target.take_damage(amount, push_direction)
+	var landed: bool = target.take_damage(amount, push_direction, "hazard:" + hazard_id)
 	if landed:
 		player_hits += 1
 	return landed

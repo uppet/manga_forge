@@ -89,6 +89,8 @@ func _process(delta: float) -> void:
 
 func _collect() -> void:
 	var game := get_parent()
+	if game.has_method("record_playtest_event"):
+		game.record_playtest_event("pickup_collected", {"pickup": pickup_kind, "value": value, "position": global_position})
 	match pickup_kind:
 		"heal":
 			if target.has_method("heal"):
