@@ -83,6 +83,7 @@ func _validate_chinese_runtime() -> bool:
 	game.hud._unhandled_input(right_trigger)
 	if not game.hud.story_visible:
 		return _fail("right trigger did not open the Story Archive")
+	game.hud.debug_finish_popup_transition()
 	game.hud._unhandled_input(right_trigger)
 	if not game.hud.story_visible:
 		return _fail("held right trigger repeatedly toggled the Story Archive")
@@ -92,6 +93,7 @@ func _validate_chinese_runtime() -> bool:
 		return _fail("right trigger did not re-arm after returning to neutral")
 	game.hud._unhandled_input(_joy_axis(JOY_AXIS_TRIGGER_RIGHT, 0.0))
 	game.hud.show_settings()
+	game.hud.debug_finish_popup_transition()
 	game.hud.settings_selected = 0
 	var stick_down := _joy_axis(JOY_AXIS_LEFT_Y, 1.0)
 	game.hud._unhandled_input(stick_down)
@@ -111,6 +113,7 @@ func _validate_chinese_runtime() -> bool:
 		return _fail("eleventh settings row overlaps the footer")
 
 	game.hud.hide_settings()
+	game.hud.debug_finish_popup_transition()
 	game.hud.set_xp(2, 5, 3)
 	if game.hud.level_label.text != "等级 3":
 		return _fail("level HUD remained in English")
@@ -136,6 +139,7 @@ func _validate_chinese_runtime() -> bool:
 	resonant_choice["_draft_next_threshold"] = 3
 	var upgrade_choices: Array[Dictionary] = [resonant_choice, Content.upgrade("ink-wave"), Content.upgrade("merciful-revision")]
 	game.hud.show_upgrade(upgrade_choices)
+	game.hud.debug_finish_upgrade_transition()
 	if game.hud.upgrade_name_labels[0].text.find("锋刃墨") < 0 or game.hud.upgrade_description_labels[2].text.find("恢复") < 0:
 		return _fail("technique cards were not localized")
 	if game.hud.upgrade_title_label.text.find("当前构筑") < 0 or game.hud.upgrade_rarity_labels[0].text.find("即将觉醒") < 0 or game.hud.upgrade_rarity_labels[0].text.find("墨锋") < 0:
@@ -147,6 +151,7 @@ func _validate_chinese_runtime() -> bool:
 	game.hud.upgrade_panel.visible = false
 
 	game.hud.show_event(Content.event("forgotten-shrine"))
+	game.hud.debug_finish_popup_transition()
 	if game.hud.event_title.text.find("遗忘神龛") < 0 or game.hud.event_buttons[0].text.find("献出一次心跳") < 0:
 		return _fail("event choices were not localized")
 	game.hud.event_visible = false

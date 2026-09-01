@@ -29,13 +29,16 @@ func _process(_delta: float) -> bool:
 		if not _capture("inkbound-zh-title.png"):
 			return true
 		game.hud.show_settings()
+		game.hud.debug_finish_popup_transition()
 	elif frames == 8:
 		if not _capture("inkbound-zh-settings.png"):
 			return true
 		game.hud.hide_settings()
+		game.hud.debug_finish_popup_transition()
 		game.hud.hide_title()
 		var upgrade_choices: Array[Dictionary] = [Content.upgrade("razor-ink"), Content.upgrade("ink-wave"), Content.upgrade("merciful-revision")]
 		game.hud.show_upgrade(upgrade_choices)
+		game.hud.debug_finish_upgrade_transition()
 	elif frames == 11:
 		if not _capture("inkbound-zh-upgrades.png"):
 			return true
@@ -65,6 +68,7 @@ func _process(_delta: float) -> bool:
 
 
 func _capture(filename: String) -> bool:
+	game.hud.debug_finish_popup_transition()
 	var image := root.get_texture().get_image()
 	if image == null:
 		push_error("INKBOUND_LOCALIZATION_UI_FAIL: viewport texture unavailable")

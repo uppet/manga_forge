@@ -95,11 +95,17 @@ func _process(_delta: float) -> bool:
 
 func _resolve_modal_state() -> void:
 	if game.choosing_relic:
+		game.hud.debug_finish_popup_transition()
 		game.hud._choose_relic(0)
+		game.hud.debug_finish_popup_transition()
 	elif game.choosing_upgrade:
+		game.hud.debug_finish_upgrade_transition()
 		game.hud._choose_upgrade(0)
+		game.hud.debug_finish_upgrade_transition()
 	elif game.choosing_event:
+		game.hud.debug_finish_popup_transition()
 		game.hud._choose_event(1)
+		game.hud.debug_finish_popup_transition()
 	elif paused:
 		paused = false
 

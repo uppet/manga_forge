@@ -36,9 +36,11 @@ func _process(_delta: float) -> bool:
 		game.hud.set_input_mode(true)
 		game.hud.show_title(game._meta_snapshot())
 		game.hud._show_daily()
+		game.hud.debug_finish_popup_transition()
 		return false
 	if frames < 5:
 		return false
+	game.hud.debug_finish_popup_transition()
 	if not _validate_layout():
 		_cleanup(1)
 		return true

@@ -21,6 +21,7 @@ func _process(_delta: float) -> bool:
 		game.hud.show_title(game._meta_snapshot())
 		game.hud.set_input_mode(true)
 		game.hud.show_manual(0)
+		game.hud.debug_finish_popup_transition()
 	elif frames == 12:
 		if not _capture("inkbound-field-manual.png"):
 			return true
@@ -37,6 +38,7 @@ func _process(_delta: float) -> bool:
 
 
 func _capture(filename: String) -> bool:
+	game.hud.debug_finish_popup_transition()
 	var design_height := float(ProjectSettings.get_setting("display/window/size/viewport_height", 270))
 	var viewport_scale := maxf(1.0, float(root.get_texture().get_height()) / maxf(1.0, design_height))
 	if game.hud.manual_body_label.get_content_height() > game.hud.manual_body_label.size.y * viewport_scale:

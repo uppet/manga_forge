@@ -141,6 +141,7 @@ func _validate_controls_and_fresh_lock(game: Node) -> bool:
 		return false
 	game.hud.show_title(game._meta_snapshot())
 	game.hud._show_proof_ledger()
+	game.hud.debug_finish_popup_transition()
 	if not game.hud.proof_visible or game.hud.proof_buttons.size() != 11 or not game.hud.proof_buttons[1].disabled:
 		_fail("fresh Proof Ledger did not expose one open and ten locked depths", game)
 		return false

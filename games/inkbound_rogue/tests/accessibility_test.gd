@@ -75,6 +75,7 @@ func _run_test() -> void:
 
 	game.debug_set_language(Localization.LANGUAGE_CHINESE)
 	game.hud.show_settings()
+	game.hud.debug_finish_popup_transition()
 	var aim_row: int = game.hud.SETTINGS_ROWS.find(["aim_assist", "CONTROLLER AIM ASSIST"])
 	var flashes_row: int = game.hud.SETTINGS_ROWS.find(["reduced_flashes", "REDUCED FLASHES"])
 	if aim_row < 0 or flashes_row < 0:

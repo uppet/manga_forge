@@ -1,4 +1,4 @@
-# P1 candidate readiness — 0.23.2-alpha
+# P1 candidate readiness — 0.23.3-alpha
 
 Snapshot date: 2026-09-02. This is the automated development baseline for a
 small, private Windows playtest. It is not evidence of Steam release quality or
@@ -9,13 +9,14 @@ of player enjoyment, accessibility, minimum hardware, or controller coverage.
 | Check | Result |
 | --- | --- |
 | Serial regression | Pass: 26/26 gameplay, save, pause, UI, localization, balance, persona, recorder, and stress gates |
-| Evidence directory | `build/p1-suite/20260901T162501Z/` in the Windows runtime; compact summary plus one log per gate |
-| Recorded stress run | Pass: 1,200 frames, 141.1 processing FPS average, 74 peak enemies, 58 peak pickups, 784 peak nodes, 120.3 MiB static memory, Page 13, 223 kills |
-| Unrecorded suite stress run | Pass: 1,200 frames, 141.0 processing FPS average, 76 peak enemies, 61 peak pickups, 768 peak nodes, 120.0 MiB static memory, Page 13, 238 kills |
+| Modal transitions | Pass: upgrade drafts retain their 0.24-second/0.18-second elastic transitions and 1.016× opening/closing overshoot; relic, event, pause, manual, settings, binding, title-overlay, game-over, and credits panels use 0.16-second fade-ins and 0.12-second fade-outs. Input stays locked and gameplay stays paused until closing callbacks complete |
+| Evidence directory | `build/p1-suite/20260901T173520Z/` in the Windows runtime; compact summary plus one log per gate |
+| Recorded stress run | Pass: 1,200 frames, 142.1 processing FPS average, 76 peak enemies, 51 peak pickups, 779 peak nodes, 121.1 MiB static memory, Page 13, 225 kills |
+| Unrecorded suite stress run | Pass: 1,200 frames, 142.1 processing FPS average, 77 peak enemies, 44 peak pickups, 728 peak nodes, 120.7 MiB static memory, Page 13, 225 kills |
 | Windows export boot | Pass: embedded-PCK executable ran 120 frames with GL Compatibility on Radeon RX 9070 XT and exited normally |
 | Recorded CMD launcher | Pass: consent-capable launcher started the real EXE, wrote a complete pseudonymous session, removed `incomplete.flag`, and left zero processes |
-| Release/depot audit | Pass: 73 assets; 59 procedural, 14 pre-generated AI, zero live AI; exactly 3 Steam depot files (111,333,225 bytes) and 4 itch.io recorded-playtest files (111,336,590 bytes) |
-| Candidate executable | `build/itch-windows/InkboundRogue.exe`; audited SHA-256 `0d27ded951304eeede3dc270d95b93be43dac2a22045db2206bb7075b13f2d50` |
+| Release/depot audit | Pass: 73 assets; 59 procedural, 14 pre-generated AI, zero live AI; exactly 3 Steam depot files (111,345,433 bytes) and 4 itch.io recorded-playtest files (111,348,798 bytes) |
+| Candidate executable | `build/itch-windows/InkboundRogue.exe`; audited SHA-256 `ab98ffbb3bb4fad3d3f8427d65eab78774724ae294a73d1334da0124382c6a61` |
 | Process hygiene | Pass: zero Godot or exported-game processes after the serial suite |
 
 The recorded and unrecorded stress figures are development-machine processing

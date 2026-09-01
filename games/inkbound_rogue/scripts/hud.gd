@@ -28,6 +28,12 @@ const PAPER := Color("efe2c4")
 const WHITE := Color("fff8e0")
 const CRIMSON := Color("d33037")
 const GOLD := Color("f2b344")
+const UPGRADE_OPEN_DURATION := 0.24
+const UPGRADE_CARD_STAGGER := 0.025
+const UPGRADE_CLOSE_DURATION := 0.18
+const POPUP_FADE_IN_DURATION := 0.16
+const POPUP_FADE_OUT_DURATION := 0.12
+const POPUP_START_SCALE := Vector2(0.97, 0.97)
 
 var hp_bar: ColorRect
 var hp_bar_fill: ColorRect
@@ -87,6 +93,12 @@ var restart_button: Button
 var device_notice: Label
 var device_notice_tween: Tween
 var upgrade_visible := false
+var upgrade_transitioning := false
+var upgrade_transition_phase := ""
+var upgrade_transition_tween: Tween
+var pending_upgrade_index := -1
+var popup_transitions: Dictionary = {}
+var popup_button_states: Dictionary = {}
 var relic_draft_visible := false
 var game_over_visible := false
 var using_gamepad := false
@@ -473,6 +485,7 @@ func _build_hud() -> void:
 	# remain as context without competing with the isolated card text regions.
 	upgrade_panel.color = Color(0.035, 0.03, 0.045, 0.9)
 	upgrade_panel.clip_contents = true
+	upgrade_panel.pivot_offset = upgrade_panel.size * 0.5
 	upgrade_panel.visible = false
 	add_child(upgrade_panel)
 	upgrade_title_label = _make_child_label(upgrade_panel, "CHOOSE THE NEXT STROKE", Vector2(8, 2), Vector2(452, 24), 14, WHITE)
@@ -591,7 +604,7 @@ func _build_hud() -> void:
 	restart_button.text = "R  REWRITE THE PAGE"
 	restart_button.add_theme_font_size_override("font_size", 10)
 	restart_button.focus_mode = Control.FOCUS_NONE
-	restart_button.pressed.connect(func() -> void: restart_requested.emit())
+	restart_button.pressed.connect(_request_game_over_restart)
 	game_over_panel.add_child(restart_button)
 
 	victory_credits_panel = ColorRect.new()
@@ -1068,19 +1081,24 @@ func _build_manual() -> void:
 
 
 func show_manual(page_value: int = 0) -> void:
+	if _popup_transition_active(manual_panel):
+		return
 	manual_page = clampi(page_value, 0, FIELD_MANUAL_PAGES.size() - 1)
 	manual_visible = true
-	manual_panel.visible = true
 	manual_panel.move_to_front()
 	_refresh_manual()
+	_show_popup(manual_panel)
 	manual_visibility_changed.emit(true)
 
 
 func hide_manual() -> void:
-	if not manual_visible:
+	if not manual_visible or _popup_transition_active(manual_panel):
 		return
+	_hide_popup(manual_panel, _finish_hide_manual)
+
+
+func _finish_hide_manual() -> void:
 	manual_visible = false
-	manual_panel.visible = false
 	manual_visibility_changed.emit(false)
 
 
@@ -1288,13 +1306,55 @@ func set_ink_art(art_name_value: String, remaining: float, maximum: float) -> vo
 
 
 func show_upgrade(choices: Array[Dictionary]) -> void:
+	_cancel_upgrade_transition()
 	upgrade_visible = true
+	upgrade_transitioning = true
+	upgrade_transition_phase = "opening"
+	pending_upgrade_index = -1
 	upgrade_panel.visible = true
 	upgrade_panel.move_to_front()
+	upgrade_panel.pivot_offset = upgrade_panel.size * 0.5
+	upgrade_panel.scale = Vector2(0.84, 0.84)
+	upgrade_panel.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	current_choices.clear()
 	for choice in choices:
 		current_choices.append(choice)
 	_refresh_upgrade_buttons()
+	for index in range(upgrade_buttons.size()):
+		var button := upgrade_buttons[index]
+		button.pivot_offset = button.size * 0.5
+		button.scale = Vector2(0.88, 0.88)
+		button.modulate = Color(1.0, 1.0, 1.0, 0.68)
+	_start_upgrade_open_animation()
+
+
+func _start_upgrade_open_animation() -> void:
+	upgrade_transition_tween = create_tween()
+	upgrade_transition_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	upgrade_transition_tween.set_parallel(true)
+	upgrade_transition_tween.tween_property(upgrade_panel, "scale", Vector2.ONE, UPGRADE_OPEN_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	upgrade_transition_tween.tween_property(upgrade_panel, "modulate", Color.WHITE, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	for index in range(upgrade_buttons.size()):
+		if not upgrade_buttons[index].visible:
+			continue
+		var delay := 0.035 + float(index) * UPGRADE_CARD_STAGGER
+		upgrade_transition_tween.tween_property(upgrade_buttons[index], "scale", Vector2.ONE, 0.18).set_delay(delay).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		upgrade_transition_tween.tween_property(upgrade_buttons[index], "modulate", Color.WHITE, 0.12).set_delay(delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	upgrade_transition_tween.finished.connect(_finish_upgrade_open)
+
+
+func _finish_upgrade_open() -> void:
+	if upgrade_transition_phase != "opening":
+		return
+	upgrade_transition_tween = null
+	upgrade_transition_phase = ""
+	upgrade_transitioning = false
+	upgrade_panel.scale = Vector2.ONE
+	upgrade_panel.modulate = Color.WHITE
+	for index in range(upgrade_buttons.size()):
+		upgrade_buttons[index].scale = Vector2.ONE
+		upgrade_buttons[index].modulate = Color.WHITE
+		upgrade_buttons[index].disabled = index >= current_choices.size()
 
 
 func _refresh_upgrade_buttons() -> void:
@@ -1305,6 +1365,7 @@ func _refresh_upgrade_buttons() -> void:
 	for i in range(upgrade_buttons.size()):
 		var has_choice := i < current_choices.size()
 		upgrade_buttons[i].visible = has_choice
+		upgrade_buttons[i].disabled = upgrade_transitioning or not has_choice
 		if not has_choice:
 			continue
 		var choice: Dictionary = Localization.localized(current_choices[i])
@@ -1378,23 +1439,228 @@ func _upgrade_rarity_color(rarity: String) -> Color:
 
 
 func _choose_upgrade(index: int) -> void:
-	if not upgrade_visible:
+	if not upgrade_visible or upgrade_transitioning or index < 0 or index >= current_choices.size():
 		return
+	upgrade_transitioning = true
+	upgrade_transition_phase = "closing"
+	pending_upgrade_index = index
+	for button in upgrade_buttons:
+		button.disabled = true
+	upgrade_buttons[index].modulate = Color(1.08, 0.94, 0.64, 1.0)
+	upgrade_transition_tween = create_tween()
+	upgrade_transition_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	upgrade_transition_tween.set_parallel(true)
+	# BACK/EASE_IN briefly pulls the panel outward before it snaps toward the
+	# centre, making dismissal feel like a physical release instead of a cut.
+	upgrade_transition_tween.tween_property(upgrade_panel, "scale", Vector2(0.84, 0.84), UPGRADE_CLOSE_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	upgrade_transition_tween.tween_property(upgrade_panel, "modulate", Color(1.0, 1.0, 1.0, 0.0), 0.14).set_delay(0.04).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	upgrade_transition_tween.finished.connect(_finish_upgrade_close)
+
+
+func _finish_upgrade_close() -> void:
+	if upgrade_transition_phase != "closing":
+		return
+	var selected_index := pending_upgrade_index
+	upgrade_transition_tween = null
+	upgrade_transition_phase = ""
+	pending_upgrade_index = -1
+	upgrade_transitioning = false
 	upgrade_visible = false
 	upgrade_panel.visible = false
+	upgrade_panel.scale = Vector2.ONE
+	upgrade_panel.modulate = Color.WHITE
+	for button in upgrade_buttons:
+		button.scale = Vector2.ONE
+		button.modulate = Color.WHITE
 	current_choices.clear()
-	upgrade_selected.emit(index)
+	upgrade_selected.emit(selected_index)
+
+
+func _cancel_upgrade_transition() -> void:
+	if upgrade_transition_tween != null and upgrade_transition_tween.is_valid():
+		upgrade_transition_tween.kill()
+	upgrade_transition_tween = null
+	upgrade_transition_phase = ""
+	upgrade_transitioning = false
+	pending_upgrade_index = -1
+
+
+func debug_finish_upgrade_transition() -> void:
+	# Deterministic render/smoke tests can settle the real transition without
+	# weakening production input locking or depending on host frame rate.
+	var phase := upgrade_transition_phase
+	if phase.is_empty():
+		return
+	if upgrade_transition_tween != null and upgrade_transition_tween.is_valid():
+		upgrade_transition_tween.kill()
+	upgrade_transition_tween = null
+	if phase == "opening":
+		_finish_upgrade_open()
+	elif phase == "closing":
+		_finish_upgrade_close()
+
+
+func _show_popup(panel: Control, scale_effect: bool = true) -> void:
+	if not is_instance_valid(panel):
+		return
+	_cancel_popup_transition(panel)
+	var panel_id := panel.get_instance_id()
+	panel.visible = true
+	panel.pivot_offset = panel.size * 0.5
+	panel.scale = POPUP_START_SCALE if scale_effect else Vector2.ONE
+	panel.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	_lock_popup_buttons(panel)
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.set_parallel(true)
+	tween.tween_property(panel, "modulate", Color.WHITE, POPUP_FADE_IN_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	if scale_effect:
+		tween.tween_property(panel, "scale", Vector2.ONE, POPUP_FADE_IN_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	popup_transitions[panel_id] = {
+		"panel": panel,
+		"phase": "in",
+		"tween": tween,
+		"callback": Callable(),
+	}
+	tween.finished.connect(_finish_popup_transition.bind(panel_id))
+
+
+func _hide_popup(panel: Control, callback: Callable = Callable(), scale_effect: bool = true) -> void:
+	if not is_instance_valid(panel):
+		if callback.is_valid():
+			callback.call()
+		return
+	if not panel.visible:
+		if callback.is_valid():
+			callback.call()
+		return
+	_cancel_popup_transition(panel)
+	var panel_id := panel.get_instance_id()
+	_lock_popup_buttons(panel)
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.set_parallel(true)
+	tween.tween_property(panel, "modulate", Color(1.0, 1.0, 1.0, 0.0), POPUP_FADE_OUT_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	if scale_effect:
+		tween.tween_property(panel, "scale", POPUP_START_SCALE, POPUP_FADE_OUT_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	popup_transitions[panel_id] = {
+		"panel": panel,
+		"phase": "out",
+		"tween": tween,
+		"callback": callback,
+	}
+	tween.finished.connect(_finish_popup_transition.bind(panel_id))
+
+
+func _finish_popup_transition(panel_id: int) -> void:
+	var transition: Dictionary = popup_transitions.get(panel_id, {})
+	if transition.is_empty():
+		return
+	var panel: Control = transition.get("panel")
+	var phase := str(transition.get("phase", ""))
+	var callback: Callable = transition.get("callback", Callable())
+	popup_transitions.erase(panel_id)
+	if is_instance_valid(panel):
+		panel.scale = Vector2.ONE
+		panel.modulate = Color.WHITE
+		if phase == "out":
+			panel.visible = false
+	_unlock_popup_buttons(panel_id)
+	if phase == "out" and callback.is_valid():
+		callback.call()
+
+
+func _cancel_popup_transition(panel: Control) -> void:
+	var panel_id := panel.get_instance_id()
+	var transition: Dictionary = popup_transitions.get(panel_id, {})
+	if transition.is_empty():
+		return
+	var tween: Tween = transition.get("tween")
+	if tween != null and tween.is_valid():
+		tween.kill()
+	popup_transitions.erase(panel_id)
+	panel.scale = Vector2.ONE
+	panel.modulate = Color.WHITE
+	_unlock_popup_buttons(panel_id)
+
+
+func _lock_popup_buttons(panel: Control) -> void:
+	var panel_id := panel.get_instance_id()
+	if popup_button_states.has(panel_id):
+		return
+	var states: Array[Dictionary] = []
+	for node in panel.find_children("*", "Button", true, false):
+		var button := node as Button
+		states.append({"button": button, "disabled": button.disabled})
+		button.disabled = true
+	popup_button_states[panel_id] = states
+
+
+func _unlock_popup_buttons(panel_id: int) -> void:
+	var states: Array = popup_button_states.get(panel_id, [])
+	popup_button_states.erase(panel_id)
+	for state_value in states:
+		var state: Dictionary = state_value
+		var button: Button = state.get("button")
+		if is_instance_valid(button):
+			button.disabled = bool(state.get("disabled", false))
+
+
+func _popup_transition_active(panel: Control) -> bool:
+	return is_instance_valid(panel) and popup_transitions.has(panel.get_instance_id())
+
+
+func _popup_transition_phase(panel: Control) -> String:
+	if not is_instance_valid(panel):
+		return ""
+	return str(popup_transitions.get(panel.get_instance_id(), {}).get("phase", ""))
+
+
+func _hide_popup_immediate(panel: Control) -> void:
+	if not is_instance_valid(panel):
+		return
+	_cancel_popup_transition(panel)
+	panel.visible = false
+	panel.scale = Vector2.ONE
+	panel.modulate = Color.WHITE
+
+
+func debug_finish_popup_transition(panel: Control = null) -> void:
+	if panel != null:
+		var panel_id := panel.get_instance_id()
+		var transition: Dictionary = popup_transitions.get(panel_id, {})
+		if transition.is_empty():
+			return
+		var tween: Tween = transition.get("tween")
+		if tween != null and tween.is_valid():
+			tween.kill()
+		_finish_popup_transition(panel_id)
+		return
+	# Some close callbacks intentionally open the parent panel (bindings back to
+	# settings). Drain those chained transitions as well for deterministic tests.
+	var guard := 0
+	while not popup_transitions.is_empty() and guard < 8:
+		guard += 1
+		for panel_id_value in popup_transitions.keys():
+			var panel_id := int(panel_id_value)
+			var transition: Dictionary = popup_transitions.get(panel_id, {})
+			if transition.is_empty():
+				continue
+			var tween: Tween = transition.get("tween")
+			if tween != null and tween.is_valid():
+				tween.kill()
+			_finish_popup_transition(panel_id)
 
 
 func show_relic_draft(choices: Array[Dictionary], source: String = "FOUND IN THE MARGIN") -> void:
 	relic_draft_visible = true
-	relic_draft_panel.visible = true
 	relic_draft_panel.move_to_front()
 	current_relic_choices.clear()
 	for choice in choices:
 		current_relic_choices.append(choice)
 	relic_draft_source_label.text = Localization.text(source.to_upper())
 	_refresh_relic_draft_buttons()
+	_show_popup(relic_draft_panel)
 
 
 func _refresh_relic_draft_buttons() -> void:
@@ -1414,10 +1680,13 @@ func _refresh_relic_draft_buttons() -> void:
 
 
 func _choose_relic(index: int) -> void:
-	if not relic_draft_visible or index < 0 or index >= current_relic_choices.size():
+	if not relic_draft_visible or _popup_transition_active(relic_draft_panel) or index < 0 or index >= current_relic_choices.size():
 		return
+	_hide_popup(relic_draft_panel, _finish_relic_choice.bind(index))
+
+
+func _finish_relic_choice(index: int) -> void:
 	relic_draft_visible = false
-	relic_draft_panel.visible = false
 	current_relic_choices.clear()
 	relic_selected.emit(index)
 
@@ -1425,7 +1694,6 @@ func _choose_relic(index: int) -> void:
 func show_event(event_data: Dictionary) -> void:
 	event_visible = true
 	current_event = event_data.duplicate(true)
-	event_panel.visible = true
 	event_panel.move_to_front()
 	var localized_event: Dictionary = Localization.localized(event_data)
 	event_title.text = str(localized_event.get("title", Localization.text("A MEMORY IN THE MARGIN")))
@@ -1441,16 +1709,20 @@ func show_event(event_data: Dictionary) -> void:
 			event_buttons[index].text = "%s\n%s\n\n%s" % [prefixes[index], option.get("label", "CHOICE"), option.get("description", "")]
 		else:
 			event_buttons[index].visible = false
+	_show_popup(event_panel)
 
 
 func _choose_event(index: int) -> void:
-	if not event_visible:
+	if not event_visible or _popup_transition_active(event_panel):
 		return
 	var options: Array = current_event.get("options", [])
 	if index < 0 or index >= options.size():
 		return
+	_hide_popup(event_panel, _finish_event_choice.bind(index))
+
+
+func _finish_event_choice(index: int) -> void:
 	event_visible = false
-	event_panel.visible = false
 	current_event.clear()
 	event_selected.emit(index)
 
@@ -1459,27 +1731,34 @@ func show_game_over(summary: Dictionary) -> void:
 	hide_victory_credits()
 	last_result_summary = summary.duplicate(true)
 	game_over_visible = true
-	game_over_backdrop.visible = true
-	game_over_panel.visible = true
 	game_over_backdrop.move_to_front()
 	game_over_panel.move_to_front()
 	game_over_title.text = "THE PAGE GOES BLACK"
 	game_over_title.add_theme_color_override("font_color", CRIMSON)
 	game_over_label.text = _run_result_text(summary)
 	restart_button.text = "REWRITE THE PAGE"
+	_show_popup(game_over_backdrop, false)
+	_show_popup(game_over_panel)
+
+
+func _request_game_over_restart() -> void:
+	if not game_over_visible or _popup_transition_active(game_over_panel):
+		return
+	_hide_popup(game_over_backdrop, Callable(), false)
+	_hide_popup(game_over_panel, func() -> void: restart_requested.emit())
 
 
 func show_victory(summary: Dictionary) -> void:
 	last_result_summary = summary.duplicate(true)
 	game_over_visible = false
-	game_over_backdrop.visible = false
-	game_over_panel.visible = false
+	_hide_popup(game_over_backdrop, Callable(), false)
+	_hide_popup(game_over_panel)
 	victory_credit_pages = _victory_credit_page_data(summary)
 	victory_credit_page = 0
 	victory_credits_visible = true
-	victory_credits_panel.visible = true
 	victory_credits_panel.move_to_front()
 	_show_victory_credit_page()
+	_show_popup(victory_credits_panel, false)
 
 
 func _victory_credit_page_data(summary: Dictionary) -> Array[Dictionary]:
@@ -1536,14 +1815,14 @@ func _skip_victory_credits_to_thanks() -> void:
 	_show_victory_credit_page()
 
 
-func hide_victory_credits() -> void:
+func hide_victory_credits(callback: Callable = Callable()) -> void:
 	if victory_credit_tween != null and victory_credit_tween.is_valid():
 		victory_credit_tween.kill()
 	victory_credit_tween = null
 	victory_credit_pages.clear()
 	victory_credits_visible = false
 	victory_credits_final = false
-	victory_credits_panel.visible = false
+	_hide_popup(victory_credits_panel, callback, false)
 
 
 func _run_result_text(summary: Dictionary) -> String:
@@ -1632,7 +1911,11 @@ func _run_result_text_zh(summary: Dictionary) -> String:
 
 
 func set_paused(paused: bool) -> void:
-	pause_panel.visible = paused and not manual_visible and not upgrade_visible and not relic_draft_visible and not game_over_visible
+	var should_show := paused and not manual_visible and not upgrade_visible and not relic_draft_visible and not event_visible and not game_over_visible
+	if should_show and (not pause_panel.visible or _popup_transition_phase(pause_panel) == "out"):
+		_show_popup(pause_panel)
+	elif not should_show and pause_panel.visible and _popup_transition_phase(pause_panel) != "out":
+		_hide_popup(pause_panel)
 	if not paused and settings_visible and not title_visible:
 		hide_settings()
 
@@ -1760,13 +2043,13 @@ func show_title(meta: Dictionary) -> void:
 	proof_depth = clampi(int(title_data.get("preferred_proof_depth", 0)), 0, int(title_data.get("max_proof_depth", 0)))
 	proof_selected = proof_depth
 	proof_visible = false
-	proof_panel.visible = false
+	_hide_popup_immediate(proof_panel)
 	daily_visible = false
-	daily_panel.visible = false
+	_hide_popup_immediate(daily_panel)
 	restoration_visible = false
-	restoration_panel.visible = false
+	_hide_popup_immediate(restoration_panel)
 	loadout_visible = false
-	loadout_panel.visible = false
+	_hide_popup_immediate(loadout_panel)
 	new_game_armed = false
 	title_panel.visible = true
 	_ensure_title_selections_unlocked()
@@ -1779,21 +2062,21 @@ func hide_title() -> void:
 	title_visible = false
 	title_panel.visible = false
 	proof_visible = false
-	proof_panel.visible = false
+	_hide_popup_immediate(proof_panel)
 	daily_visible = false
-	daily_panel.visible = false
+	_hide_popup_immediate(daily_panel)
 	restoration_visible = false
-	restoration_panel.visible = false
+	_hide_popup_immediate(restoration_panel)
 	codex_visible = false
-	codex_panel.visible = false
+	_hide_popup_immediate(codex_panel)
 	achievements_visible = false
-	achievements_panel.visible = false
+	_hide_popup_immediate(achievements_panel)
 	history_visible = false
-	history_panel.visible = false
+	_hide_popup_immediate(history_panel)
 	story_visible = false
-	story_panel.visible = false
+	_hide_popup_immediate(story_panel)
 	loadout_visible = false
-	loadout_panel.visible = false
+	_hide_popup_immediate(loadout_panel)
 	title_navigation_cursor.visible = false
 
 
@@ -1990,28 +2273,28 @@ func _show_daily() -> void:
 	if not title_visible:
 		return
 	codex_visible = false
-	codex_panel.visible = false
+	_hide_popup(codex_panel)
 	achievements_visible = false
-	achievements_panel.visible = false
+	_hide_popup(achievements_panel)
 	history_visible = false
-	history_panel.visible = false
+	_hide_popup(history_panel)
 	story_visible = false
-	story_panel.visible = false
+	_hide_popup(story_panel)
 	loadout_visible = false
-	loadout_panel.visible = false
+	_hide_popup(loadout_panel)
 	proof_visible = false
-	proof_panel.visible = false
+	_hide_popup(proof_panel)
 	restoration_visible = false
-	restoration_panel.visible = false
+	_hide_popup(restoration_panel)
 	daily_visible = true
-	daily_panel.visible = true
 	daily_panel.move_to_front()
 	_refresh_daily_chronicle()
+	_show_popup(daily_panel)
 
 
 func _hide_daily() -> void:
 	daily_visible = false
-	daily_panel.visible = false
+	_hide_popup(daily_panel)
 
 
 func _begin_daily() -> void:
@@ -2075,20 +2358,20 @@ func _show_loadout() -> void:
 	if not title_visible:
 		return
 	codex_visible = false
-	codex_panel.visible = false
+	_hide_popup(codex_panel)
 	achievements_visible = false
-	achievements_panel.visible = false
+	_hide_popup(achievements_panel)
 	history_visible = false
-	history_panel.visible = false
+	_hide_popup(history_panel)
 	story_visible = false
-	story_panel.visible = false
+	_hide_popup(story_panel)
 	proof_visible = false
-	proof_panel.visible = false
+	_hide_popup(proof_panel)
 	daily_visible = false
-	daily_panel.visible = false
+	_hide_popup(daily_panel)
 	loadout_visible = true
-	loadout_panel.visible = true
 	_refresh_loadout()
+	_show_popup(loadout_panel)
 
 
 func _move_loadout_selection(direction: int) -> void:
@@ -2101,23 +2384,28 @@ func _move_loadout_selection(direction: int) -> void:
 
 
 func _choose_loadout(index: int) -> void:
-	if not loadout_visible or index < 0 or index >= Content.STARTING_WEAPONS.size():
+	if not loadout_visible or _popup_transition_active(loadout_panel) or index < 0 or index >= Content.STARTING_WEAPONS.size():
 		return
 	var weapon_id := str(Content.STARTING_WEAPONS[index]["id"])
 	if weapon_id not in _unlocked_loadout_ids():
 		show_device_notice("STARTING BLADE STILL LOCKED")
 		return
 	loadout_selected = index
+	_hide_popup(loadout_panel, _finish_loadout_choice.bind(weapon_id))
+
+
+func _finish_loadout_choice(weapon_id: String) -> void:
 	loadout_visible = false
-	loadout_panel.visible = false
 	new_game_armed = false
 	hide_title()
 	start_requested.emit(difficulty_ids[difficulty_index], Content.CONTRACTS[contract_index]["id"], weapon_id, proof_depth)
 
 
 func _cancel_loadout() -> void:
+	if _popup_transition_active(loadout_panel):
+		return
 	loadout_visible = false
-	loadout_panel.visible = false
+	_hide_popup(loadout_panel)
 	new_game_armed = false
 	_refresh_title()
 
@@ -2137,19 +2425,22 @@ func _refresh_codex() -> void:
 
 
 func _toggle_codex() -> void:
-	if not title_visible:
+	if not title_visible or _popup_transition_active(codex_panel):
 		return
 	codex_visible = not codex_visible
-	codex_panel.visible = codex_visible
+	if codex_visible:
+		_show_popup(codex_panel)
+	else:
+		_hide_popup(codex_panel)
 	if codex_visible:
 		daily_visible = false
-		daily_panel.visible = false
+		_hide_popup(daily_panel)
 		achievements_visible = false
-		achievements_panel.visible = false
+		_hide_popup(achievements_panel)
 		history_visible = false
-		history_panel.visible = false
+		_hide_popup(history_panel)
 		story_visible = false
-		story_panel.visible = false
+		_hide_popup(story_panel)
 
 
 func _refresh_achievements() -> void:
@@ -2166,19 +2457,22 @@ func _refresh_achievements() -> void:
 
 
 func _toggle_achievements() -> void:
-	if not title_visible:
+	if not title_visible or _popup_transition_active(achievements_panel):
 		return
 	achievements_visible = not achievements_visible
-	achievements_panel.visible = achievements_visible
+	if achievements_visible:
+		_show_popup(achievements_panel)
+	else:
+		_hide_popup(achievements_panel)
 	if achievements_visible:
 		daily_visible = false
-		daily_panel.visible = false
+		_hide_popup(daily_panel)
 		codex_visible = false
-		codex_panel.visible = false
+		_hide_popup(codex_panel)
 		history_visible = false
-		history_panel.visible = false
+		_hide_popup(history_panel)
 		story_visible = false
-		story_panel.visible = false
+		_hide_popup(story_panel)
 
 
 func _refresh_history() -> void:
@@ -2208,19 +2502,22 @@ func _refresh_history() -> void:
 
 
 func _toggle_history() -> void:
-	if not title_visible:
+	if not title_visible or _popup_transition_active(history_panel):
 		return
 	history_visible = not history_visible
-	history_panel.visible = history_visible
+	if history_visible:
+		_show_popup(history_panel)
+	else:
+		_hide_popup(history_panel)
 	if history_visible:
 		daily_visible = false
-		daily_panel.visible = false
+		_hide_popup(daily_panel)
 		codex_visible = false
-		codex_panel.visible = false
+		_hide_popup(codex_panel)
 		achievements_visible = false
-		achievements_panel.visible = false
+		_hide_popup(achievements_panel)
 		story_visible = false
-		story_panel.visible = false
+		_hide_popup(story_panel)
 
 
 func _story_archive_entries() -> Array[Dictionary]:
@@ -2264,19 +2561,22 @@ func _refresh_story() -> void:
 
 
 func _toggle_story() -> void:
-	if not title_visible:
+	if not title_visible or _popup_transition_active(story_panel):
 		return
 	story_visible = not story_visible
-	story_panel.visible = story_visible
+	if story_visible:
+		_show_popup(story_panel)
+	else:
+		_hide_popup(story_panel)
 	if story_visible:
 		daily_visible = false
-		daily_panel.visible = false
+		_hide_popup(daily_panel)
 		codex_visible = false
-		codex_panel.visible = false
+		_hide_popup(codex_panel)
 		achievements_visible = false
-		achievements_panel.visible = false
+		_hide_popup(achievements_panel)
 		history_visible = false
-		history_panel.visible = false
+		_hide_popup(history_panel)
 	_refresh_story()
 
 
@@ -2371,15 +2671,22 @@ func refresh_localization() -> void:
 
 
 func show_settings() -> void:
+	if _popup_transition_active(settings_panel):
+		return
 	settings_visible = true
 	settings_selected = 0
-	settings_panel.visible = true
 	_refresh_settings()
+	_show_popup(settings_panel)
 
 
 func hide_settings() -> void:
+	if not settings_visible or _popup_transition_active(settings_panel):
+		return
+	_hide_popup(settings_panel, _finish_hide_settings)
+
+
+func _finish_hide_settings() -> void:
 	settings_visible = false
-	settings_panel.visible = false
 
 
 func _adjust_setting(setting_id: String, direction: int) -> void:
@@ -2424,25 +2731,30 @@ func set_bindings(data: Dictionary) -> void:
 
 func show_bindings() -> void:
 	settings_visible = false
-	settings_panel.visible = false
+	_hide_popup(settings_panel)
 	bindings_visible = true
 	binding_waiting = false
 	binding_selected_row = 0
 	binding_selected_device = 0
-	bindings_panel.visible = true
 	binding_status_label.text = "A/ENTER REBIND  ·  Y RESET DEFAULTS  ·  B/ESC BACK"
 	_refresh_bindings()
+	_show_popup(bindings_panel)
 
 
 func hide_bindings() -> void:
+	if not bindings_visible or _popup_transition_active(bindings_panel):
+		return
+	_hide_popup(bindings_panel, _finish_hide_bindings)
+
+
+func _finish_hide_bindings() -> void:
 	bindings_visible = false
 	binding_waiting = false
 	waiting_action = ""
 	waiting_device = ""
-	bindings_panel.visible = false
 	settings_visible = true
-	settings_panel.visible = true
 	_refresh_settings()
+	_show_popup(settings_panel)
 
 
 func _begin_rebind(action_id: String, device_type: String) -> void:
@@ -2543,53 +2855,55 @@ func _show_restoration() -> void:
 	if not title_visible:
 		return
 	codex_visible = false
-	codex_panel.visible = false
+	_hide_popup(codex_panel)
 	achievements_visible = false
-	achievements_panel.visible = false
+	_hide_popup(achievements_panel)
 	history_visible = false
-	history_panel.visible = false
+	_hide_popup(history_panel)
 	story_visible = false
-	story_panel.visible = false
+	_hide_popup(story_panel)
 	loadout_visible = false
-	loadout_panel.visible = false
+	_hide_popup(loadout_panel)
 	proof_visible = false
-	proof_panel.visible = false
+	_hide_popup(proof_panel)
 	daily_visible = false
-	daily_panel.visible = false
+	_hide_popup(daily_panel)
 	restoration_visible = true
-	restoration_panel.visible = true
 	restoration_panel.move_to_front()
 	restoration_selected = clampi(restoration_selected, 0, Content.META_RESTORATIONS.size() - 1)
 	_refresh_restoration_board()
+	_show_popup(restoration_panel)
 
 
 func _show_proof_ledger() -> void:
 	if not title_visible:
 		return
 	codex_visible = false
-	codex_panel.visible = false
+	_hide_popup(codex_panel)
 	achievements_visible = false
-	achievements_panel.visible = false
+	_hide_popup(achievements_panel)
 	history_visible = false
-	history_panel.visible = false
+	_hide_popup(history_panel)
 	story_visible = false
-	story_panel.visible = false
+	_hide_popup(story_panel)
 	loadout_visible = false
-	loadout_panel.visible = false
+	_hide_popup(loadout_panel)
 	restoration_visible = false
-	restoration_panel.visible = false
+	_hide_popup(restoration_panel)
 	daily_visible = false
-	daily_panel.visible = false
+	_hide_popup(daily_panel)
 	proof_visible = true
-	proof_panel.visible = true
 	proof_panel.move_to_front()
 	proof_selected = proof_depth
 	_refresh_proof_ledger()
+	_show_popup(proof_panel)
 
 
 func _hide_proof_ledger() -> void:
+	if _popup_transition_active(proof_panel):
+		return
 	proof_visible = false
-	proof_panel.visible = false
+	_hide_popup(proof_panel)
 
 
 func _select_proof(index: int) -> void:
@@ -2650,8 +2964,10 @@ func _refresh_proof_ledger() -> void:
 
 
 func _hide_restoration() -> void:
+	if _popup_transition_active(restoration_panel):
+		return
 	restoration_visible = false
-	restoration_panel.visible = false
+	_hide_popup(restoration_panel)
 
 
 func _select_restoration(index: int) -> void:
@@ -2806,11 +3122,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	# to neutral, preventing story/pause panels and selections from oscillating.
 	if _consume_repeated_gamepad_ui_event(event):
 		return
+	# Opening and closing animation frames are part of the modal. Swallow all
+	# selection edges during them so button mashing cannot choose twice or leak
+	# into gameplay when the closing callback resumes the tree.
+	if (upgrade_visible and upgrade_transitioning) or not popup_transitions.is_empty():
+		return
 	_emit_input_ui_sound(event)
 	if victory_credits_visible:
 		if _any_button_pressed(event):
 			if victory_credits_final:
-				return_to_title_requested.emit()
+				hide_victory_credits(func() -> void: return_to_title_requested.emit())
 			else:
 				_skip_victory_credits_to_thanks()
 		return
@@ -2902,11 +3223,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		if codex_visible or achievements_visible or history_visible:
 			if event.is_action_pressed("pause") or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B) or (event is InputEventKey and event.pressed and event.physical_keycode == KEY_ESCAPE):
 				codex_visible = false
-				codex_panel.visible = false
+				_hide_popup(codex_panel)
 				achievements_visible = false
-				achievements_panel.visible = false
+				_hide_popup(achievements_panel)
 				history_visible = false
-				history_panel.visible = false
+				_hide_popup(history_panel)
 				_refresh_title_navigation()
 			return
 		if event.is_action_pressed("move_up"):
@@ -2983,7 +3304,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_choose_upgrade(3)
 		return
 	if game_over_visible and event.is_action_pressed("restart"):
-		restart_requested.emit()
+		_request_game_over_restart()
 		return
 	if event.is_action_pressed("pause") and not game_over_visible:
 		pause_requested.emit()

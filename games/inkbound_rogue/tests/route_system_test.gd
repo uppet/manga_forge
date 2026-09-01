@@ -50,7 +50,9 @@ func _run_route_test() -> void:
 	if game.current_event.get("options", []).size() != 3:
 		_fail("route modal did not expose three choices")
 		return
+	game.hud.debug_finish_popup_transition()
 	game.hud._choose_event(1)
+	game.hud.debug_finish_popup_transition()
 	if paused or game.choosing_event or game.active_route_id != "razor-gallery":
 		_fail("route selection did not activate Razor Gallery and resume play")
 		return
@@ -93,14 +95,18 @@ func _run_route_test() -> void:
 	if not game._offer_route(2):
 		_fail("act-two route choice did not open")
 		return
+	game.hud.debug_finish_popup_transition()
 	game.hud._choose_event(1)
+	game.hud.debug_finish_popup_transition()
 	if game.active_route_id != "errata-canals" or game.route_spawn_interval >= 1.0:
 		_fail("Errata Canals did not activate its faster encounter tide")
 		return
 	if not game._offer_route(3):
 		_fail("act-three route choice did not open")
 		return
+	game.hud.debug_finish_popup_transition()
 	game.hud._choose_event(1)
+	game.hud.debug_finish_popup_transition()
 	if game.active_route_id != "red-press" or game.route_enemy_damage <= 1.0:
 		_fail("Red Press did not activate its damage pressure")
 		return

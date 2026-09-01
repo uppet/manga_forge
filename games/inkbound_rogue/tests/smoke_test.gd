@@ -114,6 +114,7 @@ func _run_smoke_test() -> void:
 	if not game.hud.can_process():
 		_fail("manual pause also disabled the always-responsive HUD")
 		return
+	game.hud.debug_finish_popup_transition()
 	var start_release := InputEventJoypadButton.new()
 	start_release.button_index = JOY_BUTTON_START
 	start_release.pressed = false
@@ -124,6 +125,7 @@ func _run_smoke_test() -> void:
 		return
 	game.hud._unhandled_input(start_release)
 	game.hud.show_manual(4)
+	game.hud.debug_finish_popup_transition()
 	if not game.manual_open or not game.hud.manual_visible or not paused or game.hud.FIELD_MANUAL_PAGES.size() != 5:
 		_fail("Field Manual did not enter its paused five-page modal state")
 		return
@@ -131,12 +133,23 @@ func _run_smoke_test() -> void:
 		_fail("in-game credits and legal summary are missing")
 		return
 	game.hud.hide_manual()
+	game.hud.debug_finish_popup_transition()
 	if game.manual_open or paused:
 		_fail("closing the Field Manual did not resume gameplay")
 		return
 	game._on_level_up(game.player.level)
 	if not game.choosing_upgrade or not paused or not game.hud.upgrade_visible:
 		_fail("level-up choice did not enter its paused selection state")
+		return
+	if not game.hud.upgrade_transitioning or game.hud.upgrade_transition_phase != "opening" or game.hud.upgrade_panel.scale.x >= 1.0 or game.hud.upgrade_panel.modulate.a >= 1.0:
+		_fail("upgrade panel did not begin its elastic fade-in")
+		return
+	if not game.hud.upgrade_buttons[0].disabled:
+		_fail("upgrade input was not locked during the opening transition")
+		return
+	game.hud.debug_finish_upgrade_transition()
+	if game.hud.upgrade_transitioning or not game.hud.upgrade_panel.scale.is_equal_approx(Vector2.ONE) or not is_equal_approx(game.hud.upgrade_panel.modulate.a, 1.0) or game.hud.upgrade_buttons[0].disabled:
+		_fail("upgrade opening transition did not settle into an interactive modal")
 		return
 	if game.hud.upgrade_input_labels.size() != 4 or game.hud.upgrade_name_labels.size() != 4 or game.hud.upgrade_description_labels.size() != 4 or game.hud.upgrade_rarity_labels.size() != 4:
 		_fail("upgrade cards are missing their isolated text regions")
@@ -166,12 +179,17 @@ func _run_smoke_test() -> void:
 			_fail("upgrade selection left an enemy processing")
 			return
 	game.hud._choose_upgrade(0)
+	if not game.choosing_upgrade or not paused or not game.hud.upgrade_visible or not game.hud.upgrade_transitioning or game.hud.upgrade_transition_phase != "closing":
+		_fail("upgrade choice did not retain modal pause for its elastic close")
+		return
+	game.hud.debug_finish_upgrade_transition()
 	if game.choosing_upgrade or paused or game.hud.upgrade_visible:
 		_fail("upgrade selection did not resume gameplay after choosing")
 		return
 	game._set_input_mode(false)
 	var vibration_before := bool(game.settings["vibration"])
 	game.hud.show_settings()
+	game.hud.debug_finish_popup_transition()
 	if not game.hud.settings_visible or game.hud.settings_buttons.size() != 11:
 		_fail("controller-accessible settings panel did not open")
 		return
@@ -187,7 +205,9 @@ func _run_smoke_test() -> void:
 		return
 	game.hud._adjust_setting("vibration", 1)
 	game.hud.hide_settings()
+	game.hud.debug_finish_popup_transition()
 	game.hud.show_bindings()
+	game.hud.debug_finish_popup_transition()
 	if not game.hud.bindings_visible or game.hud.binding_buttons.size() != 18:
 		_fail("runtime binding editor did not open with keyboard and gamepad slots")
 		return
@@ -212,6 +232,9 @@ func _run_smoke_test() -> void:
 		_fail("reset bindings did not restore the complete default layout")
 		return
 	game.hud.hide_bindings()
+	game.hud.debug_finish_popup_transition()
+	game.hud.hide_settings()
+	game.hud.debug_finish_popup_transition()
 
 	if Content.STORY.size() < 7 or Content.UPGRADES.size() < 36 or Content.RELICS.size() < 12 or Content.STARTING_WEAPONS.size() != 5 or Content.ENEMIES.size() < 15 or Content.CONTRACTS.size() < 6 or Content.EVENTS.size() < 9 or Content.ROUTES.size() < 9 or Content.ACHIEVEMENTS.size() < 19 or Content.PROGRESSION_UNLOCKS.size() < 13 or Content.PAGE_DIRECTIVES.size() < 9 or Content.ENCOUNTER_SQUADS.size() < 9 or Content.PROOF_LEVELS.size() != 11:
 		_fail("release content database is below the minimum narrative/build variety")
@@ -310,6 +333,7 @@ func _run_smoke_test() -> void:
 	if not game.hud.daily_visible:
 		_fail("A/Cross did not activate the highlighted title item")
 		return
+	game.hud.debug_finish_popup_transition()
 	var title_back := InputEventJoypadButton.new()
 	title_back.button_index = JOY_BUTTON_B
 	title_back.pressed = true
@@ -318,11 +342,13 @@ func _run_smoke_test() -> void:
 	title_back_release.button_index = JOY_BUTTON_B
 	title_back_release.pressed = false
 	game.hud._unhandled_input(title_back_release)
+	game.hud.debug_finish_popup_transition()
 	if game.hud.daily_visible:
 		_fail("B/Circle did not return from a title submenu")
 		return
 	game.run_won = true
 	game.hud.show_victory({"won": true, "ending": "keep", "wave": 12, "level": 10, "score": 12345, "kills": 120, "best_score": 12345, "memory_earned": 12, "archive_rank": 2})
+	game.hud.debug_finish_popup_transition()
 	if not game.hud.victory_credits_visible or game.hud.game_over_visible or game.hud.victory_credit_pages.size() < 5:
 		_fail("victory did not begin the automatic staff carousel")
 		return
@@ -331,15 +357,18 @@ func _run_smoke_test() -> void:
 		_fail("victory credits did not stop on the thank-you page")
 		return
 	game.hud._unhandled_input(title_accept)
+	game.hud.debug_finish_popup_transition()
 	game.hud._unhandled_input(title_accept_release)
 	if game.hud.victory_credits_visible or not game.hud.title_visible or game.run_won:
 		_fail("any button on the final thank-you page did not return to the title")
 		return
 	game.hud._toggle_achievements()
+	game.hud.debug_finish_popup_transition()
 	if not game.hud.achievements_visible or game.hud.achievements_label.text.is_empty():
 		_fail("achievement gallery did not open from the title screen")
 		return
 	game.hud._toggle_achievements()
+	game.hud.debug_finish_popup_transition()
 	game.hud.show_achievement("Smoke Test", "Queued toast validation.")
 	if not game.hud.achievement_toast.visible or game.hud.achievement_toast_label.text.find("SMOKE TEST") < 0:
 		_fail("achievement unlock toast did not enter its visible queue state")
@@ -360,17 +389,21 @@ func _run_smoke_test() -> void:
 	if not game.debug_offer_event("forgotten-shrine") or not game.choosing_event or not paused or not game.hud.event_visible:
 		_fail("chapter event did not open its paused choice state")
 		return
+	game.hud.debug_finish_popup_transition()
 	if game.can_process() or game.player.can_process():
 		_fail("chapter event left gameplay processing while its choice was open")
 		return
 	game.hud._choose_event(1)
+	game.hud.debug_finish_popup_transition()
 	if game.choosing_event or paused or game.hud.event_visible or game.run_shards <= event_shards_before:
 		_fail("chapter event choice did not apply its reward and resume")
 		return
 	if not game._offer_route(2) or not paused or not game.hud.event_visible:
 		_fail("route draft did not open as a paused three-choice modal")
 		return
+	game.hud.debug_finish_popup_transition()
 	game.hud._choose_event(0)
+	game.hud.debug_finish_popup_transition()
 	if paused or game.active_route_id != "chain-vault" or game.arena.route_id != "chain-vault":
 		_fail("route choice did not configure gameplay, arena presentation, and resume")
 		return
@@ -620,9 +653,13 @@ func _run_smoke_test() -> void:
 			if not long_game.choosing_event or not paused:
 				_fail("forced full-run state machine missed event on page %d" % target_wave)
 				return
+			long_game.hud.debug_finish_popup_transition()
 			long_game.hud._choose_event(1)
+			long_game.hud.debug_finish_popup_transition()
 			if long_game.choosing_relic:
+				long_game.hud.debug_finish_popup_transition()
 				long_game.hud._choose_relic(0)
+				long_game.hud.debug_finish_popup_transition()
 		else:
 			var expected_boss: String = {4: "editor", 8: "binder", 12: "author"}[target_wave]
 			if not _has_boss_kind(long_game, expected_boss):

@@ -38,7 +38,8 @@ func _run() -> void:
 	if not _validate_open_draft(3, "FIELD RELIC"):
 		return
 	var first_choice_id := str(game.current_relic_choices[1].get("id", ""))
-	_send_gamepad(JOY_BUTTON_Y)
+	if not _send_gamepad(JOY_BUTTON_Y):
+		return
 	if game.choosing_relic or game.hud.relic_draft_visible or paused:
 		_fail("gamepad Y did not choose the second relic and resume")
 		return
@@ -58,7 +59,8 @@ func _run() -> void:
 	game.choosing_event = false
 	if not game._try_open_pending_relic_draft() or not _validate_open_draft(2, "ARCHIVE CACHE"):
 		return
-	_send_gamepad(JOY_BUTTON_X)
+	if not _send_gamepad(JOY_BUTTON_X):
+		return
 	if game.choosing_relic or paused or game.relic_ids.size() != 11:
 		_fail("queued event relic did not resolve cleanly")
 		return
@@ -69,7 +71,8 @@ func _run() -> void:
 	game.directive_target = float(game.active_directive.get("target", 1.0))
 	if not game._complete_page_directive() or not _validate_open_draft(1, "PAGE DIRECTIVE"):
 		return
-	_send_gamepad(JOY_BUTTON_X)
+	if not _send_gamepad(JOY_BUTTON_X):
+		return
 	if game.choosing_relic or paused or game.relic_ids.size() != Content.RELICS.size():
 		_fail("directive relic did not complete the twelve-relic collection (owned=%s player=%s choices=%s pending=%s choosing=%s paused=%s)" % [
 			str(game.relic_ids),
@@ -96,6 +99,20 @@ func _run() -> void:
 
 
 func _validate_open_draft(expected_choices: int, source_fragment: String) -> bool:
+	if not game.hud._popup_transition_active(game.hud.relic_draft_panel) or game.hud._popup_transition_phase(game.hud.relic_draft_panel) != "in":
+		_fail("relic reward did not begin a fade-in transition")
+		return false
+	if game.hud.relic_draft_panel.modulate.a >= 1.0 or game.hud.relic_draft_panel.scale.x >= 1.0:
+		_fail("relic fade-in did not begin below full opacity and scale")
+		return false
+	for button in game.hud.relic_draft_buttons:
+		if button.visible and not button.disabled:
+			_fail("relic choice accepted input during its opening transition")
+			return false
+	game.hud.debug_finish_popup_transition()
+	if game.hud._popup_transition_active(game.hud.relic_draft_panel) or not is_equal_approx(game.hud.relic_draft_panel.modulate.a, 1.0) or not is_equal_approx(game.hud.relic_draft_panel.scale.x, 1.0):
+		_fail("relic fade-in did not settle to its interactive state")
+		return false
 	if not game.choosing_relic or not game.hud.relic_draft_visible or not game.hud.relic_draft_panel.visible or not paused:
 		_fail("relic reward did not open a modal paused draft")
 		return false
@@ -114,6 +131,9 @@ func _validate_open_draft(expected_choices: int, source_fragment: String) -> boo
 		ids.append(relic_id)
 	for index in range(expected_choices):
 		var button: Button = game.hud.relic_draft_buttons[index]
+		if button.disabled:
+			_fail("relic choice remained locked after the opening transition")
+			return false
 		var input_label: RichTextLabel = game.hud.relic_draft_input_labels[index]
 		var name_label: RichTextLabel = game.hud.relic_draft_name_labels[index]
 		var description_label: RichTextLabel = game.hud.relic_draft_description_labels[index]
@@ -136,15 +156,23 @@ func _validate_open_draft(expected_choices: int, source_fragment: String) -> boo
 	return true
 
 
-func _send_gamepad(button_index: int) -> void:
+func _send_gamepad(button_index: int) -> bool:
 	var pressed_event := InputEventJoypadButton.new()
 	pressed_event.button_index = button_index
 	pressed_event.pressed = true
 	game.hud._unhandled_input(pressed_event)
+	if not game.choosing_relic or not game.hud.relic_draft_visible or not paused:
+		_fail("relic selection resumed gameplay before its fade-out finished")
+		return false
+	if not game.hud._popup_transition_active(game.hud.relic_draft_panel) or game.hud._popup_transition_phase(game.hud.relic_draft_panel) != "out":
+		_fail("relic selection did not begin a fade-out transition")
+		return false
+	game.hud.debug_finish_popup_transition()
 	var released_event := InputEventJoypadButton.new()
 	released_event.button_index = button_index
 	released_event.pressed = false
 	game.hud._unhandled_input(released_event)
+	return true
 
 
 func _fail(message: String) -> void:

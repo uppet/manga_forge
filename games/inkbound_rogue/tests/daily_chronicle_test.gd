@@ -165,6 +165,7 @@ func _validate_controls_and_panel(game: Node, date_id: String) -> bool:
 	game.hud._unhandled_input(accept_event)
 	accept_event.pressed = false
 	game.hud._unhandled_input(accept_event)
+	game.hud.debug_finish_popup_transition()
 	if not game.hud.daily_visible or not game.hud.daily_panel.visible or game.hud.daily_contract_label.text.find("SEED") < 0 or game.hud.daily_rules_label.text.find("RESTORATIONS SEALED") < 0:
 		_fail("A/Cross did not open the browsed Daily Chronicle panel", game)
 		return false
@@ -172,7 +173,8 @@ func _validate_controls_and_panel(game: Node, date_id: String) -> bool:
 	close_event.button_index = JOY_BUTTON_B
 	close_event.pressed = true
 	game.hud._unhandled_input(close_event)
-	if game.hud.daily_visible:
+	game.hud.debug_finish_popup_transition()
+	if game.hud.daily_visible or game.hud.daily_panel.visible:
 		_fail("B/Circle did not close the Daily Chronicle panel", game)
 		return false
 	return true

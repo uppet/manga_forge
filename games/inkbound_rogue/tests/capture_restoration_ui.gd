@@ -30,11 +30,13 @@ func _process(_delta: float) -> bool:
 		}
 		game.hud.show_title(game._meta_snapshot())
 		game.hud._show_restoration()
+		game.hud.debug_finish_popup_transition()
 		game.hud.restoration_selected = 4
 		game.hud._refresh_restoration_board()
 		return false
 	if frames < 5:
 		return false
+	game.hud.debug_finish_popup_transition()
 	if not _validate_layout():
 		_cleanup(1)
 		return true

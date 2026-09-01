@@ -44,21 +44,26 @@ func _process(_delta: float) -> bool:
 		8:
 			_capture("inkbound-session-title.png")
 			game.hud._show_loadout()
+			game.hud.debug_finish_popup_transition()
 		10:
 			_capture("inkbound-starting-armory.png")
 			game.hud._cancel_loadout()
 			game.hud._toggle_story()
+			game.hud.debug_finish_popup_transition()
 		12:
 			_capture("inkbound-story-archive.png")
 			game.hud._toggle_story()
+			game.hud.debug_finish_popup_transition()
 			game.hud.hide_title()
 			game.run_started = true
 			game.manually_paused = true
 			game._sync_pause_state()
+			game.hud.debug_finish_popup_transition()
 		16:
 			_capture("inkbound-save-return.png")
 			game.manually_paused = false
 			game._sync_pause_state()
+			game.hud.debug_finish_popup_transition()
 			_prepare_supplies()
 		22:
 			_capture("inkbound-recovery-aoe.png")
@@ -70,6 +75,7 @@ func _process(_delta: float) -> bool:
 				Content.upgrade("last-word"),
 			]
 			game.hud.show_upgrade(worst_case_choices)
+			game.hud.debug_finish_upgrade_transition()
 		26:
 			_capture("inkbound-upgrade-cards.png")
 			game.hud.upgrade_visible = false
@@ -77,9 +83,11 @@ func _process(_delta: float) -> bool:
 			game.hud.current_choices.clear()
 			paused = false
 			game.offer_relic_draft("FIELD RELIC · CHOOSE ONE MEMORY")
+			game.hud.debug_finish_popup_transition()
 		28:
 			_capture("inkbound-relic-draft.png")
 			game.hud._choose_relic(0)
+			game.hud.debug_finish_popup_transition()
 			paused = false
 			_prepare_ink_art()
 		30:
@@ -122,6 +130,7 @@ func _process(_delta: float) -> bool:
 				"directives_completed": 7,
 				"directives_offered": 9,
 			})
+			game.hud.debug_finish_popup_transition()
 		45:
 			_capture("inkbound-victory-results.png")
 			game.hud._skip_victory_credits_to_thanks()
@@ -285,6 +294,7 @@ func _prepare_boss_hud() -> void:
 
 
 func _capture(filename: String) -> void:
+	game.hud.debug_finish_popup_transition()
 	if failed:
 		return
 	var output_dir := ProjectSettings.globalize_path("res://build/captures")

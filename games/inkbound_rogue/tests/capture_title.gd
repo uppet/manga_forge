@@ -42,29 +42,35 @@ func _process(_delta: float) -> bool:
 		if capture_failed:
 			return true
 		game.hud._toggle_history()
+		game.hud.debug_finish_popup_transition()
 	elif frames == 16:
 		_capture("inkbound-history-render.png")
 		if capture_failed:
 			return true
 		game.hud._toggle_history()
 		game.hud._toggle_achievements()
+		game.hud.debug_finish_popup_transition()
 	elif frames == 20:
 		_capture("inkbound-achievements-render.png")
 		if capture_failed:
 			return true
 		game.hud._toggle_achievements()
 		game.hud.show_settings()
+		game.hud.debug_finish_popup_transition()
 	elif frames == 24:
 		_capture("inkbound-options-render.png")
 		if capture_failed:
 			return true
 		game.hud.show_bindings()
+		game.hud.debug_finish_popup_transition()
 	elif frames == 32:
 		_capture("inkbound-bindings-render.png")
 		if capture_failed:
 			return true
 		game.hud.hide_bindings()
+		game.hud.debug_finish_popup_transition()
 		game.hud.hide_settings()
+		game.hud.debug_finish_popup_transition()
 		game.hud.hide_title()
 		game.debug_play_story("prologue")
 	elif frames == 40:
@@ -76,21 +82,25 @@ func _process(_delta: float) -> bool:
 		paused = false
 	elif frames == 150:
 		game.debug_offer_event("forgotten-shrine")
+		game.hud.debug_finish_popup_transition()
 	elif frames == 158:
 		_capture("inkbound-event-render.png")
 		if capture_failed:
 			return true
 		game.hud._choose_event(1)
+		game.hud.debug_finish_popup_transition()
 	elif frames == 166:
 		game.wave = 5
 		game.arena.set_chapter(2)
 		game.hud.set_run_stats(5, game.score, true)
 		game._offer_route(2)
+		game.hud.debug_finish_popup_transition()
 	elif frames == 174:
 		_capture("inkbound-route-render.png")
 		if capture_failed:
 			return true
 		game.hud._choose_event(0)
+		game.hud.debug_finish_popup_transition()
 	elif frames == 204:
 		if game.hud.achievement_toast_tween != null and game.hud.achievement_toast_tween.is_valid():
 			game.hud.achievement_toast_tween.kill()
@@ -113,6 +123,7 @@ func _process(_delta: float) -> bool:
 			"route_ids": ["razor-gallery", "errata-canals", "red-press"],
 			"new_unlocks": ["GLASS SCRIPT", "TWIN-STROKE FORM"],
 		})
+		game.hud.debug_finish_popup_transition()
 	elif frames == 226:
 		_capture("inkbound-run-summary-render.png")
 		if capture_failed:
@@ -168,6 +179,7 @@ func _prepare_combat_gallery() -> void:
 
 
 func _capture(filename: String) -> void:
+	game.hud.debug_finish_popup_transition()
 	var output_dir := ProjectSettings.globalize_path("res://build/captures")
 	DirAccess.make_dir_recursive_absolute(output_dir)
 	var image := root.get_texture().get_image()

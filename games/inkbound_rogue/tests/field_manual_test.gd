@@ -48,6 +48,7 @@ func _validate_manual_input_and_layout() -> bool:
 	game.manually_paused = false
 	game._sync_pause_state()
 	game.hud.show_manual(0)
+	game.hud.debug_finish_popup_transition()
 	if not game.manual_open or not game.hud.manual_visible or not paused:
 		return _fail("opening the manual did not pause a live run")
 	var body: RichTextLabel = game.hud.manual_body_label
@@ -74,6 +75,7 @@ func _validate_navigation_pause_and_persistence() -> bool:
 	if not _content_fits(game.hud.manual_body_label):
 		return _fail("credits page overflows its text region")
 	_send_action("manual")
+	game.hud.debug_finish_popup_transition()
 	if game.manual_open or game.hud.manual_visible or paused or not game.field_manual_seen:
 		return _fail("closing the live-run manual did not resume or mark it seen")
 	game.field_manual_seen = true
@@ -102,11 +104,13 @@ func _validate_first_run_flow() -> bool:
 	game.completed_endings.clear()
 	game.run_started = false
 	game._on_start_requested("standard", "open-draft", "marginalia")
+	game.hud.debug_finish_popup_transition()
 	if not game.run_started or not game.onboarding_pending or not game.manual_open or not paused:
 		return _fail("a fresh New Game did not stop at the field manual")
 	if game.cutscene.active:
 		return _fail("prologue started underneath first-run onboarding")
 	_send_action("manual")
+	game.hud.debug_finish_popup_transition()
 	if game.onboarding_pending or game.manual_open or not game.field_manual_seen:
 		return _fail("closing first-run onboarding did not commit its state")
 	if not game.cutscene.active or game.cutscene.sequence_id != "prologue" or not paused:
@@ -119,9 +123,11 @@ func _validate_first_run_flow() -> bool:
 	game.manually_paused = true
 	game._sync_pause_state()
 	game.hud.show_manual(2)
+	game.hud.debug_finish_popup_transition()
 	if not paused or game.hud.pause_panel.visible:
 		return _fail("manual opened from pause did not replace the pause panel")
 	_send_action("manual")
+	game.hud.debug_finish_popup_transition()
 	if not paused or not game.hud.pause_panel.visible:
 		return _fail("closing the manual did not return to the existing pause menu")
 	return true

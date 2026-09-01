@@ -23,11 +23,13 @@ func _process(_delta: float) -> bool:
 		game.highest_proof_cleared = 7
 		game.hud.show_title(game._meta_snapshot())
 		game.hud._show_proof_ledger()
+		game.hud.debug_finish_popup_transition()
 		game.hud.proof_selected = 10
 		game.hud._refresh_proof_ledger()
 		return false
 	if frames < 5:
 		return false
+	game.hud.debug_finish_popup_transition()
 	if not _validate_layout():
 		_cleanup(1)
 		return true

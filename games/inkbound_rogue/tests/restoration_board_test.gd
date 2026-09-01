@@ -28,6 +28,7 @@ func _run_test() -> void:
 		return
 	game.hud.show_title(game._meta_snapshot())
 	game.hud._show_restoration()
+	game.hud.debug_finish_popup_transition()
 	if not game.hud.restoration_visible or not game.hud.restoration_panel.visible:
 		_fail("Restoration Board did not open as a title modal", game)
 		return

@@ -39,6 +39,7 @@ func _run() -> void:
 	fresh._sync_pause_state()
 	fresh.hud.show_title(fresh._meta_snapshot())
 	fresh.hud._start_from_title()
+	fresh.hud.debug_finish_popup_transition()
 	if not fresh.hud.loadout_visible or not fresh.hud.loadout_panel.visible or fresh.hud.loadout_buttons.size() != 5:
 		_fail(fresh, "New Game did not open the five-form Armory")
 		return
@@ -76,6 +77,7 @@ func _run() -> void:
 	confirm.button_index = JOY_BUTTON_A
 	confirm.pressed = true
 	fresh.hud._unhandled_input(confirm)
+	fresh.hud.debug_finish_popup_transition()
 	if fresh.hud.loadout_visible or fresh.hud.title_visible or not fresh.run_started:
 		_fail(fresh, "gamepad confirmation did not leave Armory and start the run")
 		return
@@ -142,10 +144,12 @@ func _run() -> void:
 	if not replacement.hud.loadout_visible or replacement.checkpoint_data.is_empty():
 		_fail(replacement, "opening Armory erased the saved draft before a weapon was confirmed")
 		return
+	replacement.hud.debug_finish_popup_transition()
 	var cancel := InputEventJoypadButton.new()
 	cancel.button_index = JOY_BUTTON_B
 	cancel.pressed = true
 	replacement.hud._unhandled_input(cancel)
+	replacement.hud.debug_finish_popup_transition()
 	if replacement.hud.loadout_visible or not replacement.hud.title_visible or replacement.checkpoint_data.is_empty():
 		_fail(replacement, "gamepad cancel did not return from Armory with the saved draft intact")
 		return
@@ -173,11 +177,13 @@ func _run() -> void:
 	veteran._sync_pause_state()
 	veteran.hud.show_title(veteran._meta_snapshot())
 	veteran.hud._start_from_title()
+	veteran.hud.debug_finish_popup_transition()
 	for button in veteran.hud.loadout_buttons:
 		if button.disabled:
 			_fail(veteran, "veteran Armory did not expose all five restored forms")
 			return
 	veteran.hud._choose_loadout(4)
+	veteran.hud.debug_finish_popup_transition()
 	if veteran.starting_weapon_id != "twin-stroke" or veteran.player.weapon_form != "TWIN-STROKE" or str(veteran.player.ink_art_profile().get("name", "")) != "CROSS REVISION":
 		_fail(veteran, "Twin-Stroke did not start with its distinct form and Ink Art")
 		return

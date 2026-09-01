@@ -34,6 +34,7 @@ func _process(_delta: float) -> bool:
 	if frames == 2:
 		hud.set_input_mode(false)
 		hud.show_upgrade(_choices_for_upgrade_page(upgrade_page))
+		hud.debug_finish_upgrade_transition()
 	elif validating_all and frames % 2 == 0:
 		if not _validate_card_regions():
 			quit(1)
@@ -41,6 +42,7 @@ func _process(_delta: float) -> bool:
 		upgrade_page += 1
 		if upgrade_page * PAGE_SIZE < Content.UPGRADES.size():
 			hud.show_upgrade(_choices_for_upgrade_page(upgrade_page))
+			hud.debug_finish_upgrade_transition()
 		elif not validating_gamepad:
 			# Re-run every production description with the wider gamepad glyphs;
 			# this is where the old absolute layout had the least horizontal room.
@@ -48,6 +50,7 @@ func _process(_delta: float) -> bool:
 			upgrade_page = 0
 			hud.set_input_mode(true)
 			hud.show_upgrade(_choices_for_upgrade_page(upgrade_page))
+			hud.debug_finish_upgrade_transition()
 		else:
 			validating_all = false
 			hud.show_upgrade([
@@ -56,6 +59,7 @@ func _process(_delta: float) -> bool:
 				_discipline_preview("afterimage-cut", "ghost-draft", 3, 6, false, true),
 				_discipline_preview("merciful-revision", "bound-page", 4, 6, false, false),
 			])
+			hud.debug_finish_upgrade_transition()
 	elif not validating_all and frames % 2 == 0:
 		if not _validate_card_regions():
 			quit(1)
@@ -73,7 +77,7 @@ func _process(_delta: float) -> bool:
 			push_error("INKBOUND_UPGRADE_UI_FAIL: save_png error %d" % result)
 			quit(1)
 			return true
-		print("INKBOUND_UPGRADE_UI_OK layout=2x2 upgrades=%d modes=keyboard+gamepad gaps=11px adaptive=6px-min opaque=ok content=contained autowrap=smart size=%dx%d" % [Content.UPGRADES.size(), image.get_width(), image.get_height()])
+		print("INKBOUND_UPGRADE_UI_OK layout=2x2 upgrades=%d modes=keyboard+gamepad gaps=11px adaptive=6px-min translucent=0.90 content=contained autowrap=smart size=%dx%d" % [Content.UPGRADES.size(), image.get_width(), image.get_height()])
 		quit(0)
 		return true
 	return false
@@ -135,7 +139,7 @@ func _validate_card_regions() -> bool:
 		if input_label.get_content_width() > input_label.size.x or name_label.get_content_width() > name_label.size.x or name_label.get_content_height() > name_label.size.y or rarity_label.get_content_width() > rarity_label.size.x or rarity_label.get_content_height() > rarity_label.size.y:
 			push_error("INKBOUND_UPGRADE_UI_FAIL: rendered heading or rarity escapes card %d" % index)
 			return false
-	if not is_equal_approx(hud.upgrade_panel.color.a, 1.0):
-		push_error("INKBOUND_UPGRADE_UI_FAIL: live HUD can bleed through the upgrade modal")
+	if hud.upgrade_panel.color.a < 0.88 or hud.upgrade_panel.color.a > 0.92:
+		push_error("INKBOUND_UPGRADE_UI_FAIL: upgrade modal left its controlled translucent range")
 		return false
 	return true

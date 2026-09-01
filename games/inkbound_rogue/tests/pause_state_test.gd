@@ -18,6 +18,10 @@ var bootstrapped := false
 var phase := 0
 var phase_frames := 0
 var snapshot := {}
+var upgrade_open_peak_scale := 0.0
+var upgrade_close_peak_scale := 0.0
+var upgrade_open_started_msec := 0
+var upgrade_close_started_msec := 0
 
 
 func _process(_delta: float) -> bool:
@@ -63,6 +67,10 @@ func _advance_test(_delta: float) -> void:
 	if not is_instance_valid(game) or not is_instance_valid(enemy):
 		return
 	phase_frames += 1
+	if phase == 3:
+		upgrade_open_peak_scale = maxf(upgrade_open_peak_scale, game.hud.upgrade_panel.scale.x)
+	elif phase == 4:
+		upgrade_close_peak_scale = maxf(upgrade_close_peak_scale, game.hud.upgrade_panel.scale.x)
 	match phase:
 		0:
 			if phase_frames >= SETTLE_FRAMES:
@@ -70,6 +78,7 @@ func _advance_test(_delta: float) -> void:
 					_fail("unpaused simulation did not advance before the pause probe")
 					return
 				_send_pause_key()
+				game.hud.debug_finish_popup_transition()
 				if not game.manually_paused or not paused:
 					_fail("Escape did not enter manual pause")
 					return
@@ -85,6 +94,7 @@ func _advance_test(_delta: float) -> void:
 					_fail("manual pause process modes are inconsistent")
 					return
 				_send_pause_gamepad()
+				game.hud.debug_finish_popup_transition()
 				if game.manually_paused or paused:
 					_fail("gamepad Start did not resume manual pause")
 					return
@@ -104,29 +114,60 @@ func _advance_test(_delta: float) -> void:
 				if not game.choosing_upgrade or not paused or not game.hud.upgrade_visible:
 					_fail("upgrade selection did not enter modal pause")
 					return
+				if not game.hud.upgrade_transitioning or game.hud.upgrade_transition_phase != "opening" or not game.hud.upgrade_buttons[0].disabled:
+					_fail("upgrade opening animation did not lock modal input")
+					return
 				game.player.attack_cooldown = 0.75
 				snapshot = _capture()
+				upgrade_open_started_msec = Time.get_ticks_msec()
 				_next_phase()
 		3:
+			if not _matches_snapshot(snapshot):
+				_fail("upgrade selection allowed gameplay state to advance")
+				return
+			if game.hud.upgrade_transitioning:
+				if Time.get_ticks_msec() - upgrade_open_started_msec > 1000:
+					_fail("upgrade opening animation did not complete within one second")
+				return
 			if phase_frames >= FROZEN_FRAMES:
-				if not _matches_snapshot(snapshot):
-					_fail("upgrade selection allowed gameplay state to advance")
+				if game.hud.upgrade_transitioning or game.hud.upgrade_transition_phase != "" or not game.hud.upgrade_panel.scale.is_equal_approx(Vector2.ONE) or game.hud.upgrade_buttons[0].disabled:
+					_fail("upgrade opening animation did not settle into an interactive state")
+					return
+				if upgrade_open_peak_scale <= 1.005:
+					_fail("upgrade opening animation never reached its elastic overshoot")
 					return
 				game.player.controls_enabled = true
 				game.player.ink_art_cooldown = 0.0
 				game.player.ink_art_uses = 0
 				Input.action_press("special")
 				_send_upgrade_gamepad()
-				if game.choosing_upgrade or paused or game.hud.upgrade_visible:
-					_fail("gamepad upgrade choice did not resume the run")
-					return
-				game.player._physics_process(1.0 / 60.0)
-				if game.player.ink_art_uses != 0 or not game.player.gameplay_input_release_gate:
-					_fail("B/Circle upgrade choice leaked into the Ink Art action")
+				if not game.choosing_upgrade or not paused or not game.hud.upgrade_visible or not game.hud.upgrade_transitioning or game.hud.upgrade_transition_phase != "closing":
+					_fail("upgrade closing animation did not retain modal pause")
 					return
 				snapshot = _capture()
+				upgrade_close_started_msec = Time.get_ticks_msec()
 				_next_phase()
 		4:
+			if game.hud.upgrade_transitioning:
+				if not _matches_snapshot(snapshot):
+					_fail("upgrade close animation resumed gameplay before it finished")
+					return
+				if Time.get_ticks_msec() - upgrade_close_started_msec > 1000:
+					_fail("upgrade close animation did not complete within one second")
+				return
+			if game.choosing_upgrade or paused or game.hud.upgrade_visible:
+				_fail("gamepad upgrade choice did not resume after the close animation")
+				return
+			if upgrade_close_peak_scale <= 1.005:
+				_fail("upgrade closing animation never reached its elastic pullback")
+				return
+			game.player._physics_process(1.0 / 60.0)
+			if game.player.ink_art_uses != 0 or not game.player.gameplay_input_release_gate:
+				_fail("B/Circle upgrade choice leaked into the Ink Art action")
+				return
+			snapshot = _capture()
+			_next_phase()
+		5:
 			if phase_frames >= SETTLE_FRAMES:
 				if game.elapsed <= float(snapshot["elapsed"]) or game.player.attack_cooldown >= float(snapshot["attack_cooldown"]) or game.player.ink_art_uses != 0:
 					_fail("simulation did not advance after upgrade selection")
@@ -138,21 +179,23 @@ func _advance_test(_delta: float) -> void:
 				if not game.choosing_relic or not paused or not game.hud.relic_draft_visible:
 					_fail("relic selection did not enter modal pause")
 					return
+				game.hud.debug_finish_popup_transition()
 				game.player.attack_cooldown = 0.75
 				snapshot = _capture()
 				_next_phase()
-		5:
+		6:
 			if phase_frames >= FROZEN_FRAMES:
 				if not _matches_snapshot(snapshot):
 					_fail("relic selection allowed gameplay state to advance")
 					return
 				_send_relic_gamepad()
+				game.hud.debug_finish_popup_transition()
 				if game.choosing_relic or paused or game.hud.relic_draft_visible:
 					_fail("gamepad relic choice did not resume the run")
 					return
 				snapshot = _capture()
 				_next_phase()
-		6:
+		7:
 			if phase_frames >= SETTLE_FRAMES:
 				if game.elapsed <= float(snapshot["elapsed"]) or game.player.attack_cooldown >= float(snapshot["attack_cooldown"]):
 					_fail("simulation did not advance after relic selection")
@@ -165,7 +208,7 @@ func _advance_test(_delta: float) -> void:
 				game.player.attack_cooldown = 0.75
 				snapshot = _capture()
 				_next_phase()
-		7:
+		8:
 			if phase_frames >= FROZEN_FRAMES:
 				if not _matches_snapshot(snapshot):
 					_fail("focus loss allowed gameplay state to advance")
@@ -182,18 +225,19 @@ func _advance_test(_delta: float) -> void:
 				if not game.application_focused or not game.hud.input_enabled or not game.cutscene.input_enabled or not game.manually_paused or not paused:
 					_fail("focus restore did not re-enable input while retaining explicit pause")
 					return
+				game.hud.debug_finish_popup_transition()
 				_send_pause_gamepad()
 				if game.manually_paused or paused:
 					_fail("explicit pause input did not resume after focus restore")
 					return
 				snapshot = _capture()
 				_next_phase()
-		8:
+		9:
 			if phase_frames >= SETTLE_FRAMES:
 				if game.elapsed <= float(snapshot["elapsed"]):
 					_fail("simulation did not resume after focus restore")
 					return
-				print("INKBOUND_PAUSE_OK menu=frozen upgrade=frozen relic=frozen focus=frozen background_gamepad=ignored restore=explicit keyboard=ok gamepad=ok frames=%d" % (FROZEN_FRAMES * 4))
+				print("INKBOUND_PAUSE_OK menu=frozen upgrade=frozen elastic=open+close overshoot=%.3f/%.3f input_locked=ok relic=frozen focus=frozen background_gamepad=ignored restore=explicit keyboard=ok gamepad=ok frames=%d" % [upgrade_open_peak_scale, upgrade_close_peak_scale, FROZEN_FRAMES * 4])
 				_cleanup(0)
 				return
 
