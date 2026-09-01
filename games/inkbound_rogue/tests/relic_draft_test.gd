@@ -71,7 +71,14 @@ func _run() -> void:
 		return
 	_send_gamepad(JOY_BUTTON_X)
 	if game.choosing_relic or paused or game.relic_ids.size() != Content.RELICS.size():
-		_fail("directive relic did not complete the twelve-relic collection")
+		_fail("directive relic did not complete the twelve-relic collection (owned=%s player=%s choices=%s pending=%s choosing=%s paused=%s)" % [
+			str(game.relic_ids),
+			str(game.player.relics),
+			str(game.current_relic_choices),
+			str(game.pending_relic_sources),
+			str(game.choosing_relic),
+			str(paused),
+		])
 		return
 
 	var memory_before: int = game.run_shards
@@ -130,10 +137,14 @@ func _validate_open_draft(expected_choices: int, source_fragment: String) -> boo
 
 
 func _send_gamepad(button_index: int) -> void:
-	var event := InputEventJoypadButton.new()
-	event.button_index = button_index
-	event.pressed = true
-	game.hud._unhandled_input(event)
+	var pressed_event := InputEventJoypadButton.new()
+	pressed_event.button_index = button_index
+	pressed_event.pressed = true
+	game.hud._unhandled_input(pressed_event)
+	var released_event := InputEventJoypadButton.new()
+	released_event.button_index = button_index
+	released_event.pressed = false
+	game.hud._unhandled_input(released_event)
 
 
 func _fail(message: String) -> void:

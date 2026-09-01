@@ -246,6 +246,11 @@ seconds so a failed Godot test cannot linger indefinitely. `host_game.py
 process-status` reports every game/Godot process with elapsed time, CPU, memory,
 and command line; `host_game.py cleanup-tests` terminates only this project's
 `res://tests/` processes and never matches an editor or exported game.
+`host_game.py p1-suite` first mirrors/imports current source, then runs 26 core
+gates serially in one delegate session and finishes with a zero-process check.
+It keeps a compact summary and one diagnostic log per gate under
+`build/p1-suite/<UTC timestamp>/`; `build/p1-suite/latest.txt` identifies the
+newest run without deleting earlier evidence.
 `host_game.py capture-session` renders a ten-frame title, Armory, Story Archive,
 Save & Return, recovery/AOE, technique, relic-draft, Ink Art, Directive, and
 route-hazard readability gallery.

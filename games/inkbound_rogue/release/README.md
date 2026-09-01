@@ -11,6 +11,10 @@ Historical captures and local diagnostic files may remain under other build
 directories, but the Steam templates map only `build/steam-depot/` so they
 cannot leak into an uploaded depot.
 
+`p1-readiness.md` is the dated automated-candidate snapshot and private
+playtest checklist. Update it with each candidate; never promote untested manual
+hardware rows or automated persona simulations into human-playtest evidence.
+
 Export always mirrors current source first, preserving only `.godot/` cache and
 `build/` evidence while pruning stale source files. It then boots the exact
 embedded-PCK executable with the Windows GL renderer for 120 frames and runs `release-audit` over
@@ -23,14 +27,17 @@ commit credentials or a live Steam Guard session.
 
 Before uploading a playtest depot:
 
-1. Run `host_game.py test`, `host_game.py pause-test`, `host_game.py save-test`,
+1. Run the serial `host_game.py p1-suite`, which covers `host_game.py test`,
+   `host_game.py pause-test`, `host_game.py save-test`,
    `host_game.py session-test`, `host_game.py supply-test`, `host_game.py balance`,
    `host_game.py persona-test`, `host_game.py daily-test`,
    `host_game.py progression`, `host_game.py routes`, `host_game.py manual-test`,
    `host_game.py cast-test`, `host_game.py audio-test`, `host_game.py combat-feel-test`, `host_game.py accessibility-test`, `host_game.py restoration-test`,
    `host_game.py proof-test`, `host_game.py playtest-recorder-test`,
-   `host_game.py soak`, `host_game.py recorded-soak`, and
-   `host_game.py release-audit`.
+   and `host_game.py soak` without overlapping Godot instances. Then run
+   `host_game.py recorded-soak` and `host_game.py release-audit`. Preserve the
+   timestamped `build/p1-suite/` summary and per-gate logs with the candidate's
+   internal test evidence; they are excluded from the depot.
 2. Run `host_game.py capture-session`, `host_game.py capture-upgrades`,
    `host_game.py capture-restoration`, `host_game.py capture-proof`,
    `host_game.py capture-daily`, and `host_game.py capture-manual`, then inspect

@@ -201,6 +201,85 @@ test ! -e "$OUTPUT/PERF-SOAK/incomplete.flag"
     remote(config, command, 240)
 
 
+def p1_suite(config: dict[str, Any], game: str) -> None:
+    sync(config, game)
+    game_root = posix_game_root(config, game)
+    gates = [
+        ("smoke", "smoke_test.gd", "headless", 120),
+        ("pause", "pause_state_test.gd", "headless", 120),
+        ("save", "save_recovery_test.gd", "headless", 120),
+        ("session", "session_flow_test.gd", "headless", 180),
+        ("supply", "supply_drop_test.gd", "headless", 120),
+        ("ink-art", "ink_art_test.gd", "headless", 120),
+        ("encounters", "encounter_director_test.gd", "headless", 180),
+        ("hazards", "route_hazard_test.gd", "headless", 120),
+        ("loadout", "starting_loadout_test.gd", "headless", 120),
+        ("relics", "relic_draft_test.gd", "headless", 120),
+        ("cutscenes", "cutscene_animation_test.gd", "headless", 120),
+        ("manual", "field_manual_test.gd", "window", 120),
+        ("localization", "localization_test.gd", "window", 120),
+        ("cast", "combat_cast_test.gd", "headless", 120),
+        ("audio", "audio_system_test.gd", "headless", 120),
+        ("combat-feel", "combat_feel_test.gd", "headless", 120),
+        ("accessibility", "accessibility_test.gd", "headless", 120),
+        ("restoration", "restoration_board_test.gd", "headless", 120),
+        ("proof", "proof_depth_test.gd", "headless", 120),
+        ("daily", "daily_chronicle_test.gd", "headless", 120),
+        ("progression", "progression_test.gd", "headless", 120),
+        ("routes", "route_system_test.gd", "headless", 120),
+        ("balance", "balance_matrix_test.gd", "headless", 180),
+        ("personas", "player_persona_test.gd", "headless", 240),
+        ("recorder", "playtest_recorder_test.gd", "headless", 120),
+        ("soak", "soak_test.gd", "headless", 180),
+    ]
+    invocations = "\n".join(
+        f"run_gate '{label}' '{mode}' '{script}' '{limit}s'"
+        for label, script, mode, limit in gates
+    )
+    command = godot_resolver(config) + f"""
+set -e
+GAME='{game_root}'
+RUN_ID=$(date -u +'%Y%m%dT%H%M%SZ')
+REPORT_ROOT="$GAME/build/p1-suite"
+REPORT_DIR="$REPORT_ROOT/$RUN_ID"
+SUMMARY="$REPORT_DIR/summary.log"
+mkdir -p "$REPORT_DIR"
+printf '%s\n' "$RUN_ID" > "$REPORT_ROOT/latest.txt"
+unset INKBOUND_PLAYTEST INKBOUND_PLAYTEST_SESSION INKBOUND_PLAYTEST_PARTICIPANT INKBOUND_PLAYTEST_DIR INKBOUND_BUILD_ID INKBOUND_GIT_COMMIT INKBOUND_BOOT_SMOKE
+run_gate() {{
+  LABEL="$1"
+  MODE="$2"
+  SCRIPT="$3"
+  LIMIT="$4"
+  LOG="$REPORT_DIR/$LABEL.log"
+  printf 'P1_GATE_BEGIN %s\n' "$LABEL" | tee -a "$SUMMARY"
+  if [ "$MODE" = 'window' ]; then
+    if timeout "$LIMIT" "$GODOT" --path "$GAME" --script "res://tests/$SCRIPT" > "$LOG" 2>&1; then
+      STATUS=0
+    else
+      STATUS=$?
+    fi
+  else
+    if timeout "$LIMIT" "$GODOT" --headless --path "$GAME" --script "res://tests/$SCRIPT" > "$LOG" 2>&1; then
+      STATUS=0
+    else
+      STATUS=$?
+    fi
+  fi
+  if [ "$STATUS" -ne 0 ]; then
+    printf 'P1_GATE_FAIL %s exit=%s log=%s\n' "$LABEL" "$STATUS" "$LOG" | tee -a "$SUMMARY"
+    tail -n 80 "$LOG"
+    exit "$STATUS"
+  fi
+  printf 'P1_GATE_PASS %s\n' "$LABEL" | tee -a "$SUMMARY"
+}}
+{invocations}
+printf 'INKBOUND_P1_SUITE_OK gates={len(gates)} mode=serial report=%s\n' "$REPORT_DIR" | tee -a "$SUMMARY"
+"""
+    remote(config, command, 1800)
+    process_status(config)
+
+
 def save_test(config: dict[str, Any], game: str) -> None:
     game_root = posix_game_root(config, game)
     command = godot_resolver(config) + f"""
@@ -675,7 +754,7 @@ echo "gracefully restarted $TARGET"
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "test", "save-test", "pause-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "capture-session", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
+    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "p1-suite", "test", "save-test", "pause-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "capture-session", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
     parser.add_argument("--game", default=DEFAULT_GAME)
     parser.add_argument("--participant", default="anonymous", help="anonymous facilitator-assigned playtest code")
     parser.add_argument("--reuse-build", action="store_true", help="launch the existing exported build without sync/export")
@@ -683,6 +762,8 @@ def main() -> int:
     config = load_config()
     if args.command == "sync":
         sync(config, args.game)
+    elif args.command == "p1-suite":
+        p1_suite(config, args.game)
     elif args.command == "probe":
         probe(config)
     elif args.command == "process-status":

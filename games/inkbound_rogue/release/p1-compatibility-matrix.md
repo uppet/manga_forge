@@ -21,6 +21,7 @@ separate so a pass on the development PC cannot masquerade as low-end coverage.
 | Source/release audit | 68/68 runtime assets hashed; 9 pre-generated AI, 59 procedural, zero live AI; inert Steam IDs |
 | Stress soak | 1,200 accelerated frames, final act reached, ≤1,000 nodes, ≤256 MiB static memory, ≥90 processing fps |
 | Recorded stress soak | Same budget with the opt-in local recorder writing event/performance streams |
+| Serial regression | 26 gameplay/save/UI/balance/persona/recorder/stress gates in one non-overlapping delegate session, with timestamped per-gate evidence |
 | Export boot | Exact embedded-PCK `InkboundRogue.exe` opens with the Windows GL renderer for 120 frames and exits cleanly |
 | Depot isolation | Exactly EXE, notices, and version JSON; no logs, captures, save data, source, tests, or credentials |
 | UI renderer | English/Chinese title, settings, upgrades, story, and combat HUD render through Windows GL Compatibility |
