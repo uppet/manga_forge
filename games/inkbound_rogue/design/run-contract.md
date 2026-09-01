@@ -62,20 +62,27 @@ a brief damage grace period. Save & Return reaches the title without committing
 the run; New Game requires confirmation before replacing the current draft.
 Final victory or defeat clears the checkpoint. A seven-entry Story Archive
 replays unlocked cinematics without applying run or ending side effects.
+Victory then runs a five-page staff carousel and stops on a bilingual player
+thank-you page; any keyboard, mouse, or controller button returns to the title.
 
 ## Validation content
 
 - Responsive 8-way movement with keyboard/mouse and a default gamepad layout:
   left stick/D-pad movement, right-stick aim, face-button/trigger attack, shoulder
-  dash, Start pause, menu selection, hot-plug prompts, and vibration feedback.
+  dash, Start pause, hot-plug prompts, and vibration feedback. The title uses a
+  visible spatial browse/select cursor with D-pad/left-stick navigation, physical
+  A/Cross confirmation, and B/Circle back. Modal selections gate every gameplay
+  action until their physical inputs are released, preventing a menu B press from
+  leaking into the active Ink Art when combat resumes.
 - A shared transparent 4×4 combat atlas gives the player, all twelve regular
   roles, and all three bosses distinct project-bound manga-pixel silhouettes.
   Grounding shadows and procedural move, dash, and attack poses add clarity
   without changing collisions or exceeding the existing scene-node budget.
 - Arc-based multi-target slash with knockback, crits, freeze, flash, sound,
   particles, camera shake, and comic typography.
-- Three sixteen-second act loops crossfade into three dedicated twelve-second
-  boss themes. Twenty-five cues distinguish weapon forms, Ink Arts, positional
+- Three thirty-two-second act loops crossfade into three dedicated twenty-four-second
+  boss themes. The user music gain is applied once without a hidden attenuation
+  cap. Twenty-five cues distinguish weapon forms, Ink Arts, positional
   enemy warnings, supplies, UI navigation, pause, and saving, with squad-safe
   cooldowns and persistent volume settings.
 - Dash with cooldown and brief invulnerability.

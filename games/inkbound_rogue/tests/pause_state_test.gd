@@ -112,17 +112,28 @@ func _advance_test(_delta: float) -> void:
 				if not _matches_snapshot(snapshot):
 					_fail("upgrade selection allowed gameplay state to advance")
 					return
+				game.player.controls_enabled = true
+				game.player.ink_art_cooldown = 0.0
+				game.player.ink_art_uses = 0
+				Input.action_press("special")
 				_send_upgrade_gamepad()
 				if game.choosing_upgrade or paused or game.hud.upgrade_visible:
 					_fail("gamepad upgrade choice did not resume the run")
+					return
+				game.player._physics_process(1.0 / 60.0)
+				if game.player.ink_art_uses != 0 or not game.player.gameplay_input_release_gate:
+					_fail("B/Circle upgrade choice leaked into the Ink Art action")
 					return
 				snapshot = _capture()
 				_next_phase()
 		4:
 			if phase_frames >= SETTLE_FRAMES:
-				if game.elapsed <= float(snapshot["elapsed"]) or game.player.attack_cooldown >= float(snapshot["attack_cooldown"]):
+				if game.elapsed <= float(snapshot["elapsed"]) or game.player.attack_cooldown >= float(snapshot["attack_cooldown"]) or game.player.ink_art_uses != 0:
 					_fail("simulation did not advance after upgrade selection")
 					return
+				Input.action_release("special")
+				_send_upgrade_gamepad_release()
+				game.player.controls_enabled = false
 				game.offer_relic_draft("PAUSE REGRESSION RELIC")
 				if not game.choosing_relic or not paused or not game.hud.relic_draft_visible:
 					_fail("relic selection did not enter modal pause")
@@ -238,8 +249,15 @@ func _send_pause_gamepad_release() -> void:
 
 func _send_upgrade_gamepad() -> void:
 	var event := InputEventJoypadButton.new()
-	event.button_index = JOY_BUTTON_X
+	event.button_index = JOY_BUTTON_B
 	event.pressed = true
+	game.hud._unhandled_input(event)
+
+
+func _send_upgrade_gamepad_release() -> void:
+	var event := InputEventJoypadButton.new()
+	event.button_index = JOY_BUTTON_B
+	event.pressed = false
 	game.hud._unhandled_input(event)
 
 
@@ -261,6 +279,7 @@ func _fail(message: String) -> void:
 
 
 func _cleanup(exit_code: int) -> void:
+	Input.action_release("special")
 	Engine.time_scale = 1.0
 	paused = false
 	if is_instance_valid(probe):

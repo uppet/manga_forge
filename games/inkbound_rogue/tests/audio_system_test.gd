@@ -59,6 +59,9 @@ func _validate_catalog() -> bool:
 			return _fail("boss theme %s is shorter than twenty-four seconds" % music_id)
 	if game.music_player == null or game.music_fade_player == null or game.music_player.process_mode != Node.PROCESS_MODE_ALWAYS or game.music_fade_player.process_mode != Node.PROCESS_MODE_ALWAYS:
 		return _fail("crossfade players do not survive modal pause")
+	var expected_music_gain := linear_to_db(float(game.settings.get("music", 0.65)))
+	if not is_equal_approx(game._music_volume_db(), expected_music_gain) or game._music_volume_db() < -5.0:
+		return _fail("background music is still hidden behind a second attenuation cap")
 	for limited_id in ["enemy_cast", "enemy_dash", "teleport", "parry", "shield", "heal", "ui_move"]:
 		if int(game.SOUND_COOLDOWNS_MSEC.get(limited_id, 0)) <= 0:
 			return _fail("spam limiter missing for %s" % limited_id)
@@ -152,9 +155,9 @@ func _validate_runtime_crossfade() -> bool:
 	game.current_music = ""
 	game.play_music("archive")
 	var outgoing = game.music_player
-	if not outgoing.playing:
+	if not outgoing.playing or not is_equal_approx(outgoing.volume_db, game._music_volume_db()):
 		game.test_mode = true
-		return _fail("production music player did not start")
+		return _fail("production music player did not start at the user-selected gain")
 	game.play_music("boss_editor")
 	if game.current_music != "boss_editor" or game.music_player == outgoing or not game.music_player.playing or not game.music_fade_player.playing:
 		game.test_mode = true

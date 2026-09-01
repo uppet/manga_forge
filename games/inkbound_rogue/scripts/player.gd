@@ -17,6 +17,10 @@ const CRIMSON := Color("d33037")
 const ATTACK_BUFFER_SECONDS := 0.13
 const DASH_BUFFER_SECONDS := 0.12
 const INK_ART_BUFFER_SECONDS := 0.14
+const GAMEPLAY_INPUT_ACTIONS := [
+	"move_left", "move_right", "move_up", "move_down",
+	"attack", "dash", "special",
+]
 
 var max_health := 8.0
 var health := 8.0
@@ -45,6 +49,7 @@ var dash_direction := Vector2.RIGHT
 var dash_trail_timer := 0.0
 var controls_enabled := true
 var using_gamepad := false
+var gameplay_input_release_gate := false
 var upgrade_stacks: Dictionary = {}
 var build_milestones: Array[String] = []
 var relics: Array[String] = []
@@ -179,7 +184,8 @@ func _physics_process(delta: float) -> void:
 			if chain_game.has_method("apply_status_nearby"):
 				chain_game.apply_status_nearby(global_position, 64.0, 0.0, 0.0, 0.35)
 	else:
-		var input_vector := Input.get_vector("move_left", "move_right", "move_up", "move_down") if controls_enabled else Vector2.ZERO
+		var combat_controls_enabled := controls_enabled and not _gameplay_input_is_gated()
+		var input_vector := Input.get_vector("move_left", "move_right", "move_up", "move_down") if combat_controls_enabled else Vector2.ZERO
 		velocity = Vector2.ZERO
 		if input_vector.length_squared() > 0.01:
 			standstill_time = 0.0
@@ -194,11 +200,11 @@ func _physics_process(delta: float) -> void:
 				var aura_game := get_parent()
 				if aura_game.has_method("damage_nearby"):
 					aura_game.damage_nearby(global_position, 44.0, damage * 0.28, Vector2.ZERO)
-		var stick_aim := Input.get_vector("aim_left", "aim_right", "aim_up", "aim_down") if controls_enabled else Vector2.ZERO
+		var stick_aim := Input.get_vector("aim_left", "aim_right", "aim_up", "aim_down") if combat_controls_enabled else Vector2.ZERO
 		if stick_aim.length_squared() > 0.04:
 			last_direction = stick_aim.normalized()
 
-		if controls_enabled:
+		if combat_controls_enabled:
 			if Input.is_action_just_pressed("dash"):
 				dash_buffer_time = DASH_BUFFER_SECONDS
 			if Input.is_action_just_pressed("attack"):
@@ -210,9 +216,9 @@ func _physics_process(delta: float) -> void:
 			dash_buffer_time = 0.0
 			ink_art_buffer_time = 0.0
 
-		if controls_enabled and dash_buffer_time > 0.0 and start_dash(input_vector):
+		if combat_controls_enabled and dash_buffer_time > 0.0 and start_dash(input_vector):
 			dash_buffer_time = 0.0
-		if controls_enabled and (Input.is_action_pressed("attack") or attack_buffer_time > 0.0):
+		if combat_controls_enabled and (Input.is_action_pressed("attack") or attack_buffer_time > 0.0):
 			var aim := stick_aim if using_gamepad else get_global_mouse_position() - global_position
 			if aim.length_squared() <= 0.04:
 				aim = last_direction
@@ -220,7 +226,7 @@ func _physics_process(delta: float) -> void:
 				aim = _assisted_gamepad_aim(aim, attack_reach + 16.0)
 			if perform_attack(aim):
 				attack_buffer_time = 0.0
-		if controls_enabled and ink_art_buffer_time > 0.0:
+		if combat_controls_enabled and ink_art_buffer_time > 0.0:
 			var art_aim := stick_aim if using_gamepad else get_global_mouse_position() - global_position
 			if art_aim.length_squared() <= 0.04:
 				art_aim = last_direction
@@ -238,6 +244,23 @@ func _physics_process(delta: float) -> void:
 		global_position = game_parent.clamp_to_arena(global_position, 18.0)
 	_update_visual(delta)
 	_notify_ink_art_changed()
+
+
+func suppress_gameplay_input_until_released() -> void:
+	gameplay_input_release_gate = true
+	attack_buffer_time = 0.0
+	dash_buffer_time = 0.0
+	ink_art_buffer_time = 0.0
+
+
+func _gameplay_input_is_gated() -> bool:
+	if not gameplay_input_release_gate:
+		return false
+	for action in GAMEPLAY_INPUT_ACTIONS:
+		if Input.is_action_pressed(action):
+			return true
+	gameplay_input_release_gate = false
+	return false
 
 
 func _assisted_gamepad_aim(direction: Vector2, max_distance: float) -> Vector2:

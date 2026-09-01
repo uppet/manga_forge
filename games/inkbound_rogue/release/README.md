@@ -53,7 +53,8 @@ Before uploading a playtest depot:
 2. Run `host_game.py capture-session`, `host_game.py capture-upgrades`,
    `host_game.py capture-restoration`, `host_game.py capture-proof`,
    `host_game.py capture-daily`, and `host_game.py capture-manual`, then inspect
-   the visual capture gallery.
+   the visual capture gallery. The session gallery includes the victory result
+   and terminal thank-you pages in addition to the title and combat HUD states.
 3. Export and launch the exact depot executable on Windows.
 4. Verify clean-profile save creation, profile migration, current-draft backup
    recovery, Continue / Load, New Game confirmation, and checkpoint cleanup.

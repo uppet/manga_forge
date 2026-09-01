@@ -321,6 +321,7 @@ func _ready() -> void:
 	hud.relic_selected.connect(_on_relic_selected)
 	hud.event_selected.connect(_on_event_selected)
 	hud.restart_requested.connect(_restart)
+	hud.return_to_title_requested.connect(_on_return_to_title_requested)
 	hud.pause_requested.connect(_toggle_pause)
 	hud.start_requested.connect(_on_start_requested)
 	hud.daily_requested.connect(_on_daily_requested)
@@ -1396,7 +1397,10 @@ func play_music(music_id: String) -> void:
 
 
 func _music_volume_db() -> float:
-	return linear_to_db(maxf(0.001, float(settings.get("music", 0.65)) * 0.32))
+	# The music setting is already a user-facing gain. A second hidden 0.32
+	# multiplier made the quietest act loop almost 20 dB softer than combat SFX
+	# and capped even the 100% setting at -9.9 dB.
+	return linear_to_db(maxf(0.001, float(settings.get("music", 0.65))))
 
 
 func _chapter_music_id(page: int = wave) -> String:
@@ -1575,7 +1579,6 @@ func _on_cutscene_finished(sequence_name: String) -> void:
 		if hud.has_method("show_victory"):
 			hud.show_victory(last_run_summary)
 		_sync_pause_state()
-		request_playtest_survey("victory")
 		return
 	if not _try_open_pending_relic_draft():
 		_sync_pause_state()
@@ -1968,6 +1971,7 @@ func _on_event_selected(index: int) -> void:
 	if index < 0 or index >= options.size():
 		return
 	var option: Dictionary = options[index]
+	_suppress_modal_selection_input()
 	record_playtest_event("event_selected", {
 		"event": str(current_event.get("id", "")),
 		"index": index,
@@ -2639,6 +2643,7 @@ func _on_upgrade_selected(index: int) -> void:
 	if index < 0 or index >= current_choices.size():
 		return
 	var choice := current_choices[index]
+	_suppress_modal_selection_input()
 	record_playtest_event("upgrade_selected", {"index": index, "upgrade": str(choice.get("id", "")), "level": player.level, "page": wave})
 	player.apply_upgrade(choice["id"])
 	_record_upgrade(choice["id"])
@@ -2655,6 +2660,7 @@ func _on_relic_selected(index: int) -> void:
 	if not choosing_relic or index < 0 or index >= current_relic_choices.size():
 		return
 	var selected: Dictionary = current_relic_choices[index]
+	_suppress_modal_selection_input()
 	var relic_id := str(selected.get("id", ""))
 	record_playtest_event("relic_selected", {"index": index, "relic": relic_id, "page": wave})
 	current_relic_choices.clear()
@@ -2677,6 +2683,25 @@ func _toggle_pause() -> void:
 	if not manually_paused:
 		focus_pause_engaged = false
 	_sync_pause_state()
+
+
+func _suppress_modal_selection_input() -> void:
+	if is_instance_valid(player):
+		player.suppress_gameplay_input_until_released()
+
+
+func _on_return_to_title_requested() -> void:
+	record_playtest_event("victory_credits_finished", {"ending": ending_id})
+	request_playtest_survey("victory")
+	if test_mode:
+		run_started = false
+		run_won = false
+		manually_paused = false
+		hud.hide_victory_credits()
+		hud.show_title(_meta_snapshot())
+		_sync_pause_state()
+		return
+	_restart()
 
 
 func _on_save_return_requested() -> void:

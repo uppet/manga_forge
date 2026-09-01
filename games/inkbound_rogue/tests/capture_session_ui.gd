@@ -102,7 +102,32 @@ func _process(_delta: float) -> bool:
 			_prepare_boss_hud()
 		43:
 			_capture("inkbound-boss-hud.png")
-			print("INKBOUND_SESSION_CAPTURE_OK gallery=11 size=%dx%d" % [root.get_texture().get_width(), root.get_texture().get_height()])
+			game.hud.set_boss("", 0.0, 0.0)
+			game.hud.show_victory({
+				"won": true,
+				"ending": "keep",
+				"wave": 12,
+				"level": 18,
+				"score": 42860,
+				"kills": 186,
+				"best_score": 42860,
+				"memory_earned": 24,
+				"archive_rank": 5,
+				"duration_seconds": 1187,
+				"difficulty": "standard",
+				"contract_name": "OPEN DRAFT",
+				"proof_depth": 0,
+				"weapon_form": "GREATBRUSH",
+				"relic_count": 3,
+				"directives_completed": 7,
+				"directives_offered": 9,
+			})
+		45:
+			_capture("inkbound-victory-results.png")
+			game.hud._skip_victory_credits_to_thanks()
+		47:
+			_capture("inkbound-thank-you.png")
+			print("INKBOUND_SESSION_CAPTURE_OK gallery=13 size=%dx%d" % [root.get_texture().get_width(), root.get_texture().get_height()])
 			paused = false
 			game.debug_clear_save_files()
 			game.free()

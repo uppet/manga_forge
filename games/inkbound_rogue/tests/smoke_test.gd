@@ -33,6 +33,12 @@ func _run_smoke_test() -> void:
 	if game.player == null or game.hud == null or game.arena == null:
 		_fail("core runtime nodes are missing")
 		return
+	if game.hud.xp_bar.size.y > 3.0 or game.hud.hp_bar.size.y > 8.0:
+		_fail("pixel HUD bars exceed their readability budget (HP %.1f px, XP %.1f px)" % [game.hud.hp_bar.size.y, game.hud.xp_bar.size.y])
+		return
+	if game.hud.top_panel.color.a > 0.75 or game.hud.ink_art_panel.color.a > 0.8 or game.hud.directive_panel.color.a > 0.8 or game.hud.upgrade_panel.color.a > 0.92:
+		_fail("combat HUD or paused choice panels lost their translucent treatment")
+		return
 	game._on_bindings_reset_requested()
 
 	var gamepad_actions := [
@@ -276,6 +282,59 @@ func _run_smoke_test() -> void:
 	if not game.hud.title_visible or game.hud.title_stats_label.text.is_empty():
 		_fail("title and persistent progression presentation did not open")
 		return
+	if game.hud.title_navigation_buttons.size() != game.hud.title_navigation_actions.size() or game.hud.title_navigation_buttons.size() < 12 or not game.hud.title_navigation_cursor.visible:
+		_fail("title screen is missing its visible controller navigation model")
+		return
+	var title_navigation_before: int = game.hud.title_navigation_index
+	var title_down := InputEventJoypadButton.new()
+	title_down.button_index = JOY_BUTTON_DPAD_DOWN
+	title_down.pressed = true
+	game.hud._unhandled_input(title_down)
+	var title_down_release := InputEventJoypadButton.new()
+	title_down_release.button_index = JOY_BUTTON_DPAD_DOWN
+	title_down_release.pressed = false
+	game.hud._unhandled_input(title_down_release)
+	if game.hud.title_navigation_index == title_navigation_before or game.hud.daily_visible:
+		_fail("D-pad Down opened a shortcut instead of browsing the title menu")
+		return
+	game.hud.title_navigation_index = game.hud.title_navigation_actions.find("daily")
+	game.hud._refresh_title_navigation()
+	var title_accept := InputEventJoypadButton.new()
+	title_accept.button_index = JOY_BUTTON_A
+	title_accept.pressed = true
+	game.hud._unhandled_input(title_accept)
+	var title_accept_release := InputEventJoypadButton.new()
+	title_accept_release.button_index = JOY_BUTTON_A
+	title_accept_release.pressed = false
+	game.hud._unhandled_input(title_accept_release)
+	if not game.hud.daily_visible:
+		_fail("A/Cross did not activate the highlighted title item")
+		return
+	var title_back := InputEventJoypadButton.new()
+	title_back.button_index = JOY_BUTTON_B
+	title_back.pressed = true
+	game.hud._unhandled_input(title_back)
+	var title_back_release := InputEventJoypadButton.new()
+	title_back_release.button_index = JOY_BUTTON_B
+	title_back_release.pressed = false
+	game.hud._unhandled_input(title_back_release)
+	if game.hud.daily_visible:
+		_fail("B/Circle did not return from a title submenu")
+		return
+	game.run_won = true
+	game.hud.show_victory({"won": true, "ending": "keep", "wave": 12, "level": 10, "score": 12345, "kills": 120, "best_score": 12345, "memory_earned": 12, "archive_rank": 2})
+	if not game.hud.victory_credits_visible or game.hud.game_over_visible or game.hud.victory_credit_pages.size() < 5:
+		_fail("victory did not begin the automatic staff carousel")
+		return
+	game.hud._skip_victory_credits_to_thanks()
+	if not game.hud.victory_credits_final or game.hud.victory_credits_title.text.find("THANK YOU") < 0:
+		_fail("victory credits did not stop on the thank-you page")
+		return
+	game.hud._unhandled_input(title_accept)
+	game.hud._unhandled_input(title_accept_release)
+	if game.hud.victory_credits_visible or not game.hud.title_visible or game.run_won:
+		_fail("any button on the final thank-you page did not return to the title")
+		return
 	game.hud._toggle_achievements()
 	if not game.hud.achievements_visible or game.hud.achievements_label.text.is_empty():
 		_fail("achievement gallery did not open from the title screen")
@@ -295,6 +354,8 @@ func _run_smoke_test() -> void:
 		_fail("title contract selector did not cycle and refresh")
 		return
 	game.hud.hide_title()
+	game.run_started = true
+	game._sync_pause_state()
 	var event_shards_before: int = game.run_shards
 	if not game.debug_offer_event("forgotten-shrine") or not game.choosing_event or not paused or not game.hud.event_visible:
 		_fail("chapter event did not open its paused choice state")

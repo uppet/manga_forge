@@ -21,7 +21,9 @@ return to zero.
 Boss entry crossfades from the active act loop over 0.55 seconds. Defeat returns
 to the current act loop; restored checkpoints select the boss layer whenever a
 boss is present. Both music players process during modal pause so transitions do
-not stall underneath story or interface states.
+not stall underneath story or interface states. The saved music setting is the
+single user-facing gain; no second internal attenuation may make an enabled loop
+effectively inaudible beneath combat cues.
 
 ## Cue language
 

@@ -8,6 +8,7 @@ signal upgrade_selected(index: int)
 signal relic_selected(index: int)
 signal event_selected(index: int)
 signal restart_requested
+signal return_to_title_requested
 signal pause_requested
 signal start_requested(difficulty_id: String, contract_id: String, starting_weapon_id: String, proof_depth: int)
 signal daily_requested
@@ -28,8 +29,11 @@ const WHITE := Color("fff8e0")
 const CRIMSON := Color("d33037")
 const GOLD := Color("f2b344")
 
-var hp_bar: ProgressBar
-var xp_bar: ProgressBar
+var hp_bar: ColorRect
+var hp_bar_fill: ColorRect
+var xp_bar: ColorRect
+var xp_bar_fill: ColorRect
+var top_panel: ColorRect
 var level_label: Label
 var wave_label: Label
 var score_label: Label
@@ -67,6 +71,15 @@ var game_over_backdrop: ColorRect
 var game_over_panel: ColorRect
 var game_over_title: Label
 var game_over_label: Label
+var victory_credits_panel: ColorRect
+var victory_credits_title: Label
+var victory_credits_body: Label
+var victory_credits_prompt: Label
+var victory_credits_visible := false
+var victory_credits_final := false
+var victory_credit_page := 0
+var victory_credit_pages: Array[Dictionary] = []
+var victory_credit_tween: Tween
 var pause_panel: ColorRect
 var pause_label: Label
 var controls_label: Label
@@ -125,6 +138,11 @@ var daily_visible := false
 var restore_title_label: Label
 var start_button: Button
 var continue_button: Button
+var story_button: Button
+var settings_button: Button
+var history_button: Button
+var achievements_button: Button
+var codex_button: Button
 var restoration_open_button: Button
 var restoration_panel: ColorRect
 var restoration_status_label: Label
@@ -188,6 +206,11 @@ var manual_button: Button
 var pause_manual_button: Button
 var manual_visible := false
 var manual_page := 0
+var title_navigation_label: Label
+var title_navigation_cursor: ColorRect
+var title_navigation_buttons: Array[Button] = []
+var title_navigation_actions: Array[String] = []
+var title_navigation_index := 0
 
 const FIELD_MANUAL_PAGES := [
 	{
@@ -295,17 +318,22 @@ func _on_ui_button_down(button: Button) -> void:
 func _on_ui_button_hovered(button: Button) -> void:
 	if button.visible and not button.disabled:
 		ui_sound_requested.emit("ui_move")
+		var title_index := title_navigation_buttons.find(button)
+		if title_visible and not _title_overlay_visible() and title_index >= 0:
+			title_navigation_index = title_index
+			_refresh_title_navigation()
 
 
 func _emit_input_ui_sound(event: InputEvent) -> void:
-	var in_ui := title_visible or pause_panel.visible or settings_visible or bindings_visible or manual_visible or event_visible or relic_draft_visible or upgrade_visible or game_over_visible
+	var in_ui := title_visible or pause_panel.visible or settings_visible or bindings_visible or manual_visible or event_visible or relic_draft_visible or upgrade_visible or game_over_visible or victory_credits_visible
+	var gamepad_cancel: bool = event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B
 	if not in_ui:
 		if event.is_action_pressed("manual") or event.is_action_pressed("pause") or event.is_action_pressed("options") or event.is_action_pressed("restoration") or event.is_action_pressed("proof_ledger") or event.is_action_pressed("daily_chronicle"):
 			ui_sound_requested.emit("ui_confirm")
 		return
 	if event.is_action_pressed("move_up") or event.is_action_pressed("move_down") or event.is_action_pressed("move_left") or event.is_action_pressed("move_right") or event.is_action_pressed("contract_prev") or event.is_action_pressed("contract_next"):
 		ui_sound_requested.emit("ui_move")
-	elif event.is_action_pressed("pause") or event.is_action_pressed("options") or event.is_action_pressed("upgrade_3") and (settings_visible or manual_visible or restoration_visible or proof_visible):
+	elif (gamepad_cancel and (title_visible or settings_visible or manual_visible)) or event.is_action_pressed("pause") or event.is_action_pressed("options") or (event.is_action_pressed("upgrade_3") and (settings_visible or manual_visible or restoration_visible or proof_visible)):
 		ui_sound_requested.emit("ui_cancel")
 	elif event.is_action_pressed("restoration") or event.is_action_pressed("proof_ledger") or event.is_action_pressed("daily_chronicle") or event.is_action_pressed("attack") or event.is_action_pressed("dash") or event.is_action_pressed("restart") or event.is_action_pressed("upgrade_1") or event.is_action_pressed("upgrade_2") or event.is_action_pressed("upgrade_3") or event.is_action_pressed("upgrade_4"):
 		ui_sound_requested.emit("ui_confirm")
@@ -334,15 +362,17 @@ func _build_hud() -> void:
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(frame)
 
-	var top := ColorRect.new()
-	top.position = Vector2(8, 7)
-	top.size = Vector2(464, 37)
-	top.color = Color(0.03, 0.025, 0.04, 0.9)
-	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(top)
+	top_panel = ColorRect.new()
+	top_panel.position = Vector2(8, 7)
+	top_panel.size = Vector2(464, 37)
+	top_panel.color = Color(0.03, 0.025, 0.04, 0.72)
+	top_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(top_panel)
 
-	hp_bar = _make_bar(Vector2(15, 14), Vector2(132, 8), CRIMSON)
-	xp_bar = _make_bar(Vector2(15, 29), Vector2(132, 5), GOLD)
+	hp_bar = _make_pixel_bar(Vector2(15, 14), Vector2(132, 8), CRIMSON)
+	hp_bar_fill = hp_bar.get_child(0) as ColorRect
+	xp_bar = _make_pixel_bar(Vector2(15, 31), Vector2(132, 3), GOLD)
+	xp_bar_fill = xp_bar.get_child(0) as ColorRect
 	level_label = _make_label("LV 1", Vector2(153, 10), Vector2(48, 16), 11, PAPER)
 	wave_label = _make_label("PAGE 1", Vector2(210, 10), Vector2(80, 16), 12, WHITE)
 	score_label = _make_label("INK 000000", Vector2(303, 10), Vector2(100, 16), 11, PAPER)
@@ -356,7 +386,7 @@ func _build_hud() -> void:
 	ink_art_panel = ColorRect.new()
 	ink_art_panel.position = Vector2(300, 201)
 	ink_art_panel.size = Vector2(168, 29)
-	ink_art_panel.color = Color(0.025, 0.02, 0.03, 0.92)
+	ink_art_panel.color = Color(0.025, 0.02, 0.03, 0.78)
 	ink_art_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(ink_art_panel)
 	ink_art_label = _make_child_label(ink_art_panel, "E  ART · PALIMPSEST RING", Vector2(6, 0), Vector2(156, 13), 7, GOLD)
@@ -384,7 +414,7 @@ func _build_hud() -> void:
 	boss_panel = ColorRect.new()
 	boss_panel.position = Vector2(334, 58)
 	boss_panel.size = Vector2(134, 27)
-	boss_panel.color = Color(0.025, 0.02, 0.03, 0.94)
+	boss_panel.color = Color(0.025, 0.02, 0.03, 0.82)
 	boss_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	boss_panel.visible = false
 	add_child(boss_panel)
@@ -407,7 +437,7 @@ func _build_hud() -> void:
 	directive_panel = ColorRect.new()
 	directive_panel.position = Vector2(10, 51)
 	directive_panel.size = Vector2(136, 52)
-	directive_panel.color = Color(0.025, 0.02, 0.03, 0.9)
+	directive_panel.color = Color(0.025, 0.02, 0.03, 0.78)
 	directive_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	directive_panel.clip_contents = true
 	directive_panel.visible = false
@@ -439,10 +469,9 @@ func _build_hud() -> void:
 	upgrade_panel = ColorRect.new()
 	upgrade_panel.position = Vector2(6, 6)
 	upgrade_panel.size = Vector2(468, 258)
-	# Keep the modal fully opaque. The live HUD contains labels in the same
-	# vertical bands, and even a faint bleed-through makes the card copy look
-	# doubled on bright displays.
-	upgrade_panel.color = Color(0.035, 0.03, 0.045, 1.0)
+	# The simulation is paused while this is visible, so the frozen battle can
+	# remain as context without competing with the isolated card text regions.
+	upgrade_panel.color = Color(0.035, 0.03, 0.045, 0.9)
 	upgrade_panel.clip_contents = true
 	upgrade_panel.visible = false
 	add_child(upgrade_panel)
@@ -485,7 +514,7 @@ func _build_hud() -> void:
 	relic_draft_panel = ColorRect.new()
 	relic_draft_panel.position = Vector2(10, 22)
 	relic_draft_panel.size = Vector2(460, 226)
-	relic_draft_panel.color = Color(0.025, 0.018, 0.03, 0.985)
+	relic_draft_panel.color = Color(0.025, 0.018, 0.03, 0.9)
 	relic_draft_panel.visible = false
 	add_child(relic_draft_panel)
 	var relic_draft_title := _make_child_label(relic_draft_panel, "RESTORE ONE RELIC", Vector2(8, 4), Vector2(444, 25), 16, WHITE)
@@ -516,7 +545,7 @@ func _build_hud() -> void:
 	event_panel = ColorRect.new()
 	event_panel.position = Vector2(30, 42)
 	event_panel.size = Vector2(420, 188)
-	event_panel.color = Color(0.025, 0.018, 0.03, 0.985)
+	event_panel.color = Color(0.025, 0.018, 0.03, 0.88)
 	event_panel.visible = false
 	add_child(event_panel)
 	event_title = _make_child_label(event_panel, "A MEMORY IN THE MARGIN", Vector2(12, 8), Vector2(396, 25), 16, WHITE)
@@ -565,10 +594,26 @@ func _build_hud() -> void:
 	restart_button.pressed.connect(func() -> void: restart_requested.emit())
 	game_over_panel.add_child(restart_button)
 
+	victory_credits_panel = ColorRect.new()
+	victory_credits_panel.position = Vector2.ZERO
+	victory_credits_panel.size = Vector2(480, 270)
+	victory_credits_panel.color = Color(0.01, 0.008, 0.015, 0.965)
+	victory_credits_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	victory_credits_panel.visible = false
+	add_child(victory_credits_panel)
+	victory_credits_title = _make_child_label(victory_credits_panel, "THE PAGE REMEMBERS", Vector2(24, 22), Vector2(432, 42), 24, GOLD)
+	victory_credits_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	victory_credits_body = _make_child_label(victory_credits_panel, "", Vector2(34, 67), Vector2(412, 142), 10, PAPER)
+	victory_credits_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	victory_credits_body.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	victory_credits_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	victory_credits_prompt = _make_child_label(victory_credits_panel, "CREDITS BEGIN…", Vector2(30, 226), Vector2(420, 24), 9, GOLD)
+	victory_credits_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
 	pause_panel = ColorRect.new()
 	pause_panel.position = Vector2(144, 50)
 	pause_panel.size = Vector2(192, 170)
-	pause_panel.color = Color(0.025, 0.02, 0.03, 0.95)
+	pause_panel.color = Color(0.025, 0.02, 0.03, 0.88)
 	pause_panel.visible = false
 	add_child(pause_panel)
 	pause_label = _make_child_label(pause_panel, "PANEL PAUSED\nESC TO CONTINUE", Vector2(6, 9), Vector2(180, 44), 14, PAPER)
@@ -696,46 +741,46 @@ func _build_title() -> void:
 	restoration_open_button.pressed.connect(_show_restoration)
 	title_panel.add_child(restoration_open_button)
 
-	var codex_button := Button.new()
+	codex_button = Button.new()
 	codex_button.position = Vector2(356, 68)
 	codex_button.size = Vector2(100, 28)
-	codex_button.text = "Y/△  CODEX"
+	codex_button.text = "CODEX"
 	codex_button.add_theme_font_size_override("font_size", 9)
 	codex_button.focus_mode = Control.FOCUS_NONE
 	codex_button.pressed.connect(_toggle_codex)
 	title_panel.add_child(codex_button)
 
-	var achievements_button := Button.new()
+	achievements_button = Button.new()
 	achievements_button.position = Vector2(246, 68)
 	achievements_button.size = Vector2(104, 28)
-	achievements_button.text = "B/○  ACHIEVEMENTS"
+	achievements_button.text = "ACHIEVEMENTS"
 	achievements_button.add_theme_font_size_override("font_size", 7)
 	achievements_button.focus_mode = Control.FOCUS_NONE
 	achievements_button.pressed.connect(_toggle_achievements)
 	title_panel.add_child(achievements_button)
 
-	var story_button := Button.new()
+	story_button = Button.new()
 	story_button.position = Vector2(246, 8)
 	story_button.size = Vector2(104, 26)
-	story_button.text = "RT  STORY"
+	story_button.text = "STORY ARCHIVE"
 	story_button.add_theme_font_size_override("font_size", 8)
 	story_button.focus_mode = Control.FOCUS_NONE
 	story_button.pressed.connect(_toggle_story)
 	title_panel.add_child(story_button)
 
-	var settings_button := Button.new()
+	settings_button = Button.new()
 	settings_button.position = Vector2(356, 8)
 	settings_button.size = Vector2(100, 26)
-	settings_button.text = "VIEW  OPTIONS"
+	settings_button.text = "OPTIONS"
 	settings_button.add_theme_font_size_override("font_size", 8)
 	settings_button.focus_mode = Control.FOCUS_NONE
 	settings_button.pressed.connect(show_settings)
 	title_panel.add_child(settings_button)
 
-	var history_button := Button.new()
+	history_button = Button.new()
 	history_button.position = Vector2(246, 38)
 	history_button.size = Vector2(104, 26)
-	history_button.text = "X/□  HISTORY"
+	history_button.text = "HISTORY"
 	history_button.add_theme_font_size_override("font_size", 8)
 	history_button.focus_mode = Control.FOCUS_NONE
 	history_button.pressed.connect(_toggle_history)
@@ -744,11 +789,48 @@ func _build_title() -> void:
 	manual_button = Button.new()
 	manual_button.position = Vector2(356, 38)
 	manual_button.size = Vector2(100, 26)
-	manual_button.text = "LT/F1  MANUAL"
+	manual_button.text = "FIELD MANUAL"
 	manual_button.add_theme_font_size_override("font_size", 8)
 	manual_button.focus_mode = Control.FOCUS_NONE
 	manual_button.pressed.connect(show_manual)
 	title_panel.add_child(manual_button)
+
+	title_navigation_label = _make_child_label(title_panel, "D-PAD  NAVIGATE  ·  A  SELECT  ·  B  BACK", Vector2(20, 252), Vector2(440, 14), 7, GOLD)
+	title_navigation_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_navigation_cursor = ColorRect.new()
+	title_navigation_cursor.color = GOLD
+	title_navigation_cursor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_panel.add_child(title_navigation_cursor)
+	title_navigation_buttons = [
+		start_button,
+		continue_button,
+		difficulty_button,
+		contract_button,
+		proof_button,
+		daily_button,
+		restoration_open_button,
+		story_button,
+		settings_button,
+		history_button,
+		manual_button,
+		achievements_button,
+		codex_button,
+	]
+	title_navigation_actions = [
+		"new_game",
+		"continue",
+		"difficulty",
+		"contract",
+		"proof",
+		"daily",
+		"restoration",
+		"story",
+		"settings",
+		"history",
+		"manual",
+		"achievements",
+		"codex",
+	]
 
 	codex_panel = ColorRect.new()
 	codex_panel.position = Vector2(24, 24)
@@ -934,7 +1016,7 @@ func _build_achievement_toast() -> void:
 	achievement_toast = ColorRect.new()
 	achievement_toast.position = Vector2(96, 76)
 	achievement_toast.size = Vector2(288, 46)
-	achievement_toast.color = Color(0.02, 0.015, 0.025, 0.97)
+	achievement_toast.color = Color(0.02, 0.015, 0.025, 0.88)
 	achievement_toast.visible = false
 	add_child(achievement_toast)
 	achievement_toast_label = _make_child_label(achievement_toast, "ACHIEVEMENT RESTORED", Vector2(8, 5), Vector2(272, 36), 9, GOLD)
@@ -1085,25 +1167,18 @@ func _build_bindings() -> void:
 	binding_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 
-func _make_bar(at: Vector2, bar_size: Vector2, fill: Color) -> ProgressBar:
-	return _make_child_bar(self, at, bar_size, fill)
-
-
-func _make_child_bar(parent: Node, at: Vector2, bar_size: Vector2, fill: Color) -> ProgressBar:
-	var bar := ProgressBar.new()
+func _make_pixel_bar(at: Vector2, bar_size: Vector2, fill: Color) -> ColorRect:
+	var bar := ColorRect.new()
 	bar.position = at
 	bar.size = bar_size
-	bar.min_value = 0
-	bar.max_value = 1
-	bar.value = 1
-	bar.show_percentage = false
-	var background := StyleBoxFlat.new()
-	background.bg_color = Color(0.12, 0.1, 0.13, 1)
-	var foreground := StyleBoxFlat.new()
-	foreground.bg_color = fill
-	bar.add_theme_stylebox_override("background", background)
-	bar.add_theme_stylebox_override("fill", foreground)
-	parent.add_child(bar)
+	bar.color = Color(0.12, 0.1, 0.13, 0.9)
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var foreground := ColorRect.new()
+	foreground.size = bar_size
+	foreground.color = fill
+	foreground.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(foreground)
+	add_child(bar)
 	return bar
 
 
@@ -1156,7 +1231,7 @@ func _show_intro() -> void:
 	var intro := ColorRect.new()
 	intro.position = Vector2(54, 82)
 	intro.size = Vector2(372, 102)
-	intro.color = Color(0.025, 0.02, 0.03, 0.96)
+	intro.color = Color(0.025, 0.02, 0.03, 0.78)
 	add_child(intro)
 	var title := _make_child_label(intro, "INKBOUND", Vector2(8, 10), Vector2(356, 36), 26, WHITE)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1175,13 +1250,13 @@ func show_run_intro() -> void:
 
 
 func set_health(current: float, maximum: float) -> void:
-	hp_bar.max_value = maximum
-	hp_bar.value = current
+	var ratio := clampf(current / maximum, 0.0, 1.0) if maximum > 0.0 else 0.0
+	hp_bar_fill.size.x = hp_bar.size.x * ratio
 
 
 func set_xp(current: int, needed: int, level: int) -> void:
-	xp_bar.max_value = needed
-	xp_bar.value = current
+	var ratio := clampf(float(current) / float(needed), 0.0, 1.0) if needed > 0 else 0.0
+	xp_bar_fill.size.x = xp_bar.size.x * ratio
 	level_label.text = ("等级 %d" if TranslationServer.get_locale().begins_with("zh") else "LV %d") % level
 
 
@@ -1381,6 +1456,7 @@ func _choose_event(index: int) -> void:
 
 
 func show_game_over(summary: Dictionary) -> void:
+	hide_victory_credits()
 	last_result_summary = summary.duplicate(true)
 	game_over_visible = true
 	game_over_backdrop.visible = true
@@ -1395,15 +1471,79 @@ func show_game_over(summary: Dictionary) -> void:
 
 func show_victory(summary: Dictionary) -> void:
 	last_result_summary = summary.duplicate(true)
-	game_over_visible = true
-	game_over_backdrop.visible = true
-	game_over_panel.visible = true
-	game_over_backdrop.move_to_front()
-	game_over_panel.move_to_front()
-	game_over_title.text = "THE PAGE REMEMBERS"
-	game_over_title.add_theme_color_override("font_color", GOLD)
-	game_over_label.text = _run_result_text(summary)
-	restart_button.text = "BEGIN ANOTHER DRAFT"
+	game_over_visible = false
+	game_over_backdrop.visible = false
+	game_over_panel.visible = false
+	victory_credit_pages = _victory_credit_page_data(summary)
+	victory_credit_page = 0
+	victory_credits_visible = true
+	victory_credits_panel.visible = true
+	victory_credits_panel.move_to_front()
+	_show_victory_credit_page()
+
+
+func _victory_credit_page_data(summary: Dictionary) -> Array[Dictionary]:
+	var chinese := TranslationServer.get_locale().begins_with("zh")
+	if chinese:
+		return [
+			{"title": "此页铭记于心", "body": _run_result_text_zh(summary), "duration": 4.2},
+			{"title": "制作人员", "body": "设计 · 叙事 · 程序 · 制作\nMANGA FORGE 项目流水线", "duration": 3.0},
+			{"title": "美术与声音", "body": "原创项目资产与人工指导下的视觉制作\n\n引擎\nGODOT ENGINE 与开源贡献者", "duration": 3.0},
+			{"title": "试玩玩家", "body": "感谢每一位在页边留下意见的玩家。\n你们发现的问题，让下一份草稿变得更好。", "duration": 3.0},
+			{"title": "感谢游玩", "body": "NARA 的故事会在下一份草稿中继续。", "final": true},
+		]
+	return [
+		{"title": "THE PAGE REMEMBERS", "body": _run_result_text(summary), "duration": 4.2},
+		{"title": "STAFF", "body": "DESIGN · NARRATIVE · CODE · PRODUCTION\nMANGA FORGE PROJECT PIPELINE", "duration": 3.0},
+		{"title": "ART & AUDIO", "body": "ORIGINAL PROJECT ASSETS AND DIRECTED VISUAL PRODUCTION\n\nENGINE\nGODOT ENGINE AND OPEN-SOURCE CONTRIBUTORS", "duration": 3.0},
+		{"title": "PLAYTESTERS", "body": "THANK YOU TO EVERY PLAYER WHO LEFT A NOTE IN THE MARGIN.\nYOUR FEEDBACK MADE THE NEXT DRAFT BETTER.", "duration": 3.0},
+		{"title": "THANK YOU FOR PLAYING", "body": "NARA'S STORY CONTINUES IN THE NEXT DRAFT.", "final": true},
+	]
+
+
+func _show_victory_credit_page() -> void:
+	if victory_credit_pages.is_empty() or not victory_credits_visible:
+		return
+	if victory_credit_tween != null and victory_credit_tween.is_valid():
+		victory_credit_tween.kill()
+	victory_credit_page = clampi(victory_credit_page, 0, victory_credit_pages.size() - 1)
+	var page: Dictionary = victory_credit_pages[victory_credit_page]
+	victory_credits_title.text = str(page.get("title", "THANK YOU FOR PLAYING"))
+	victory_credits_body.text = str(page.get("body", ""))
+	victory_credits_final = bool(page.get("final", false))
+	var chinese := TranslationServer.get_locale().begins_with("zh")
+	if victory_credits_final:
+		victory_credits_prompt.text = "按任意键返回开始菜单" if chinese else "PRESS ANY BUTTON TO RETURN TO THE TITLE"
+		return
+	victory_credits_prompt.text = "制作人员名单即将继续 · 按任意键跳至鸣谢" if chinese else "CREDITS CONTINUE · PRESS ANY BUTTON TO SKIP TO THANKS"
+	victory_credit_tween = create_tween()
+	victory_credit_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	victory_credit_tween.tween_interval(float(page.get("duration", 3.0)))
+	victory_credit_tween.tween_callback(_advance_victory_credit_page)
+
+
+func _advance_victory_credit_page() -> void:
+	if not victory_credits_visible or victory_credits_final:
+		return
+	victory_credit_page = mini(victory_credit_page + 1, victory_credit_pages.size() - 1)
+	_show_victory_credit_page()
+
+
+func _skip_victory_credits_to_thanks() -> void:
+	if victory_credit_pages.is_empty():
+		return
+	victory_credit_page = victory_credit_pages.size() - 1
+	_show_victory_credit_page()
+
+
+func hide_victory_credits() -> void:
+	if victory_credit_tween != null and victory_credit_tween.is_valid():
+		victory_credit_tween.kill()
+	victory_credit_tween = null
+	victory_credit_pages.clear()
+	victory_credits_visible = false
+	victory_credits_final = false
+	victory_credits_panel.visible = false
 
 
 func _run_result_text(summary: Dictionary) -> String:
@@ -1506,20 +1646,21 @@ func set_input_mode(gamepad_active: bool) -> void:
 		pause_label.text = "战场已暂停\n按 START 继续" if chinese else "PANEL PAUSED\nSTART TO CONTINUE"
 		pause_options_button.text = "VIEW  选项" if chinese else "VIEW  OPTIONS"
 		pause_manual_button.text = "LT  战地手册" if chinese else "LT  FIELD MANUAL"
-		manual_button.text = "LT  手册" if chinese else "LT  MANUAL"
+		manual_button.text = "战地手册" if chinese else "FIELD MANUAL"
 	else:
 		controls_label.text = "WASD 移动  ·  鼠标/J 斩击  ·  空格/K 冲刺  ·  E 墨术  ·  ESC 暂停" if chinese else "WASD MOVE  ·  MOUSE/J SLASH  ·  SPACE/K DASH  ·  E ART  ·  ESC PAUSE"
 		restart_button.text = "R  重写此页" if chinese else "R  REWRITE THE PAGE"
 		pause_label.text = "战场已暂停\n按 ESC 继续" if chinese else "PANEL PAUSED\nESC TO CONTINUE"
 		pause_options_button.text = "O / F10  选项" if chinese else "O / F10  OPTIONS"
 		pause_manual_button.text = "F1 / H  战地手册" if chinese else "F1 / H  FIELD MANUAL"
-		manual_button.text = "F1 / H  手册" if chinese else "F1 / H  MANUAL"
+		manual_button.text = "战地手册" if chinese else "FIELD MANUAL"
 	_refresh_manual()
 	set_ink_art(ink_art_source_name, ink_art_remaining, ink_art_maximum)
 	if upgrade_visible:
 		_refresh_upgrade_buttons()
 	if relic_draft_visible:
 		_refresh_relic_draft_buttons()
+	_refresh_title_navigation()
 
 
 func set_input_enabled(enabled: bool) -> void:
@@ -1630,6 +1771,8 @@ func show_title(meta: Dictionary) -> void:
 	title_panel.visible = true
 	_ensure_title_selections_unlocked()
 	_refresh_title()
+	title_navigation_index = 1 if not continue_button.disabled else 0
+	_refresh_title_navigation()
 
 
 func hide_title() -> void:
@@ -1651,6 +1794,7 @@ func hide_title() -> void:
 	story_panel.visible = false
 	loadout_visible = false
 	loadout_panel.visible = false
+	title_navigation_cursor.visible = false
 
 
 func refresh_title_meta(meta: Dictionary) -> void:
@@ -1708,6 +1852,111 @@ func _refresh_title() -> void:
 	_refresh_history()
 	_refresh_story()
 	_refresh_loadout()
+	_refresh_title_navigation()
+
+
+func _title_overlay_visible() -> bool:
+	return daily_visible or proof_visible or restoration_visible or loadout_visible or codex_visible or achievements_visible or history_visible or story_visible or settings_visible or bindings_visible or manual_visible
+
+
+func _refresh_title_navigation() -> void:
+	if title_navigation_buttons.is_empty() or title_navigation_cursor == null:
+		return
+	title_navigation_index = clampi(title_navigation_index, 0, title_navigation_buttons.size() - 1)
+	if title_navigation_buttons[title_navigation_index].disabled or not title_navigation_buttons[title_navigation_index].visible:
+		for index in range(title_navigation_buttons.size()):
+			if not title_navigation_buttons[index].disabled and title_navigation_buttons[index].visible:
+				title_navigation_index = index
+				break
+	for index in range(title_navigation_buttons.size()):
+		var button := title_navigation_buttons[index]
+		button.modulate = Color(1.0, 0.82, 0.42, 1.0) if index == title_navigation_index and not button.disabled else Color.WHITE
+	var selected := title_navigation_buttons[title_navigation_index]
+	title_navigation_cursor.position = selected.position + Vector2(-5, 4)
+	title_navigation_cursor.size = Vector2(3, maxf(8.0, selected.size.y - 8.0))
+	title_navigation_cursor.visible = title_visible and not _title_overlay_visible() and not selected.disabled
+	if using_gamepad:
+		title_navigation_label.text = "十字键/左摇杆  选择  ·  A/×  确认  ·  B/○  返回" if TranslationServer.get_locale().begins_with("zh") else "D-PAD / LEFT STICK  NAVIGATE  ·  A/CROSS  SELECT  ·  B/CIRCLE  BACK"
+	else:
+		title_navigation_label.text = "方向键  选择  ·  回车  确认  ·  ESC  返回" if TranslationServer.get_locale().begins_with("zh") else "ARROWS  NAVIGATE  ·  ENTER  SELECT  ·  ESC  BACK"
+
+
+func _move_title_navigation(direction: Vector2) -> void:
+	if title_navigation_buttons.is_empty() or direction == Vector2.ZERO:
+		return
+	var current := title_navigation_buttons[title_navigation_index]
+	var current_center := current.position + current.size * 0.5
+	var best_index := -1
+	var best_score := INF
+	for index in range(title_navigation_buttons.size()):
+		if index == title_navigation_index:
+			continue
+		var candidate := title_navigation_buttons[index]
+		if candidate.disabled or not candidate.visible:
+			continue
+		var offset := candidate.position + candidate.size * 0.5 - current_center
+		var forward := offset.dot(direction)
+		if forward <= 1.0:
+			continue
+		var cross_distance := absf(offset.cross(direction))
+		var score_value := forward + cross_distance * 1.75
+		if score_value < best_score:
+			best_score = score_value
+			best_index = index
+	if best_index >= 0:
+		title_navigation_index = best_index
+		_refresh_title_navigation()
+
+
+func _activate_title_navigation() -> void:
+	if title_navigation_index < 0 or title_navigation_index >= title_navigation_actions.size():
+		return
+	match title_navigation_actions[title_navigation_index]:
+		"new_game":
+			_start_from_title()
+		"continue":
+			_continue_from_title()
+		"difficulty":
+			_cycle_difficulty(1)
+		"contract":
+			_cycle_contract(1)
+		"proof":
+			_show_proof_ledger()
+		"daily":
+			_show_daily()
+		"restoration":
+			_show_restoration()
+		"story":
+			_toggle_story()
+		"settings":
+			show_settings()
+		"history":
+			_toggle_history()
+		"manual":
+			show_manual()
+		"achievements":
+			_toggle_achievements()
+		"codex":
+			_toggle_codex()
+	_refresh_title_navigation()
+
+
+func _title_accept_pressed(event: InputEvent) -> bool:
+	if event is InputEventJoypadButton:
+		return event.pressed and event.button_index == JOY_BUTTON_A
+	if event is InputEventKey:
+		return event.pressed and event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER]
+	return false
+
+
+func _any_button_pressed(event: InputEvent) -> bool:
+	if event is InputEventKey:
+		return event.pressed and not event.echo
+	if event is InputEventJoypadButton:
+		return event.pressed
+	if event is InputEventMouseButton:
+		return event.pressed
+	return false
 
 
 func _refresh_daily_chronicle() -> void:
@@ -1717,9 +1966,8 @@ func _refresh_daily_chronicle() -> void:
 	var chinese := TranslationServer.get_locale().begins_with("zh")
 	var date_id := str(data.get("id", "TODAY"))
 	var contract_name := Localization.text(data.get("contract_name", "OPEN DRAFT"))
-	var prompt := "↓" if using_gamepad else "T"
 	var cleared_mark := ("已通关" if chinese else "CLEARED") if bool(data.get("cleared", false)) else ("开放" if chinese else "OPEN")
-	daily_button.text = ("%s  每日编年史 · %s\n%s · 最佳 %06d" if chinese else "%s  DAILY CHRONICLE · %s\n%s · BEST %06d") % [prompt, cleared_mark, contract_name, int(data.get("best_score", 0))]
+	daily_button.text = ("每日编年史 · %s\n%s · 最佳 %06d" if chinese else "DAILY CHRONICLE · %s\n%s · BEST %06d") % [cleared_mark, contract_name, int(data.get("best_score", 0))]
 	daily_title_label.text = ("每日编年史 · %s" if chinese else "DAILY CHRONICLE · %s") % date_id
 	daily_contract_label.text = ("%s · 种子 %08d" if chinese else "%s · SEED %08d") % [contract_name, int(data.get("seed", 1))]
 	var reward_text := ("首次通关奖励已领取" if chinese else "FIRST CLEAR CLAIMED") if bool(data.get("cleared", false)) else (("首次通关 +%d 记忆" if chinese else "FIRST CLEAR +%d MEMORY") % int(data.get("first_clear_bonus", Content.DAILY_CLEAR_BONUS)))
@@ -2559,6 +2807,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _consume_repeated_gamepad_ui_event(event):
 		return
 	_emit_input_ui_sound(event)
+	if victory_credits_visible:
+		if _any_button_pressed(event):
+			if victory_credits_final:
+				return_to_title_requested.emit()
+			else:
+				_skip_victory_credits_to_thanks()
+		return
 	if bindings_visible:
 		_handle_bindings_input(event)
 		return
@@ -2591,7 +2846,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if daily_visible:
 			if event.is_action_pressed("daily_chronicle") or event.is_action_pressed("pause") or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B):
 				_hide_daily()
-			elif event.is_action_pressed("attack") or event.is_action_pressed("dash") or (event is InputEventKey and event.pressed and event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER]):
+			elif _title_accept_pressed(event):
 				_begin_daily()
 			return
 		if proof_visible:
@@ -2605,7 +2860,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_jump_proof_columns(-1)
 			elif event.is_action_pressed("move_right"):
 				_jump_proof_columns(1)
-			elif event.is_action_pressed("attack") or event.is_action_pressed("dash") or (event is InputEventKey and event.pressed and event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER]):
+			elif _title_accept_pressed(event):
 				_commit_proof()
 			return
 		if restoration_visible:
@@ -2619,7 +2874,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_move_restoration(-1, 0)
 			elif event.is_action_pressed("move_right"):
 				_move_restoration(1, 0)
-			elif event.is_action_pressed("attack") or event.is_action_pressed("dash") or (event is InputEventKey and event.pressed and event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER]):
+			elif _title_accept_pressed(event):
 				_purchase_selected_restoration()
 			return
 		if loadout_visible:
@@ -2629,22 +2884,46 @@ func _unhandled_input(event: InputEvent) -> void:
 				_move_loadout_selection(-1)
 			elif event.is_action_pressed("move_down"):
 				_move_loadout_selection(1)
-			elif event.is_action_pressed("attack") or event.is_action_pressed("dash") or (event is InputEventKey and event.pressed and event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER]):
+			elif _title_accept_pressed(event):
 				_choose_loadout(loadout_selected)
 			elif event.is_action_pressed("pause") or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B):
 				_cancel_loadout()
 			return
 		if story_visible:
-			if event.is_action_pressed("pause") or event.is_action_pressed("upgrade_4") or (event is InputEventKey and event.pressed and event.physical_keycode == KEY_ESCAPE):
+			if event.is_action_pressed("pause") or event.is_action_pressed("upgrade_4") or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B) or (event is InputEventKey and event.pressed and event.physical_keycode == KEY_ESCAPE):
 				_toggle_story()
 			elif event.is_action_pressed("move_up"):
 				_move_story_selection(-1)
 			elif event.is_action_pressed("move_down"):
 				_move_story_selection(1)
-			elif event.is_action_pressed("attack") or event.is_action_pressed("dash") or (event is InputEventKey and event.pressed and event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER]):
+			elif _title_accept_pressed(event):
 				_play_story_entry(story_selected)
 			return
-		if event.is_action_pressed("daily_chronicle"):
+		if codex_visible or achievements_visible or history_visible:
+			if event.is_action_pressed("pause") or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B) or (event is InputEventKey and event.pressed and event.physical_keycode == KEY_ESCAPE):
+				codex_visible = false
+				codex_panel.visible = false
+				achievements_visible = false
+				achievements_panel.visible = false
+				history_visible = false
+				history_panel.visible = false
+				_refresh_title_navigation()
+			return
+		if event.is_action_pressed("move_up"):
+			_move_title_navigation(Vector2.UP)
+		elif event.is_action_pressed("move_down"):
+			_move_title_navigation(Vector2.DOWN)
+		elif event.is_action_pressed("move_left"):
+			_move_title_navigation(Vector2.LEFT)
+		elif event.is_action_pressed("move_right"):
+			_move_title_navigation(Vector2.RIGHT)
+		elif _title_accept_pressed(event):
+			_activate_title_navigation()
+		elif (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B) or (event is InputEventKey and event.pressed and event.physical_keycode == KEY_ESCAPE):
+			if new_game_armed:
+				new_game_armed = false
+				_refresh_title()
+		elif event.is_action_pressed("daily_chronicle"):
 			_show_daily()
 		elif event.is_action_pressed("proof_ledger"):
 			_show_proof_ledger()
@@ -2652,42 +2931,21 @@ func _unhandled_input(event: InputEvent) -> void:
 			_show_restoration()
 		elif event.is_action_pressed("options"):
 			show_settings()
+		elif event.is_action_pressed("manual"):
+			show_manual()
 		elif event.is_action_pressed("upgrade_4"):
 			_toggle_story()
-		elif event.is_action_pressed("upgrade_1"):
-			_toggle_history()
-		elif event.is_action_pressed("upgrade_2"):
-			_toggle_codex()
-		elif event.is_action_pressed("upgrade_3"):
-			_toggle_achievements()
-		elif (codex_visible or achievements_visible or history_visible) and event.is_action_pressed("pause"):
-			codex_visible = false
-			codex_panel.visible = false
-			achievements_visible = false
-			achievements_panel.visible = false
-			history_visible = false
-			history_panel.visible = false
-		elif codex_visible or achievements_visible or history_visible:
-			return
 		elif event is InputEventKey and event.pressed and event.physical_keycode == KEY_C:
 			_continue_from_title()
-		elif event is InputEventKey and event.pressed and event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER]:
-			_start_from_title()
 		elif event.is_action_pressed("contract_prev"):
 			_cycle_contract(-1)
 		elif event.is_action_pressed("contract_next"):
 			_cycle_contract(1)
-		elif event.is_action_pressed("move_left"):
-			_cycle_difficulty(-1)
-		elif event.is_action_pressed("move_right"):
-			_cycle_difficulty(1)
 		elif event.is_action_pressed("pause"):
 			if continue_button.disabled:
 				_start_from_title()
 			else:
 				_continue_from_title()
-		elif event.is_action_pressed("attack") or event.is_action_pressed("dash"):
-			_start_from_title()
 		return
 	if pause_panel.visible:
 		if event.is_action_pressed("options"):

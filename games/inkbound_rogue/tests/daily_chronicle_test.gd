@@ -117,7 +117,7 @@ func _run_test() -> void:
 		return
 	restored.debug_clear_save_files()
 	restored.free()
-	print("INKBOUND_DAILY_OK seed=stable rules=standard/marginalia/proof0 meta=sealed input=T/down checkpoint=exact reward=12 once=ok streak=1/2/1 history=3 achievements=2 save=schema12 migration=schema11")
+	print("INKBOUND_DAILY_OK seed=stable rules=standard/marginalia/proof0 meta=sealed input=T/down+A checkpoint=exact reward=12 once=ok streak=1/2/1 history=3 achievements=2 save=schema12 migration=schema11")
 	paused = false
 	quit(0)
 
@@ -154,8 +154,19 @@ func _validate_controls_and_panel(game: Node, date_id: String) -> bool:
 	open_event.button_index = JOY_BUTTON_DPAD_DOWN
 	open_event.pressed = true
 	game.hud._unhandled_input(open_event)
+	open_event.pressed = false
+	game.hud._unhandled_input(open_event)
+	if game.hud.title_navigation_actions[game.hud.title_navigation_index] != "daily" or game.hud.daily_visible:
+		_fail("D-pad Down did not browse to Daily Chronicle before confirmation", game)
+		return false
+	var accept_event := InputEventJoypadButton.new()
+	accept_event.button_index = JOY_BUTTON_A
+	accept_event.pressed = true
+	game.hud._unhandled_input(accept_event)
+	accept_event.pressed = false
+	game.hud._unhandled_input(accept_event)
 	if not game.hud.daily_visible or not game.hud.daily_panel.visible or game.hud.daily_contract_label.text.find("SEED") < 0 or game.hud.daily_rules_label.text.find("RESTORATIONS SEALED") < 0:
-		_fail("D-pad Down did not open the complete Daily Chronicle panel", game)
+		_fail("A/Cross did not open the browsed Daily Chronicle panel", game)
 		return false
 	var close_event := InputEventJoypadButton.new()
 	close_event.button_index = JOY_BUTTON_B
