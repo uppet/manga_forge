@@ -49,10 +49,6 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_process(false)
 	set_process_unhandled_input(false)
-	if OS.get_environment("INKBOUND_BOOT_SMOKE") == "1":
-		boot_smoke_frame = 0
-		set_process(true)
-		return
 	if OS.get_environment("INKBOUND_PLAYTEST") == "1":
 		start_session({
 			"session_id": OS.get_environment("INKBOUND_PLAYTEST_SESSION"),
@@ -61,6 +57,9 @@ func _ready() -> void:
 			"build_id": OS.get_environment("INKBOUND_BUILD_ID"),
 			"git_commit": OS.get_environment("INKBOUND_GIT_COMMIT"),
 		})
+	if OS.get_environment("INKBOUND_BOOT_SMOKE") == "1":
+		boot_smoke_frame = 0
+		set_process(true)
 
 
 func start_session(options: Dictionary = {}) -> bool:

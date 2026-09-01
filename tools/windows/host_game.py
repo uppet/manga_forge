@@ -580,6 +580,8 @@ rm -f \"$GAME/build/windows/InkboundRogue.exe\" \"$GAME/build/windows/InkboundRo
 test -s \"$GAME/build/windows/InkboundRogue.exe\"
 cp \"$GAME/release/THIRD_PARTY_NOTICES.txt\" \"$GAME/build/windows/THIRD_PARTY_NOTICES.txt\"
 cp \"$GAME/release/version.json\" \"$GAME/build/windows/version.json\"
+cp \"$GAME/release/Start-Recorded-Playtest.cmd\" \"$GAME/build/windows/Start-Recorded-Playtest.cmd\"
+test \"$(tr -cd '\\r' < \"$GAME/build/windows/Start-Recorded-Playtest.cmd\" | wc -c)\" -gt 20
 DEPOT=\"$GAME/build/steam-depot\"
 mkdir -p \"$DEPOT\"
 rm -f \"$DEPOT/InkboundRogue.exe\" \"$DEPOT/THIRD_PARTY_NOTICES.txt\" \"$DEPOT/version.json\"
@@ -719,6 +721,36 @@ echo "playtest_output=$SESSION_ROOT"
     remote(config, command, 180)
 
 
+def recorded_launcher_test(config: dict[str, Any], game: str) -> None:
+    game_root = posix_game_root(config, game)
+    command = f"""
+set -e
+GAME='{game_root}'
+LAUNCHER="$GAME/build/windows/Start-Recorded-Playtest.cmd"
+TARGET="$GAME/build/windows/InkboundRogue.exe"
+RUN_ID=$(date -u +'%Y%m%dT%H%M%SZ')
+OUTPUT="$GAME/build/playtest/launcher-audit/$RUN_ID"
+test -s "$TARGET"
+test -s "$LAUNCHER"
+mkdir -p "$OUTPUT"
+export INKBOUND_LAUNCHER_PATH=$(cygpath -w "$LAUNCHER")
+export INKBOUND_PLAYTEST_DIR=$(cygpath -w "$OUTPUT")
+export INKBOUND_BOOT_SMOKE=1
+export INKBOUND_LAUNCHER_ACCEPT=1
+export INKBOUND_LAUNCHER_NO_PAUSE=1
+export INKBOUND_LAUNCHER_NO_OPEN=1
+powershell.exe -NoProfile -Command '& $env:INKBOUND_LAUNCHER_PATH automated; exit $LASTEXITCODE'
+test "$(find "$OUTPUT" -mindepth 2 -maxdepth 2 -type f -name 'summary.json' | wc -l)" -eq 1
+test "$(find "$OUTPUT" -mindepth 2 -maxdepth 2 -type f -name 'session.json' | wc -l)" -eq 1
+test "$(find "$OUTPUT" -mindepth 2 -maxdepth 2 -type f -name 'incomplete.flag' | wc -l)" -eq 0
+grep -Eq '"participant_code"[[:space:]]*:[[:space:]]*"automated"' "$OUTPUT"/*/summary.json
+grep -Eq '"complete"[[:space:]]*:[[:space:]]*true' "$OUTPUT"/*/summary.json
+echo "INKBOUND_RECORDED_LAUNCHER_OK output=$OUTPUT"
+"""
+    remote(config, command, 240)
+    process_status(config)
+
+
 def playtest_report(config: dict[str, Any], game: str) -> None:
     game_root = Path(config["wsl_runtime_root"]) / "games" / game
     sessions = game_root / "build" / "playtest" / "sessions"
@@ -754,7 +786,7 @@ echo "gracefully restarted $TARGET"
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "p1-suite", "test", "save-test", "pause-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "capture-session", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
+    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "p1-suite", "test", "save-test", "pause-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "recorded-launcher-test", "capture-session", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
     parser.add_argument("--game", default=DEFAULT_GAME)
     parser.add_argument("--participant", default="anonymous", help="anonymous facilitator-assigned playtest code")
     parser.add_argument("--reuse-build", action="store_true", help="launch the existing exported build without sync/export")
@@ -819,6 +851,8 @@ GAME='{game_root}'
 timeout 120s "$GODOT" --headless --path "$GAME" --script res://tests/playtest_recorder_test.gd
 """
         remote(config, command, 180)
+    elif args.command == "recorded-launcher-test":
+        recorded_launcher_test(config, args.game)
     elif args.command == "capture-session":
         capture_session(config, args.game)
     elif args.command == "capture-upgrades":

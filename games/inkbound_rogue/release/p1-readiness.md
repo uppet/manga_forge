@@ -13,8 +13,9 @@ of player enjoyment, accessibility, minimum hardware, or controller coverage.
 | Recorded stress run | Pass: 1,200 frames, 140.2 processing FPS average, 75 peak enemies, 36 peak pickups, 693 peak nodes, 103.2 MiB static memory, Page 13, 221 kills |
 | Unrecorded suite stress run | Pass: 1,200 frames, 140.5 processing FPS average, 76 peak enemies, 51 peak pickups, 738 peak nodes, 103.4 MiB static memory, Page 13, 237 kills |
 | Windows export boot | Pass: embedded-PCK executable ran 120 frames with GL Compatibility on Radeon RX 9070 XT and exited normally |
+| Recorded CMD launcher | Pass: consent-capable launcher started the real EXE, wrote a complete pseudonymous session, removed `incomplete.flag`, and left zero processes |
 | Release/depot audit | Pass: 68 assets; 59 procedural, 9 pre-generated AI, zero live AI; exactly 3 depot files, 93,890,429 bytes |
-| Candidate executable | `build/windows/InkboundRogue.exe`; audited SHA-256 `4dfe051bba5f29ededf1b263ca1dcdcd237220aa20b31792d24e974d750dde0a` |
+| Candidate executable | `build/windows/InkboundRogue.exe`; audited SHA-256 `15495bdf6796c5568fb09ef330b2f65f821e229b945e78ac255e574241d509be` |
 | Process hygiene | Pass: zero Godot or exported-game processes after the serial suite |
 
 The recorded and unrecorded stress figures are development-machine processing

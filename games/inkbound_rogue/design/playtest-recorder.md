@@ -44,6 +44,14 @@ an anonymous build/session identity. For repeated sessions on the identical
 export, use `--reuse-build`; do not use it after source, assets, or version data
 changes.
 
+External Windows participants can instead double-click
+`Start-Recorded-Playtest.cmd` beside the exported executable. It requires an
+explicit local-recording confirmation, accepts an optional pseudonymous code,
+creates a timestamped session, and opens the containing log directory after the
+game exits. Its default root is `playtest-logs/` beside the executable; the
+second command-line argument overrides that root. Environment variables are
+scoped to the launcher process and inherited game only.
+
 Tell the participant only the four optional marker keys:
 
 - `F6`: bug or broken behavior

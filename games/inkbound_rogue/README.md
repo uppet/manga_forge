@@ -288,6 +288,19 @@ local-only playtest session:
 python3 tools/windows/host_game.py playtest --participant P-001
 ```
 
+For a distributed Windows build, double-click
+`Start-Recorded-Playtest.cmd` beside `InkboundRogue.exe`. It explains the local
+data boundary, asks for consent and an anonymous code, creates a unique session,
+and opens the output folder after the game closes. Logs default to
+`playtest-logs/` beside the executable. Facilitators may instead run:
+
+```cmd
+Start-Recorded-Playtest.cmd P-001 "D:\\InkboundPlaytestLogs"
+```
+
+The launcher scopes all environment variables to itself and the child game; it
+does not modify the user's persistent Windows environment.
+
 During play, `F6` marks a bug, `F7` a confusing moment, `F8` an unfair moment,
 and `F9` a highlight. A mark stores the previous 30 seconds of gameplay events,
 the current run state, and a screenshot. Defeat or victory opens a bilingual

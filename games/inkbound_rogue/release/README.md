@@ -7,6 +7,16 @@ the exact Steam payload into the isolated `build/steam-depot/` directory:
 - `THIRD_PARTY_NOTICES.txt` — redistributable engine notice
 - `version.json` — product, build channel, and save-schema identity
 
+`build/windows/` additionally contains `Start-Recorded-Playtest.cmd`. Distribute
+that complete directory (or a ZIP of it) for itch.io P1 sessions so players can
+opt into local recording without configuring environment variables. The Steam
+depot intentionally excludes the launcher and remains restricted to the three
+files above.
+
+Run `host_game.py recorded-launcher-test` after export. It drives the real CMD
+launcher and exported EXE through the 120-frame boot handshake, then requires a
+complete anonymous session and zero remaining game/Godot processes.
+
 Historical captures and local diagnostic files may remain under other build
 directories, but the Steam templates map only `build/steam-depot/` so they
 cannot leak into an uploaded depot.

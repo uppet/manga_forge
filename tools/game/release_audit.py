@@ -153,6 +153,20 @@ def audit_source(repo_root: Path, game_root: Path) -> tuple[list[str], dict[str,
         errors.append("AI content disclosure worksheet is missing")
     if not (game_root / "release" / "p1-compatibility-matrix.md").is_file():
         errors.append("P1 compatibility matrix is missing")
+    launcher_path = game_root / "release" / "Start-Recorded-Playtest.cmd"
+    if not launcher_path.is_file():
+        errors.append("recorded-playtest Windows launcher is missing")
+    else:
+        launcher_text = launcher_path.read_text(encoding="utf-8")
+        for required in (
+            "INKBOUND_PLAYTEST=1",
+            "INKBOUND_PLAYTEST_SESSION=",
+            "INKBOUND_PLAYTEST_PARTICIPANT=",
+            "INKBOUND_PLAYTEST_DIR=",
+            "INKBOUND_LAUNCHER_ACCEPT",
+        ):
+            if required not in launcher_text:
+                errors.append(f"recorded-playtest launcher is missing: {required}")
 
     summary = {
         "assets": len(entries),
