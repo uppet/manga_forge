@@ -13,7 +13,7 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_GAME_ROOT = REPO_ROOT / "games" / "inkbound_rogue"
-RUNTIME_SUFFIXES = {".png", ".wav"}
+RUNTIME_SUFFIXES = {".png", ".wav", ".ogg"}
 DEPOT_ALLOWLIST = {"InkboundRogue.exe", "THIRD_PARTY_NOTICES.txt", "version.json"}
 ITCH_ALLOWLIST = DEPOT_ALLOWLIST | {"Start-Recorded-Playtest.cmd"}
 REQUIRED_ASSET_FIELDS = {

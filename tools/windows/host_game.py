@@ -108,7 +108,7 @@ GAME='{game_root}'
 IMPORT_STATUS=0
 timeout 180s "$GODOT" --headless --path "$GAME" --import || IMPORT_STATUS=$?
 test "$IMPORT_STATUS" -eq 0 -o "$IMPORT_STATUS" -eq 1
-SOURCE_COUNT=$(find "$GAME/assets" -type f \( -name '*.png' -o -name '*.wav' \) | wc -l)
+SOURCE_COUNT=$(find "$GAME/assets" -type f \( -name '*.png' -o -name '*.wav' -o -name '*.ogg' \) | wc -l)
 IMPORT_COUNT=$(find "$GAME/assets" -type f -name '*.import' | wc -l)
 test "$IMPORT_COUNT" -eq "$SOURCE_COUNT"
 echo "godot_import_status=$IMPORT_STATUS imported_resources=$IMPORT_COUNT"

@@ -48,13 +48,13 @@ const SOUNDS := {
 }
 
 const MUSIC := {
-	"archive": preload("res://assets/audio/music_archive.wav"),
-	"bindery": preload("res://assets/audio/music_bindery.wav"),
-	"finale": preload("res://assets/audio/music_finale.wav"),
-	"boss_editor": preload("res://assets/audio/music_editor.wav"),
-	"boss_binder": preload("res://assets/audio/music_binder.wav"),
-	"boss_author": preload("res://assets/audio/music_author.wav"),
+	"menu": preload("res://assets/audio/music_menu_hai_mian.ogg"),
+	"battle": preload("res://assets/audio/music_battle_hai_mian.ogg"),
+	"story": preload("res://assets/audio/music_story_hai_mian.ogg"),
+	"ending_keep": preload("res://assets/audio/music_ending_keep_hai_mian.ogg"),
+	"ending_rewrite": preload("res://assets/audio/music_ending_rewrite_hai_mian.ogg"),
 }
+const LOOPING_MUSIC_IDS := ["menu", "battle"]
 
 const SOUND_COOLDOWNS_MSEC := {
 	"hit": 22,
@@ -290,7 +290,7 @@ func _ready() -> void:
 	music_fade_player.process_mode = Node.PROCESS_MODE_ALWAYS
 	music_fade_player.volume_db = -60.0
 	add_child(music_fade_player)
-	play_music("archive")
+	play_music("menu")
 
 	arena = ArenaScript.new()
 	add_child(arena)
@@ -479,10 +479,8 @@ func _process(delta: float) -> void:
 		player.on_new_wave()
 		if wave == 5:
 			arena.set_chapter(2)
-			play_music("bindery")
 		elif wave == 9:
 			arena.set_chapter(3)
-			play_music("finale")
 		spawn_word(player.global_position + Vector2(0, -64), "PAGE %d" % wave, GOLD)
 		if not test_mode and wave in [5, 9]:
 			_offer_route(2 if wave == 5 else 3)
@@ -798,7 +796,7 @@ func spawn_enemy(kind: String = "mask", at: Vector2 = Vector2.INF) -> InkboundEn
 		var boss_name := Localization.text(Content.ENEMIES.get(kind, {}).get("name", kind.to_upper()))
 		spawn_word(spawn_position + Vector2(0, -46), boss_name.to_upper(), CRIMSON)
 		play_sound("boss_warning")
-		play_music(_boss_music_id(kind))
+		play_music("battle")
 		record_playtest_event("boss_started", {"boss": kind, "page": wave, "health": enemy.max_health})
 	enemy.died.connect(_on_enemy_died)
 	return enemy
@@ -859,7 +857,7 @@ func _on_enemy_died(_enemy: Node, xp_value: int, death_position: Vector2, enemy_
 		spawn_word(death_position + Vector2(0, -34), "REDACTED!", GOLD)
 		hud.set_boss("", 0.0, 0.0)
 		play_sound("boss_down")
-		play_music(_chapter_music_id())
+		play_music("battle")
 	match enemy_kind:
 		"editor":
 			_play_story("act1_reveal")
@@ -1371,7 +1369,10 @@ func play_music(music_id: String) -> void:
 	if test_mode:
 		return
 	var stream = MUSIC[music_id].duplicate()
-	stream.loop_mode = 1
+	if stream is AudioStreamOggVorbis:
+		stream.loop = music_id in LOOPING_MUSIC_IDS
+	else:
+		stream.loop_mode = 1 if music_id in LOOPING_MUSIC_IDS else 0
 	var target_volume := _music_volume_db()
 	if not music_player.playing:
 		music_player.stream = stream
@@ -1403,12 +1404,24 @@ func _music_volume_db() -> float:
 	return linear_to_db(maxf(0.001, float(settings.get("music", 0.65))))
 
 
-func _chapter_music_id(page: int = wave) -> String:
-	return "archive" if page < 5 else ("bindery" if page < 9 else "finale")
+func _chapter_music_id(_page: int = wave) -> String:
+	return "battle"
 
 
-func _boss_music_id(enemy_kind: String) -> String:
-	return "boss_" + enemy_kind if enemy_kind in BOSS_KINDS else _chapter_music_id()
+func _boss_music_id(_enemy_kind: String) -> String:
+	return "battle"
+
+
+func _story_music_id(sequence_name: String) -> String:
+	if sequence_name == "ending_keep":
+		return "ending_keep"
+	if sequence_name == "ending_rewrite":
+		return "ending_rewrite"
+	return "story"
+
+
+func _music_should_loop(music_id: String) -> bool:
+	return music_id in LOOPING_MUSIC_IDS
 
 
 func vibrate(weak: float, strong: float, duration: float) -> void:
@@ -1528,6 +1541,7 @@ func _play_story(sequence_name: String) -> void:
 	var story_data: Dictionary = Content.story(sequence_name)
 	if story_data.is_empty():
 		return
+	play_music(_story_music_id(sequence_name))
 	story_seen[sequence_name] = true
 	record_playtest_event("story_started", {"sequence": sequence_name, "replay": replaying_story, "page": wave})
 	cutscene.play(sequence_name, story_data)
@@ -1538,9 +1552,12 @@ func _on_cutscene_finished(sequence_name: String) -> void:
 	record_playtest_event("story_finished", {"sequence": sequence_name, "replay": replaying_story, "page": wave})
 	if replaying_story:
 		replaying_story = false
+		play_music("menu")
 		hud.show_title(_meta_snapshot())
 		_sync_pause_state()
 		return
+	if sequence_name in ["prologue", "act1_reveal", "act2_revelation", "act3_confrontation"]:
+		play_music("battle")
 	match sequence_name:
 		"prologue":
 			if test_mode:
@@ -1730,6 +1747,7 @@ func _on_start_requested(selected_difficulty: String, selected_contract: String 
 		enemy.contact_damage *= difficulty_damage * contract_enemy_damage * proof_enemy_damage
 		enemy.speed *= difficulty_speed * contract_enemy_speed * proof_enemy_speed
 	run_started = true
+	play_music("battle")
 	record_playtest_event("run_started", {
 		"difficulty": difficulty_id,
 		"contract": contract_id,
@@ -1811,7 +1829,10 @@ func _play_replay_sequence(sequence_name: String) -> bool:
 	if not is_instance_valid(cutscene):
 		return false
 	var story_data: Dictionary = Content.story(sequence_name)
-	return not story_data.is_empty() and cutscene.play(sequence_name, story_data)
+	if story_data.is_empty():
+		return false
+	play_music(_story_music_id(sequence_name))
+	return cutscene.play(sequence_name, story_data)
 
 
 func _story_is_unlocked(sequence_name: String) -> bool:
@@ -2697,6 +2718,7 @@ func _on_return_to_title_requested() -> void:
 		run_started = false
 		run_won = false
 		manually_paused = false
+		play_music("menu")
 		hud.hide_victory_credits()
 		hud.show_title(_meta_snapshot())
 		_sync_pause_state()

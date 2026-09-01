@@ -2,28 +2,27 @@
 
 ## Musical identity
 
-Inkbound uses dry percussion, low calligraphy-brush drones, struck paper, wood
-resonance, and restrained plucked tones. Material noise leads the mix; pitched
-voices provide shadow and tension instead of arcade-like melody. Music must
-support combat readability rather than fill every frequency. All runtime music
-is 22.05 kHz, 16-bit mono WAV and uses a short boundary guard so loop transients
-return to zero.
+Inkbound's experimental score uses five 海绵音乐 (Hai Mian Music) AIGC tracks
+as its player-facing baseline. All runtime cues are 44.1 kHz stereo Ogg Vorbis
+at roughly -16 to -17 LUFS. Music must still support combat readability rather
+than fill every frequency.
 
-| State | Runtime ID | Length | Character |
+| State | Runtime ID | Length | Source |
 | --- | --- | ---: | --- |
-| Public Archive | `archive` | 32 s | Sparse bass, paper taps, restrained two-beat phrase |
-| Forbidden Bindery | `bindery` | 32 s | Triple-meter binding knocks and darker brush grain |
-| First Press | `finale` | 32 s | Four-beat wood press rhythm and rising urgency |
-| Red Editor | `boss_editor` | 24 s | Fast stamped verdict rhythm with dry paper cracks |
-| Binder | `boss_binder` | 24 s | Heavy binding accents and circular phrase |
-| First Author | `boss_author` | 24 s | Wide press impacts and unstable plucked register |
+| Title and Story Archive shell | `menu` | 106.88 s | 《墨色残响》, trimmed and cyclically crossfaded |
+| All active gameplay and bosses | `battle` | 110.78 s | 《墨战交响》, trimmed and cyclically crossfaded |
+| Prologue, chapter cutscenes, ending choice, story replay | `story` | 128.62 s | 《墨痕残忆》, trimmed for linear playback |
+| Keep ending and its credits | `ending_keep` | 206.00 s | 《笔迹归处》, trimmed for linear playback |
+| Rewrite ending and its credits | `ending_rewrite` | 220.88 s | 《白页余响》, trimmed for linear playback |
 
-Boss entry crossfades from the active act loop over 0.55 seconds. Defeat returns
-to the current act loop; restored checkpoints select the boss layer whenever a
-boss is present. Both music players process during modal pause so transitions do
-not stall underneath story or interface states. The saved music setting is the
-single user-facing gain; no second internal attenuation may make an enabled loop
-effectively inaudible beneath combat cues.
+Every music-state change uses a 0.55-second crossfade. Only the menu and battle
+cues loop, using a 1.50-second cyclic seam; story and ending cues remain linear.
+Chapter cutscenes restore battle music when play resumes. Each selected ending
+continues through its credits, and the title cue returns only after the player
+leaves the credits. Both music players process during modal pause so transitions
+do not stall underneath story or interface states. The saved music setting is
+the single user-facing gain; no second internal attenuation may make an enabled
+cue effectively inaudible beneath combat sounds.
 
 ## Cue language
 
@@ -46,7 +45,8 @@ new cues.
 
 ## Validation
 
-`audio_system_test.gd` verifies all 25 cues, all six extended loops and their lengths,
-weapon mappings, six enemy warning families, supply and UI cues, adaptive boss
-selection, persistent-pause players, cooldown coverage, and a production-mode
-two-player crossfade.
+`audio_system_test.gd` verifies all 25 sound cues, all five Hai Mian stereo music
+cues and their production-length floors, cyclic menu/battle versus linear
+story/endings, menu/run/boss/story/ending state mapping, weapon mappings, six
+enemy warning families, supply and UI cues, persistent-pause players, cooldown
+coverage, and a production-mode two-player crossfade.

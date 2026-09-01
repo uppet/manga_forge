@@ -6,7 +6,7 @@ config_version=5
 
 config/name="Inkbound: Blade of the Blank Page"
 config/description="A manga-pixel action roguelike about restoring the stories erased from the Grand Archive."
-config/version="0.23.1-alpha"
+config/version="0.23.2-alpha"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.2", "GL Compatibility")
 config/icon="res://assets/generated/icon.png"

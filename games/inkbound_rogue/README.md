@@ -274,9 +274,9 @@ of only checking menu visibility. Release metadata, legal notices, version ident
 and inert Steam depot templates live under `release/`; real App/Depot IDs are
 never stored in the repository.
 
-`asset-manifest.json` schema 3 integrity-hashes all 68 player-consumed PNG/WAV
-assets and distinguishes 59 deterministic procedural outputs from nine
-pre-generated AI-assisted images. `release/ai-content-disclosure.md` keeps the
+`asset-manifest.json` schema 3 integrity-hashes all 73 player-consumed PNG/WAV/OGG
+assets and distinguishes 59 deterministic procedural outputs from fourteen
+pre-generated AI-assisted assets. `release/ai-content-disclosure.md` keeps the
 Steam survey draft and unresolved publisher sign-offs explicit; the shipped
 game performs no live AI generation.
 

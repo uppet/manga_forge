@@ -6,8 +6,18 @@ const EXPECTED_SOUNDS := [
 	"ink_burst", "powerup", "pickup", "level_up", "hurt", "relic",
 	"boss_warning", "boss_down", "ui_move", "ui_confirm", "ui_cancel", "save",
 ]
-const ACT_MUSIC := ["archive", "bindery", "finale"]
-const BOSS_MUSIC := ["boss_editor", "boss_binder", "boss_author"]
+const MENU_MUSIC := "menu"
+const BATTLE_MUSIC := "battle"
+const STORY_MUSIC := "story"
+const ENDING_KEEP_MUSIC := "ending_keep"
+const ENDING_REWRITE_MUSIC := "ending_rewrite"
+const MUSIC_MIN_LENGTHS := {
+	MENU_MUSIC: 100.0,
+	BATTLE_MUSIC: 105.0,
+	STORY_MUSIC: 125.0,
+	ENDING_KEEP_MUSIC: 200.0,
+	ENDING_REWRITE_MUSIC: 215.0,
+}
 
 var game
 var frames := 0
@@ -36,13 +46,13 @@ func _process(_delta: float) -> bool:
 		return false
 	if not validated or frames < 6 or Time.get_ticks_msec() - audio_released_at_msec < 250:
 		return false
-	print("INKBOUND_AUDIO_OK sounds=25 music=6 act_loops=3x32s boss_themes=3x24s crossfade=0.55s weapons=5 physical_blade_layers=4 material_score=paper/wood/brush enemy_cues=6 pickups=2 ui=4 spatial=ok cooldowns=ok")
+	print("INKBOUND_AUDIO_OK sounds=25 music=5 hai_mian_stereo=menu+battle+story+keep+rewrite loop_crossfade=1.5s state_crossfade=0.55s linear_story_endings=3 weapons=5 physical_blade_layers=4 material_score=paper/wood/brush enemy_cues=6 pickups=2 ui=4 spatial=ok cooldowns=ok")
 	_cleanup(0)
 	return true
 
 
 func _validate_catalog() -> bool:
-	if game.SOUNDS.size() != EXPECTED_SOUNDS.size() or game.MUSIC.size() != ACT_MUSIC.size() + BOSS_MUSIC.size():
+	if game.SOUNDS.size() != EXPECTED_SOUNDS.size() or game.MUSIC.size() != MUSIC_MIN_LENGTHS.size():
 		return _fail("audio catalog count drifted")
 	for sound_id in EXPECTED_SOUNDS:
 		if not game.SOUNDS.has(sound_id) or game.SOUNDS[sound_id].get_length() <= 0.05:
@@ -51,12 +61,14 @@ func _validate_catalog() -> bool:
 	for sound_id in physical_cut_lengths:
 		if game.SOUNDS[sound_id].get_length() < float(physical_cut_lengths[sound_id]):
 			return _fail("physical weapon cue %s lost its material tail" % sound_id)
-	for music_id in ACT_MUSIC:
-		if not game.MUSIC.has(music_id) or game.MUSIC[music_id].get_length() < 31.9:
-			return _fail("act loop %s is shorter than thirty-two seconds" % music_id)
-	for music_id in BOSS_MUSIC:
-		if not game.MUSIC.has(music_id) or game.MUSIC[music_id].get_length() < 23.9:
-			return _fail("boss theme %s is shorter than twenty-four seconds" % music_id)
+	for music_id in MUSIC_MIN_LENGTHS:
+		if not game.MUSIC.has(music_id) or game.MUSIC[music_id].get_length() < float(MUSIC_MIN_LENGTHS[music_id]):
+			return _fail("Hai Mian music cue %s is shorter than its production floor" % music_id)
+	if not game._music_should_loop(MENU_MUSIC) or not game._music_should_loop(BATTLE_MUSIC):
+		return _fail("menu and battle cues must loop")
+	for music_id in [STORY_MUSIC, ENDING_KEEP_MUSIC, ENDING_REWRITE_MUSIC]:
+		if game._music_should_loop(music_id):
+			return _fail("linear narrative cue unexpectedly loops: %s" % music_id)
 	if game.music_player == null or game.music_fade_player == null or game.music_player.process_mode != Node.PROCESS_MODE_ALWAYS or game.music_fade_player.process_mode != Node.PROCESS_MODE_ALWAYS:
 		return _fail("crossfade players do not survive modal pause")
 	var expected_music_gain := linear_to_db(float(game.settings.get("music", 0.65)))
@@ -69,20 +81,26 @@ func _validate_catalog() -> bool:
 
 
 func _validate_adaptive_music() -> bool:
-	if game.current_music != "archive":
-		return _fail("boot did not select the Archive loop")
-	for entry in [
-		{"kind": "editor", "wave": 4, "boss": "boss_editor", "after": "archive"},
-		{"kind": "binder", "wave": 8, "boss": "boss_binder", "after": "bindery"},
-		{"kind": "author", "wave": 12, "boss": "boss_author", "after": "finale"},
-	]:
-		game.wave = int(entry["wave"])
-		var boss = game.spawn_enemy(str(entry["kind"]), game.player.global_position + Vector2(100, 0))
-		if game.current_music != str(entry["boss"]):
-			return _fail("%s did not enter its dedicated music layer" % entry["kind"])
+	if game.current_music != MENU_MUSIC:
+		return _fail("boot did not select the Hai Mian menu loop")
+	game._on_start_requested("standard")
+	if game.current_music != BATTLE_MUSIC:
+		return _fail("starting a run did not enter the Hai Mian battle loop")
+	for page in [1, 5, 9, 12]:
+		if game._chapter_music_id(page) != BATTLE_MUSIC:
+			return _fail("page %d did not retain the battle loop" % page)
+	for kind in ["editor", "binder", "author"]:
+		var boss = game.spawn_enemy(kind, game.player.global_position + Vector2(100, 0))
+		if game.current_music != BATTLE_MUSIC or game._boss_music_id(kind) != BATTLE_MUSIC:
+			return _fail("%s did not retain the Hai Mian battle loop" % kind)
 		boss.die()
-		if game.current_music != str(entry["after"]):
-			return _fail("%s defeat did not restore its act loop" % entry["kind"])
+		if game.current_music != BATTLE_MUSIC:
+			return _fail("%s defeat did not restore the battle loop" % kind)
+	for sequence in ["prologue", "act1_reveal", "act2_revelation", "act3_confrontation", "ending_choice"]:
+		if game._story_music_id(sequence) != STORY_MUSIC:
+			return _fail("story sequence did not select the narrative cue: %s" % sequence)
+	if game._story_music_id("ending_keep") != ENDING_KEEP_MUSIC or game._story_music_id("ending_rewrite") != ENDING_REWRITE_MUSIC:
+		return _fail("ending choices do not select distinct credit suites")
 	return true
 
 
@@ -153,19 +171,30 @@ func _validate_ui_cues() -> bool:
 func _validate_runtime_crossfade() -> bool:
 	game.test_mode = false
 	game.current_music = ""
-	game.play_music("archive")
+	game.play_music(MENU_MUSIC)
 	var outgoing = game.music_player
 	if not outgoing.playing or not is_equal_approx(outgoing.volume_db, game._music_volume_db()):
 		game.test_mode = true
 		return _fail("production music player did not start at the user-selected gain")
-	game.play_music("boss_editor")
-	if game.current_music != "boss_editor" or game.music_player == outgoing or not game.music_player.playing or not game.music_fade_player.playing:
+	game.play_music(BATTLE_MUSIC)
+	if game.current_music != BATTLE_MUSIC or game.music_player == outgoing or not game.music_player.playing or not game.music_fade_player.playing:
 		game.test_mode = true
 		return _fail("production crossfade did not overlap outgoing and incoming loops")
 	if game.music_crossfade == null or not game.music_crossfade.is_valid():
 		game.test_mode = true
 		return _fail("production crossfade tween was not created")
 	game.music_crossfade.kill()
+	game.music_crossfade = null
+	game.current_music = ""
+	game.play_music(STORY_MUSIC)
+	if game.current_music != STORY_MUSIC or not game.music_player.playing:
+		game.test_mode = true
+		return _fail("production narrative cue did not start")
+	if not (game.music_player.stream is AudioStreamOggVorbis) or game.music_player.stream.loop:
+		game.test_mode = true
+		return _fail("production narrative cue did not remain linear")
+	if game.music_crossfade != null and game.music_crossfade.is_valid():
+		game.music_crossfade.kill()
 	game.music_crossfade = null
 	game.music_player.stop()
 	game.music_fade_player.stop()
