@@ -457,11 +457,65 @@ def wav_bytes(duration: float, sample_fn: Callable[[float, random.Random], float
 
 
 def sound_assets() -> dict[str, bytes]:
-    def beat_tone(t: float, rate: float, notes: tuple[float, ...], harmonic: float = 2.0) -> float:
+    def loop_guard(t: float, duration: float) -> float:
+        edge = min(1.0, t / 0.055, max(0.0, duration - t) / 0.055)
+        return edge * edge * (3.0 - 2.0 * edge)
+
+    def music_score(
+        t: float,
+        rng: random.Random,
+        state: dict[str, float],
+        duration: float,
+        root: float,
+        rate: float,
+        notes: tuple[float, ...],
+        pattern: tuple[int, ...],
+        intensity: float,
+        boss: bool = False,
+    ) -> float:
+        """Build a dry paper/wood/brush score with long-section variation."""
+
+        step = int(t * rate)
         phase = (t * rate) % 1.0
-        envelope = math.sin(math.pi * phase) ** 2
-        note = notes[int(t * rate) % len(notes)]
-        return envelope * (math.sin(math.tau * note * t) + 0.28 * math.sin(math.tau * note * harmonic * t))
+        local_t = phase / rate
+        section = int(t / 4.0) % 8
+        section_pitch = (1.0, 1.0, 1.05946, 0.94387, 1.0, 0.89090, 1.12246, 1.0)[section]
+        note = notes[step % len(notes)] * section_pitch
+
+        pluck_attack = min(1.0, local_t / 0.012)
+        pluck_envelope = pluck_attack * math.exp(-local_t * (7.5 + rate * 0.7))
+        pluck = pluck_envelope * (
+            math.sin(math.tau * note * local_t)
+            + 0.34 * math.sin(math.tau * note * 2.01 * local_t)
+            + 0.12 * math.sin(math.tau * note * 3.97 * local_t)
+        )
+
+        raw = rng.uniform(-1.0, 1.0)
+        state["paper"] += (raw - state["paper"]) * 0.31
+        state["brush"] += (state["paper"] - state["brush"]) * 0.018
+        paper_crack = raw - state["paper"]
+        brush_body = state["paper"] - state["brush"]
+        struck = pattern[step % len(pattern)]
+        percussion_envelope = math.exp(-phase * (19.0 if boss else 25.0)) if struck else 0.0
+        body_frequency = root * (0.72 if boss else 0.92)
+        percussion = percussion_envelope * (
+            paper_crack * (0.52 + 0.16 * struck)
+            + brush_body * 0.36
+            + math.sin(math.tau * body_frequency * local_t) * (0.32 + 0.1 * struck)
+        )
+
+        brush_gate = math.sin(math.pi * ((t * (0.5 if boss else 0.25)) % 1.0)) ** 2
+        brush = brush_body * brush_gate * (0.18 if boss else 0.12)
+        drone_motion = 0.82 + 0.18 * math.sin(math.tau * t / 8.0)
+        drone = drone_motion * (
+            math.sin(math.tau * root * t) * 0.095
+            + math.sin(math.tau * root * 1.5 * t) * 0.032
+        )
+        press = 0.0
+        if boss and struck >= 2:
+            press = percussion_envelope * math.sin(math.tau * root * 0.48 * local_t) * 0.24
+        arrangement = 0.78 + (0.12 if section in (2, 3, 6) else 0.0) - (0.08 if section == 4 else 0.0)
+        return loop_guard(t, duration) * intensity * arrangement * (drone + pluck * 0.2 + percussion * 0.34 + brush + press)
 
     def blade_cut(
         duration: float,
@@ -487,13 +541,13 @@ def sound_assets() -> dict[str, bytes]:
             edge_width = max(0.0035, duration * 0.027)
             contact = math.exp(-((t - contact_time) / edge_width) ** 2)
             body = math.exp(-max(0.0, t - contact_time) * 34.0) if t >= contact_time else 0.0
-            steel_tick = math.sin(math.tau * 930.0 * (t - contact_time)) * contact
+            edge_chirp = (edge_air - blade_air) * contact
             handle_thump = math.sin(math.tau * body_frequency * (t - contact_time)) * body
             return (
                 motion * (blade_air * air_weight + edge_air * air_weight * 0.28)
                 + contact * edge_air * edge_weight
-                + steel_tick * edge_weight * 0.08
-                + handle_thump * 0.13
+                + edge_chirp * edge_weight * 0.22
+                + handle_thump * 0.17
             )
 
         return sample
@@ -623,35 +677,40 @@ def sound_assets() -> dict[str, bytes]:
         env = max(0.0, 1.0 - t / 0.38)
         return 0.38 * env * (math.sin(math.tau * note * t) + 0.18 * math.sin(math.tau * note * 2.0 * t))
 
-    def archive_music(t: float, _rng: random.Random) -> float:
-        notes = (55.0, 65.41, 73.42, 49.0, 55.0, 82.41, 73.42, 65.41)
-        air = 0.018 * math.sin(math.tau * 997.0 * t) * math.sin(math.pi * ((t * 2.0) % 1.0)) ** 2
-        return 0.13 * math.sin(math.tau * 55.0 * t) + 0.1 * beat_tone(t, 2.0, notes) + air
+    music_states = {
+        track: {"paper": 0.0, "brush": 0.0}
+        for track in ("archive", "bindery", "finale", "editor", "binder", "author")
+    }
 
-    def bindery_music(t: float, _rng: random.Random) -> float:
-        notes = (58.27, 58.27, 69.30, 77.78, 58.27, 87.31, 69.30, 51.91, 58.27, 69.30, 77.78, 103.83)
-        scrape = 0.028 * math.sin(math.tau * 1307.0 * t) * math.sin(math.pi * ((t * 3.0) % 1.0)) ** 4
-        return 0.12 * math.sin(math.tau * 58.25 * t) + 0.11 * beat_tone(t, 3.0, notes, 3.0) + scrape
+    def archive_music(t: float, rng: random.Random) -> float:
+        notes = (55.0, 65.41, 73.42, 49.0, 55.0, 82.41, 73.42, 65.41, 49.0, 61.74, 69.30, 55.0, 43.65, 55.0, 65.41, 49.0)
+        pattern = (2, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 1, 0, 0, 1, 0)
+        return music_score(t, rng, music_states["archive"], 32.0, 55.0, 2.0, notes, pattern, 0.72)
 
-    def finale_music(t: float, _rng: random.Random) -> float:
+    def bindery_music(t: float, rng: random.Random) -> float:
+        notes = (58.27, 58.27, 69.30, 77.78, 58.27, 87.31, 69.30, 51.91, 58.27, 69.30, 77.78, 103.83, 51.91, 58.27, 77.78, 69.30)
+        pattern = (2, 0, 1, 0, 0, 1, 2, 0, 1, 0, 1, 0, 2, 0, 0, 1)
+        return music_score(t, rng, music_states["bindery"], 32.0, 58.27, 3.0, notes, pattern, 0.78)
+
+    def finale_music(t: float, rng: random.Random) -> float:
         notes = (49.0, 49.0, 61.74, 73.42, 49.0, 82.41, 73.42, 61.74, 55.0, 55.0, 69.30, 82.41, 55.0, 92.50, 82.41, 69.30)
-        grit = 0.024 * math.sin(math.tau * 1499.0 * t) * math.sin(math.pi * ((t * 4.0) % 1.0)) ** 4
-        return 0.13 * math.sin(math.tau * 49.0 * t) + 0.13 * beat_tone(t, 4.0, notes) + grit
+        pattern = (2, 0, 1, 0, 2, 1, 0, 1, 2, 0, 1, 1, 2, 0, 1, 0)
+        return music_score(t, rng, music_states["finale"], 32.0, 49.0, 4.0, notes, pattern, 0.84)
 
-    def editor_music(t: float, _rng: random.Random) -> float:
-        notes = (55.0, 82.41, 55.0, 98.0, 65.41, 87.31, 73.42, 110.0, 55.0, 82.41, 49.0, 73.42)
-        stamp = math.sin(math.pi * ((t * 5.0) % 1.0)) ** 8
-        return 0.13 * math.sin(math.tau * 55.0 * t) + 0.15 * beat_tone(t, 5.0, notes, 1.5) + 0.08 * stamp * math.sin(math.tau * 92.0 * t)
+    def editor_music(t: float, rng: random.Random) -> float:
+        notes = (55.0, 82.41, 55.0, 98.0, 65.41, 87.31, 73.42, 110.0, 55.0, 82.41, 49.0, 73.42, 65.41, 98.0, 55.0, 87.31)
+        pattern = (2, 0, 1, 0, 2, 1, 0, 1, 2, 0, 2, 1, 0, 1, 2, 0)
+        return music_score(t, rng, music_states["editor"], 24.0, 55.0, 5.0, notes, pattern, 0.88, True)
 
-    def binder_music(t: float, _rng: random.Random) -> float:
-        notes = (58.27, 77.78, 69.30, 103.83, 58.27, 87.31, 51.91, 77.78, 69.30, 116.54, 58.27, 87.31)
-        chain = 0.035 * math.sin(math.tau * 1741.0 * t) * math.sin(math.pi * ((t * 4.0) % 1.0)) ** 6
-        return 0.15 * math.sin(math.tau * 58.25 * t) + 0.15 * beat_tone(t, 4.0, notes, 2.5) + chain
+    def binder_music(t: float, rng: random.Random) -> float:
+        notes = (58.27, 77.78, 69.30, 103.83, 58.27, 87.31, 51.91, 77.78, 69.30, 116.54, 58.27, 87.31, 51.91, 69.30, 77.78, 103.83)
+        pattern = (2, 0, 0, 1, 2, 0, 1, 0, 2, 1, 0, 1, 2, 0, 1, 1)
+        return music_score(t, rng, music_states["binder"], 24.0, 58.27, 4.0, notes, pattern, 0.92, True)
 
-    def author_music(t: float, _rng: random.Random) -> float:
+    def author_music(t: float, rng: random.Random) -> float:
         notes = (49.0, 73.42, 98.0, 123.47, 55.0, 82.41, 110.0, 146.83, 49.0, 61.74, 92.50, 138.59, 55.0, 69.30, 103.83, 164.81)
-        press = math.sin(math.pi * ((t * 4.0) % 1.0)) ** 10
-        return 0.16 * math.sin(math.tau * 49.0 * t) + 0.17 * beat_tone(t, 4.0, notes, 2.0) + 0.09 * press * math.sin(math.tau * 41.0 * t)
+        pattern = (2, 0, 1, 1, 2, 1, 0, 1, 2, 0, 2, 1, 2, 1, 0, 1)
+        return music_score(t, rng, music_states["author"], 24.0, 49.0, 4.0, notes, pattern, 0.98, True)
 
     return {
         "slash.wav": wav_bytes(0.24, slash),
@@ -679,12 +738,12 @@ def sound_assets() -> dict[str, bytes]:
         "ui_confirm.wav": wav_bytes(0.15, ui_confirm),
         "ui_cancel.wav": wav_bytes(0.13, ui_cancel),
         "save.wav": wav_bytes(0.38, save),
-        "music_archive.wav": wav_bytes(16.0, archive_music),
-        "music_bindery.wav": wav_bytes(16.0, bindery_music),
-        "music_finale.wav": wav_bytes(16.0, finale_music),
-        "music_editor.wav": wav_bytes(12.0, editor_music),
-        "music_binder.wav": wav_bytes(12.0, binder_music),
-        "music_author.wav": wav_bytes(12.0, author_music),
+        "music_archive.wav": wav_bytes(32.0, archive_music),
+        "music_bindery.wav": wav_bytes(32.0, bindery_music),
+        "music_finale.wav": wav_bytes(32.0, finale_music),
+        "music_editor.wav": wav_bytes(24.0, editor_music),
+        "music_binder.wav": wav_bytes(24.0, binder_music),
+        "music_author.wav": wav_bytes(24.0, author_music),
     }
 
 

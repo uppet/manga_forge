@@ -21,6 +21,7 @@ var speed := 45.0
 var contact_damage := 1.0
 var xp_value := 1
 var contact_cooldown := 0.0
+var contact_windup := -1.0
 var external_velocity := Vector2.ZERO
 var shoot_timer := 2.2
 var dash_timer := 0.0
@@ -56,6 +57,7 @@ var shield_broken_time := 0.0
 var haste_time := 0.0
 var facing_direction := Vector2.RIGHT
 var source_wave := 1
+var simulation_order := 0
 
 
 func configure(kind_value: String, player_target: Node2D, wave: int) -> InkboundEnemy:
@@ -228,6 +230,8 @@ func _physics_process(delta: float) -> void:
 	if dead or not is_instance_valid(target):
 		return
 	contact_cooldown = maxf(0.0, contact_cooldown - delta)
+	if contact_windup > 0.0:
+		contact_windup = maxf(0.0, contact_windup - delta)
 	shoot_timer -= delta
 	dash_timer = maxf(0.0, dash_timer - delta)
 	dash_charge = maxf(0.0, dash_charge - delta)
@@ -309,11 +313,15 @@ func _physics_process(delta: float) -> void:
 			if dash_charge > 0.0:
 				desired *= 0.08
 				sprite.modulate = CRIMSON if int(dash_charge * 24.0) % 2 == 0 else Color.WHITE
-			elif dash_timer > 2.82:
+			elif dash_timer > 2.58:
 				desired *= 4.6
 
 	var separation := Vector2.ZERO
-	for other in get_tree().get_nodes_in_group("enemies"):
+	var nearby_enemies := get_tree().get_nodes_in_group("enemies")
+	var game := get_parent()
+	if game.has_method("uses_deterministic_simulation") and game.uses_deterministic_simulation():
+		nearby_enemies.sort_custom(func(left: Node, right: Node) -> bool: return int(left.get("simulation_order")) < int(right.get("simulation_order")))
+	for other in nearby_enemies:
 		if other == self or not is_instance_valid(other) or not (other is Node2D):
 			continue
 		var away: Vector2 = global_position - other.global_position
@@ -323,21 +331,55 @@ func _physics_process(delta: float) -> void:
 
 	velocity = desired + separation + external_velocity
 	external_velocity = external_velocity.move_toward(Vector2.ZERO, 420.0 * delta)
-	move_and_slide()
-	var game := get_parent()
+	if game.has_method("uses_deterministic_simulation") and game.uses_deterministic_simulation():
+		global_position += velocity * delta
+	else:
+		move_and_slide()
 	if game.has_method("clamp_to_arena"):
 		global_position = game.clamp_to_arena(global_position, 14.0)
 
-	var contact_range := 27.0 if enemy_kind in BOSS_KINDS else (21.0 if enemy_kind in ["brute", "warden", "censor", "blot"] else 18.0)
-	if distance < contact_range and contact_cooldown <= 0.0:
-		contact_cooldown = 0.72 if enemy_kind == "leech" else 0.86
-		if target.has_method("take_damage"):
-			var landed: bool = target.take_damage(contact_damage, direction, "contact:" + enemy_kind)
-			if landed and enemy_kind == "leech":
-				health = minf(max_health, health + contact_damage * 1.8)
-			if landed and is_elite and elite_affix == "vampiric":
-				health = minf(max_health, health + contact_damage * 2.4)
+	var contact_range := _contact_range()
+	var contact_distance := global_position.distance_to(target.global_position)
+	if contact_distance < contact_range and contact_cooldown <= 0.0:
+		if _contact_attack_is_pretelegraphed():
+			_land_contact_attack(direction)
+		elif contact_windup < 0.0:
+			contact_windup = _contact_windup_duration()
+		elif contact_windup <= 0.0:
+			_land_contact_attack(direction)
+	else:
+		contact_windup = -1.0
 	_update_visual(delta, direction)
+
+
+func _contact_range() -> float:
+	return 27.0 if enemy_kind in BOSS_KINDS else (21.0 if enemy_kind in ["brute", "warden", "censor", "blot"] else 18.0)
+
+
+func _contact_windup_duration() -> float:
+	var duration := 0.22 if enemy_kind in BOSS_KINDS else (0.18 if enemy_kind in ["brute", "warden", "censor", "blot"] else 0.14)
+	return duration * (0.72 if is_elite and elite_affix == "swift" else 1.0)
+
+
+func _contact_attack_is_pretelegraphed() -> bool:
+	return (
+		(enemy_kind == "dasher" and dash_charge <= 0.0 and dash_timer > 1.5)
+		or (enemy_kind == "author" and dash_charge <= 0.0 and dash_timer > 2.58)
+		or counter_rush > 0.0
+		or teleport_rush > 0.0
+	)
+
+
+func _land_contact_attack(direction: Vector2) -> void:
+	contact_windup = -1.0
+	contact_cooldown = 0.72 if enemy_kind == "leech" else 0.86
+	if not target.has_method("take_damage"):
+		return
+	var landed: bool = target.take_damage(contact_damage, direction, "contact:" + enemy_kind)
+	if landed and enemy_kind == "leech":
+		health = minf(max_health, health + contact_damage * 1.8)
+	if landed and is_elite and elite_affix == "vampiric":
+		health = minf(max_health, health + contact_damage * 2.4)
 
 
 func _dasher_movement(desired: Vector2, distance: float) -> Vector2:
@@ -350,7 +392,7 @@ func _dasher_movement(desired: Vector2, distance: float) -> Vector2:
 	if dash_charge > 0.0:
 		desired *= 0.12
 		sprite.modulate = CRIMSON if int(dash_charge * 18.0) % 2 == 0 else Color.WHITE
-	elif dash_timer > 1.72:
+	elif dash_timer > 1.5:
 		desired *= 4.2
 		sprite.modulate = _elite_color() if is_elite else Color.WHITE
 	return desired
@@ -617,6 +659,16 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, 19.0 + (0.65 - support_timer) * 5.0, 0.0, TAU, 24, GOLD, 1.5)
 	if enemy_kind == "blot" and not dead:
 		draw_arc(Vector2.ZERO, 13.0 + sin(pattern_phase * 3.0) * 2.0, 0.0, TAU, 18, CRIMSON, 1.0)
+	if contact_windup >= 0.0 and not dead:
+		var windup_progress := 1.0 - contact_windup / maxf(0.001, _contact_windup_duration())
+		var warning_radius := _contact_range() + lerpf(4.0, 0.0, windup_progress)
+		var warning_angle := facing_direction.angle()
+		var warning_span := lerpf(0.42, 1.08, windup_progress)
+		draw_arc(Vector2.ZERO, warning_radius, warning_angle - warning_span, warning_angle + warning_span, 18, DEEP_INK, 4.5)
+		draw_arc(Vector2.ZERO, warning_radius, warning_angle - warning_span, warning_angle + warning_span, 18, CRIMSON, 2.0)
+		for edge in [-1.0, 1.0]:
+			var tick_direction := Vector2.from_angle(warning_angle + warning_span * edge)
+			draw_line(tick_direction * (warning_radius - 3.0), tick_direction * (warning_radius + 3.0), PAPER, 1.5)
 	if is_elite and not dead:
 		draw_arc(Vector2.ZERO, 14.0 if enemy_kind not in ["brute", "warden", "censor", "blot"] else 18.0, 0.0, TAU, 20, _elite_color(), 1.5)
 	if health >= max_health or dead:

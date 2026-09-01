@@ -12,13 +12,18 @@ and two persistent endings. Completed runs continue as harder drafts.
   roles, and the Red Editor, Binder, and First Author. Shared AtlasTexture
   regions, drawn ground shadows, movement squash, and dash stretch retain horde
   performance. Nara's slash now uses a separate four-frame anticipation, cut,
-  contact, and recovery atlas instead of rotating one static combat pose.
+  contact, and recovery atlas plus a progressively drawn manga sweep instead of
+  rotating one static combat pose. Slash, dash, and Ink Art taps buffer for
+  120–140 ms, preserving deliberate inputs made at the end of recovery.
 - Fifteen enemy archetypes: twelve regular roles, four elite affixes, and three
   bosses. The roster includes shields, teleport ambushes, support healers,
   stationary bullet hazards, timed parries, splitters, summoners, and drainers.
   Early-page natural spawns use mutually exclusive roster bands so newly
   introduced ranged enemies cannot dominate Page 3. Per-page hostile-shot
-  budgets cap screen saturation while preserving authored radial patterns.
+  budgets rise smoothly from 8 to 30, capping late-screen saturation while
+  preserving authored radial patterns. Ordinary body attacks draw a shape-coded
+  100–220 ms strike arc before damage; charged dash/teleport attacks retain
+  their existing dedicated warning and now always enter a committed rush.
 - Thirty-six stackable upgrades across blade, critical, projectile, status, dash,
   defense, economy, combo, and active Ink Art tags. Their tags write six named
   run disciplines with functional bonuses at three and six points. Once a
@@ -61,8 +66,8 @@ and two persistent endings. Completed runs continue as harder drafts.
   techniques, drops, routes, and hazards remain part of the normal run. The
   first clear of a date awards 12 bonus Memory; attempts, wins, best score,
   current streak, best streak, Continue identity, and recent history persist.
-- Three difficulty drafts, three visually distinct acts, three 16-second act
-  loops and three 12-second boss themes with modal-safe crossfades, a bestiary
+- Three difficulty drafts, three visually distinct acts, three 32-second act
+  loops and three 24-second boss themes with modal-safe crossfades, a bestiary
   codex, ten Archive ranks, permanent restoration upgrades,
   milestone unlocks, recent-run history, and two endings.
 - Nine manga-environment routes form a player-chosen three-act route chain. Each
@@ -108,6 +113,9 @@ and two persistent endings. Completed runs continue as harder drafts.
   Ink Arts, enemy casts, dash warnings, teleport, parry, shield, restoration,
   combat supplies, boss entry/defeat, menu navigation, and Save & Return. Enemy
   warnings are spatial and rate-limited so large squads remain readable.
+  Blade cuts are led by shaped air, edge, paper, and handle transients rather
+  than oscillator sweeps; the six extended scores use dry paper/wood/brush
+  layers and 32-second act / 24-second boss arrangements to reduce loop fatigue.
 
 ## Controls
 
@@ -205,6 +213,7 @@ godot --path . --script res://tests/field_manual_test.gd
 godot --path . --script res://tests/localization_test.gd
 godot --headless --path . --script res://tests/combat_cast_test.gd
 godot --headless --path . --script res://tests/audio_system_test.gd
+godot --headless --path . --script res://tests/combat_feel_test.gd
 godot --headless --path . --script res://tests/restoration_board_test.gd
 godot --headless --path . --script res://tests/proof_depth_test.gd
 godot --headless --path . --script res://tests/daily_chronicle_test.gd
@@ -221,7 +230,7 @@ The Windows host workflow exposes the same gates through `host_game.py test`,
 `host_game.py session-test`, `host_game.py supply-test`, `host_game.py art-test`, `host_game.py encounter-test`,
 `host_game.py hazard-test`, `host_game.py loadout-test`, `host_game.py relic-test`,
 `host_game.py cutscene-test`, `host_game.py manual-test`, `host_game.py localization-test`, `host_game.py cast-test`,
-`host_game.py audio-test`, `host_game.py restoration-test`, `host_game.py proof-test`,
+`host_game.py audio-test`, `host_game.py combat-feel-test`, `host_game.py restoration-test`, `host_game.py proof-test`,
 `host_game.py daily-test`, `host_game.py persona-test`, `host_game.py routes`,
 `host_game.py playtest-recorder-test`, and `host_game.py soak`.
 `host_game.py capture-session` renders a ten-frame title, Armory, Story Archive,

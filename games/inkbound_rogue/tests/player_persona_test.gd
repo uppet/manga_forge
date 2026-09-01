@@ -9,6 +9,11 @@ const FxScript = preload("res://scripts/comic_fx.gd")
 const SIM_DELTA := 1.0 / 30.0
 const TICKS_PER_FRAME := 10
 const EXPECTED_ROWS := 48
+const MIN_STANDARD_SURVIVAL := 0.90
+const MIN_LATE_SURVIVAL := 0.75
+const MIN_FIRST_TIMER_CLEAR := 0.58
+const MIN_BLADE_RUSHER_SURVIVAL := 0.83
+const MAX_STANDARD_CLEAR := 0.94
 
 const DIFFICULTIES := ["story", "standard", "redline"]
 const STAGES := [
@@ -132,6 +137,7 @@ func _start_next_case() -> void:
 	difficulty_id = str(case_data["difficulty"])
 	game = packed.instantiate()
 	game.test_mode = true
+	game.deterministic_simulation = true
 	game.debug_set_save_namespace("persona_%s_%s" % [persona["id"], difficulty_id])
 	game.debug_clear_save_files()
 	root.add_child(game)
@@ -140,6 +146,10 @@ func _start_next_case() -> void:
 	var persona_index := case_index % PERSONAS.size()
 	var case_seed := 880000 + persona_index * 7919
 	game.debug_set_rng_seed(case_seed)
+	# Enemy affixes, combat criticals, and several node-local timings use Godot's
+	# global random stream. Seed it as well as the game's owned RNG so repeated
+	# runs compare the same decisions and pressure instead of incidental luck.
+	seed(case_seed + 97)
 	rng.seed = case_seed + 313
 	game._on_start_requested("standard", "open-draft", "marginalia", 0)
 	game._configure_difficulty(difficulty_id)
@@ -242,6 +252,7 @@ func _step_simulation() -> void:
 			child._physics_process(SIM_DELTA)
 		elif script == PickupScript:
 			child._process(SIM_DELTA)
+	game.advance_deterministic_simulation(SIM_DELTA)
 	_track_enemy_damage()
 	_track_incoming_damage()
 	var nearest := _nearest_enemy()
@@ -393,12 +404,15 @@ func _owned_nodes_in_group(group_name: StringName) -> Array[Node]:
 	for node in get_nodes_in_group(group_name):
 		if is_instance_valid(node) and node.get_parent() == game:
 			result.append(node)
+	if group_name == &"enemies":
+		result.sort_custom(func(left: Node, right: Node) -> bool: return int(left.get("simulation_order")) < int(right.get("simulation_order")))
 	return result
 
 
 func _clear_combat_nodes() -> void:
 	if game == null:
 		return
+	game.clear_deterministic_simulation_events()
 	for child in game.get_children().duplicate():
 		if not is_instance_valid(child):
 			continue
@@ -449,20 +463,47 @@ func _finish_suite() -> void:
 		failures.append("Page 3 ranged pressure defeats more than one Standard persona")
 	if not page3_first_timer_survived:
 		failures.append("first-timer persona does not survive Standard Page 3 ranged pressure")
+	var gate_summary := _summary_report()
+	var standard_summary: Dictionary = gate_summary["difficulty"]["standard"]
+	var story_summary: Dictionary = gate_summary["difficulty"]["story"]
+	var redline_summary: Dictionary = gate_summary["difficulty"]["redline"]
+	var late_summary: Dictionary = gate_summary["stage"]["late"]
+	var first_timer_summary: Dictionary = gate_summary["persona"]["first-timer"]
+	var blade_rusher_summary: Dictionary = gate_summary["persona"]["blade-rusher"]
+	if float(standard_summary["survival_ratio"]) < MIN_STANDARD_SURVIVAL:
+		failures.append("Standard persona survival fell below %.0f%%" % (MIN_STANDARD_SURVIVAL * 100.0))
+	if float(standard_summary["clear_ratio"]) > MAX_STANDARD_CLEAR:
+		failures.append("Standard persona clear ratio exceeded %.0f%%; pressure may be trivial" % (MAX_STANDARD_CLEAR * 100.0))
+	if float(late_summary["survival_ratio"]) < MIN_LATE_SURVIVAL:
+		failures.append("late-stage survival fell below %.0f%% across personas" % (MIN_LATE_SURVIVAL * 100.0))
+	if float(first_timer_summary["clear_ratio"]) < MIN_FIRST_TIMER_CLEAR:
+		failures.append("first-timer clear ratio fell below %.0f%%" % (MIN_FIRST_TIMER_CLEAR * 100.0))
+	if float(blade_rusher_summary["survival_ratio"]) < MIN_BLADE_RUSHER_SURVIVAL:
+		failures.append("blade-rusher survival fell below %.0f%%" % (MIN_BLADE_RUSHER_SURVIVAL * 100.0))
+	if not (float(story_summary["clear_ratio"]) > float(standard_summary["clear_ratio"]) and float(standard_summary["clear_ratio"]) > float(redline_summary["clear_ratio"])):
+		failures.append("Story, Standard, and Redline clear ratios lost their strict difficulty ordering")
 	var report := {
-		"schema": 1,
+		"schema": 2,
 		"model": "accelerated behavior personas driving live Godot combat nodes",
+		"deterministic_simulation": true,
 		"limitations": "Measures decision patterns and balance pressure; it does not replace human controller feel, readability, accessibility, or enjoyment testing.",
 		"personas": _persona_report(),
 		"difficulties": DIFFICULTIES,
 		"stages": STAGES.map(func(stage): return {"id": stage["id"], "wave": stage["wave"], "seconds": stage["seconds"], "upgrade_count": stage["upgrade_count"]}),
 		"rows": rows,
-		"summary": _summary_report(),
+		"summary": gate_summary,
+		"gates": {
+			"minimum_standard_survival": MIN_STANDARD_SURVIVAL,
+			"minimum_late_survival": MIN_LATE_SURVIVAL,
+			"minimum_first_timer_clear": MIN_FIRST_TIMER_CLEAR,
+			"minimum_blade_rusher_survival": MIN_BLADE_RUSHER_SURVIVAL,
+			"maximum_standard_clear": MAX_STANDARD_CLEAR,
+			"strict_difficulty_clear_order": true,
+		},
 		"observations": _observations(),
 		"failures": failures,
 	}
 	_write_report(report)
-	var standard_summary: Dictionary = report["summary"]["difficulty"]["standard"]
 	var page3_summary: Dictionary = report["summary"]["stage"]["page3-ranged"]
 	print("INKBOUND_PERSONA_SUMMARY rows=%d standard_clear=%.2f standard_survival=%.2f standard_dps=%.2f page3_survival=%.2f observations=%d" % [rows.size(), float(standard_summary["clear_ratio"]), float(standard_summary["survival_ratio"]), float(standard_summary["damage_per_second"]), float(page3_summary["survival_ratio"]), report["observations"].size()])
 	if not failures.is_empty():

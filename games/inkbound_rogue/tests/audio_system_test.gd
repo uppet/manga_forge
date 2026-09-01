@@ -36,7 +36,7 @@ func _process(_delta: float) -> bool:
 		return false
 	if not validated or frames < 6 or Time.get_ticks_msec() - audio_released_at_msec < 250:
 		return false
-	print("INKBOUND_AUDIO_OK sounds=25 music=6 act_loops=3x16s boss_themes=3x12s crossfade=0.55s weapons=5 physical_blade_layers=4 enemy_cues=6 pickups=2 ui=4 spatial=ok cooldowns=ok")
+	print("INKBOUND_AUDIO_OK sounds=25 music=6 act_loops=3x32s boss_themes=3x24s crossfade=0.55s weapons=5 physical_blade_layers=4 material_score=paper/wood/brush enemy_cues=6 pickups=2 ui=4 spatial=ok cooldowns=ok")
 	_cleanup(0)
 	return true
 
@@ -52,11 +52,11 @@ func _validate_catalog() -> bool:
 		if game.SOUNDS[sound_id].get_length() < float(physical_cut_lengths[sound_id]):
 			return _fail("physical weapon cue %s lost its material tail" % sound_id)
 	for music_id in ACT_MUSIC:
-		if not game.MUSIC.has(music_id) or game.MUSIC[music_id].get_length() < 15.9:
-			return _fail("act loop %s is shorter than sixteen seconds" % music_id)
+		if not game.MUSIC.has(music_id) or game.MUSIC[music_id].get_length() < 31.9:
+			return _fail("act loop %s is shorter than thirty-two seconds" % music_id)
 	for music_id in BOSS_MUSIC:
-		if not game.MUSIC.has(music_id) or game.MUSIC[music_id].get_length() < 11.9:
-			return _fail("boss theme %s is shorter than twelve seconds" % music_id)
+		if not game.MUSIC.has(music_id) or game.MUSIC[music_id].get_length() < 23.9:
+			return _fail("boss theme %s is shorter than twenty-four seconds" % music_id)
 	if game.music_player == null or game.music_fade_player == null or game.music_player.process_mode != Node.PROCESS_MODE_ALWAYS or game.music_fade_player.process_mode != Node.PROCESS_MODE_ALWAYS:
 		return _fail("crossfade players do not survive modal pause")
 	for limited_id in ["enemy_cast", "enemy_dash", "teleport", "parry", "shield", "heal", "ui_move"]:

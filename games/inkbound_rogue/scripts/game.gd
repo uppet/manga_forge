@@ -114,6 +114,9 @@ var route_shard_multiplier := 1.0
 var shake_strength := 0.0
 var hit_stop_active := false
 var test_mode := false
+var deterministic_simulation := false
+var enemy_spawn_serial := 0
+var deterministic_echoes: Array[Dictionary] = []
 var test_force_english := true
 var using_gamepad := false
 var application_focused := true
@@ -371,6 +374,10 @@ func _ready() -> void:
 
 func _playtest_recorder() -> Node:
 	return get_node_or_null("/root/PlaytestSession")
+
+
+func uses_deterministic_simulation() -> bool:
+	return deterministic_simulation
 
 
 func record_playtest_event(kind: String, data: Dictionary = {}) -> void:
@@ -738,6 +745,8 @@ func spawn_enemy(kind: String = "mask", at: Vector2 = Vector2.INF) -> InkboundEn
 		var distance := rng.randf_range(190.0, 285.0)
 		spawn_position = clamp_to_arena(player.global_position + Vector2.from_angle(angle) * distance, 24.0)
 	var enemy: InkboundEnemy = EnemyScript.new().configure(kind, player, wave)
+	enemy_spawn_serial += 1
+	enemy.simulation_order = enemy_spawn_serial
 	if not restoring_checkpoint and kind not in BOSS_KINDS and not enemy.is_elite and rng.randf() < contract_elite_bonus + route_elite_bonus + proof_elite_bonus:
 		enemy.promote_to_elite()
 	enemy.max_health *= difficulty_health * contract_enemy_health * route_enemy_health * proof_enemy_health * (proof_boss_health if kind in BOSS_KINDS else 1.0)
@@ -866,8 +875,8 @@ func hostile_projectile_limit(page: int = -1) -> int:
 	if resolved_page == 3:
 		return 12
 	if resolved_page == 4:
-		return 18
-	return mini(40, 14 + resolved_page * 2)
+		return 16
+	return mini(30, 12 + int(round(float(resolved_page) * 1.5)))
 
 
 func active_hostile_projectile_count() -> int:
@@ -1107,10 +1116,38 @@ func execute_ink_art(art_id: String, at: Vector2, direction: Vector2, art_damage
 
 
 func queue_ink_art_echo(art_id: String, at: Vector2, direction: Vector2, art_damage: float, radius: float) -> void:
+	if deterministic_simulation:
+		deterministic_echoes.append({
+			"remaining": 0.38,
+			"art_id": art_id,
+			"position": at,
+			"direction": direction,
+			"damage": art_damage,
+			"radius": radius,
+		})
+		return
 	await get_tree().create_timer(0.38, false).timeout
 	if not run_started or game_over or run_won or not is_instance_valid(player):
 		return
 	execute_ink_art(art_id, at, direction, art_damage, radius, true)
+
+
+func advance_deterministic_simulation(delta: float) -> void:
+	if not deterministic_simulation or deterministic_echoes.is_empty():
+		return
+	for index in range(deterministic_echoes.size() - 1, -1, -1):
+		var echo: Dictionary = deterministic_echoes[index]
+		echo["remaining"] = float(echo.get("remaining", 0.0)) - delta
+		if float(echo["remaining"]) > 0.0:
+			deterministic_echoes[index] = echo
+			continue
+		deterministic_echoes.remove_at(index)
+		if run_started and not game_over and not run_won and is_instance_valid(player):
+			execute_ink_art(str(echo["art_id"]), echo["position"], echo["direction"], float(echo["damage"]), float(echo["radius"]), true)
+
+
+func clear_deterministic_simulation_events() -> void:
+	deterministic_echoes.clear()
 
 
 func _damage_ink_art_radius(at: Vector2, radius: float, art_damage: float, impulse_strength: float) -> int:

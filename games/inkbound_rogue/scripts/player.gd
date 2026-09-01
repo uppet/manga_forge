@@ -14,6 +14,9 @@ signal ink_art_changed(art_name: String, remaining: float, maximum: float)
 
 const PAPER := Color("fff8e0")
 const CRIMSON := Color("d33037")
+const ATTACK_BUFFER_SECONDS := 0.13
+const DASH_BUFFER_SECONDS := 0.12
+const INK_ART_BUFFER_SECONDS := 0.14
 
 var max_health := 8.0
 var health := 8.0
@@ -33,6 +36,9 @@ var xp_needed := 5
 var attack_cooldown := 0.0
 var dash_cooldown := 0.0
 var dash_time := 0.0
+var attack_buffer_time := 0.0
+var dash_buffer_time := 0.0
+var ink_art_buffer_time := 0.0
 var invulnerable_time := 0.0
 var last_direction := Vector2.RIGHT
 var dash_direction := Vector2.RIGHT
@@ -137,6 +143,9 @@ func _physics_process(delta: float) -> void:
 	attack_cooldown = maxf(0.0, attack_cooldown - delta)
 	dash_cooldown = maxf(0.0, dash_cooldown - delta)
 	ink_art_cooldown = maxf(0.0, ink_art_cooldown - delta)
+	attack_buffer_time = maxf(0.0, attack_buffer_time - delta)
+	dash_buffer_time = maxf(0.0, dash_buffer_time - delta)
+	ink_art_buffer_time = maxf(0.0, ink_art_buffer_time - delta)
 	attack_pose_time = maxf(0.0, attack_pose_time - delta)
 	invulnerable_time = maxf(0.0, invulnerable_time - delta)
 	time_since_hit += delta
@@ -189,17 +198,34 @@ func _physics_process(delta: float) -> void:
 		if stick_aim.length_squared() > 0.04:
 			last_direction = stick_aim.normalized()
 
-		if controls_enabled and Input.is_action_just_pressed("dash"):
-			start_dash(input_vector)
-		if controls_enabled and Input.is_action_pressed("attack"):
-			var aim := stick_aim if using_gamepad else get_global_mouse_position() - global_position
-			perform_attack(aim if aim.length_squared() > 0.04 else last_direction)
-		if controls_enabled and Input.is_action_just_pressed("special"):
-			var art_aim := stick_aim if using_gamepad else get_global_mouse_position() - global_position
-			perform_ink_art(art_aim if art_aim.length_squared() > 0.04 else last_direction)
+		if controls_enabled:
+			if Input.is_action_just_pressed("dash"):
+				dash_buffer_time = DASH_BUFFER_SECONDS
+			if Input.is_action_just_pressed("attack"):
+				attack_buffer_time = ATTACK_BUFFER_SECONDS
+			if Input.is_action_just_pressed("special"):
+				ink_art_buffer_time = INK_ART_BUFFER_SECONDS
+		else:
+			attack_buffer_time = 0.0
+			dash_buffer_time = 0.0
+			ink_art_buffer_time = 0.0
 
-	move_and_slide()
+		if controls_enabled and dash_buffer_time > 0.0 and start_dash(input_vector):
+			dash_buffer_time = 0.0
+		if controls_enabled and (Input.is_action_pressed("attack") or attack_buffer_time > 0.0):
+			var aim := stick_aim if using_gamepad else get_global_mouse_position() - global_position
+			if perform_attack(aim if aim.length_squared() > 0.04 else last_direction):
+				attack_buffer_time = 0.0
+		if controls_enabled and ink_art_buffer_time > 0.0:
+			var art_aim := stick_aim if using_gamepad else get_global_mouse_position() - global_position
+			if perform_ink_art(art_aim if art_aim.length_squared() > 0.04 else last_direction):
+				ink_art_buffer_time = 0.0
+
 	var game_parent := get_parent()
+	if game_parent.has_method("uses_deterministic_simulation") and game_parent.uses_deterministic_simulation():
+		global_position += velocity * delta
+	else:
+		move_and_slide()
 	if game_parent.has_method("clamp_to_arena"):
 		global_position = game_parent.clamp_to_arena(global_position, 18.0)
 	_update_visual(delta)
@@ -337,7 +363,10 @@ func perform_attack(direction: Vector2, force: bool = false) -> bool:
 
 	var hit_count := 0
 	var half_arc_cos := cos(deg_to_rad(attack_arc * 0.5))
-	for node in get_tree().get_nodes_in_group("enemies"):
+	var attack_targets := get_tree().get_nodes_in_group("enemies")
+	if game.has_method("uses_deterministic_simulation") and game.uses_deterministic_simulation():
+		attack_targets.sort_custom(func(left: Node, right: Node) -> bool: return int(left.get("simulation_order")) < int(right.get("simulation_order")))
+	for node in attack_targets:
 		if not is_instance_valid(node) or not node.has_method("take_damage"):
 			continue
 		var offset: Vector2 = node.global_position - global_position

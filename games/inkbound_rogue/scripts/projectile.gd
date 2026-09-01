@@ -50,6 +50,11 @@ func _physics_process(delta: float) -> void:
 func _draw() -> void:
 	var pulse := 0.5 + sin(life * 15.0) * 0.5
 	var radius := 7.0 + pulse * 1.25
+	var local_direction := direction.rotated(-rotation)
+	for offset in [-2.5, 2.5]:
+		var normal: Vector2 = local_direction.rotated(PI * 0.5) * float(offset)
+		draw_line(normal - local_direction * (radius + 2.0), normal - local_direction * (radius + 9.0 + pulse * 3.0), HOSTILE_INK, 3.5)
+		draw_line(normal - local_direction * (radius + 2.0), normal - local_direction * (radius + 8.0 + pulse * 3.0), HOSTILE_CORE, 1.25)
 	draw_circle(Vector2.ZERO, radius + 1.5, Color(HOSTILE_INK.r, HOSTILE_INK.g, HOSTILE_INK.b, 0.62))
 	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 16, Color(HOSTILE_CORE.r, HOSTILE_CORE.g, HOSTILE_CORE.b, 0.76 + pulse * 0.2), 1.25)
 	for angle in [0.0, PI * 0.5, PI, PI * 1.5]:

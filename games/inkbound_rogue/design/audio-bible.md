@@ -2,19 +2,21 @@
 
 ## Musical identity
 
-Inkbound uses dry percussion, low calligraphy-brush drones, struck paper, metal
-bindings, and deliberately synthetic pulse voices. Music must support combat
-readability rather than fill every frequency. All runtime music is 22.05 kHz,
-16-bit mono WAV and loops at a boundary where transient envelopes return to zero.
+Inkbound uses dry percussion, low calligraphy-brush drones, struck paper, wood
+resonance, and restrained plucked tones. Material noise leads the mix; pitched
+voices provide shadow and tension instead of arcade-like melody. Music must
+support combat readability rather than fill every frequency. All runtime music
+is 22.05 kHz, 16-bit mono WAV and uses a short boundary guard so loop transients
+return to zero.
 
 | State | Runtime ID | Length | Character |
 | --- | --- | ---: | --- |
-| Public Archive | `archive` | 16 s | Sparse bass, air, restrained two-beat phrase |
-| Forbidden Bindery | `bindery` | 16 s | Triple-meter chain scrape and darker pulse |
-| First Press | `finale` | 16 s | Four-beat press rhythm and rising urgency |
-| Red Editor | `boss_editor` | 12 s | Fast stamped verdict rhythm |
-| Binder | `boss_binder` | 12 s | Heavy chain accents and circular phrase |
-| First Author | `boss_author` | 12 s | Wide press impacts and unstable high register |
+| Public Archive | `archive` | 32 s | Sparse bass, paper taps, restrained two-beat phrase |
+| Forbidden Bindery | `bindery` | 32 s | Triple-meter binding knocks and darker brush grain |
+| First Press | `finale` | 32 s | Four-beat wood press rhythm and rising urgency |
+| Red Editor | `boss_editor` | 24 s | Fast stamped verdict rhythm with dry paper cracks |
+| Binder | `boss_binder` | 24 s | Heavy binding accents and circular phrase |
+| First Author | `boss_author` | 24 s | Wide press impacts and unstable plucked register |
 
 Boss entry crossfades from the active act loop over 0.55 seconds. Defeat returns
 to the current act loop; restored checkpoints select the boss layer whenever a
@@ -26,8 +28,8 @@ not stall underneath story or interface states.
 - Marginalia and Twin-Stroke use a dry, broadband blade-air cut; Greatbrush uses
   a slower low-bodied stroke, Needlepoint a short bright edge, and Seal-Caster a
   paper drag plus stamp. Weapon cues lead with shaped noise and material
-  transients rather than swept oscillator tones. A restrained metal tick or
-  handle/body resonance may support the sound, but never becomes its identity.
+  transients rather than swept oscillator tones. Edge chirp and handle/body
+  resonance support the cut, but tonal beeps never become its identity.
 - Every Ink Art shares a recognizable rising ink release, pitch-shifted by form.
 - Enemy projectile casts, dash charges, teleport windups, parries, shields, and
   Archivist restoration are positional warnings, not decorative noise.
@@ -42,7 +44,7 @@ new cues.
 
 ## Validation
 
-`audio_system_test.gd` verifies all 25 cues, all six loops and their lengths,
+`audio_system_test.gd` verifies all 25 cues, all six extended loops and their lengths,
 weapon mappings, six enemy warning families, supply and UI cues, adaptive boss
 selection, persistent-pause players, cooldown coverage, and a production-mode
 two-player crossfade.

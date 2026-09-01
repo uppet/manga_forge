@@ -72,37 +72,37 @@
     {
       "id": "music-archive",
       "runtime_path": "res://assets/audio/music_archive.wav",
-      "sha256": "c9d302eacaab664702d60149da62be8ae99970c30da729116b1d784af6b477de",
+      "sha256": "59e719295a807aa72453b266708983b0b4a1c48b9a207b7e2cc4d8bd198ed30d",
       "origin": "deterministic-manga-forge"
     },
     {
       "id": "music-author",
       "runtime_path": "res://assets/audio/music_author.wav",
-      "sha256": "75e9223e9b08de4501f084aedfc5da95b3f9c76dbee49f062cf9b1203260ed0a",
+      "sha256": "78f820bdee7364eb0afd9e05ece0b1b291ac4d5130f0497939a3fe0bd5b798ef",
       "origin": "deterministic-manga-forge"
     },
     {
       "id": "music-binder",
       "runtime_path": "res://assets/audio/music_binder.wav",
-      "sha256": "8de3b45084b08e2c66f7b917db4a35d05730deacf3617c9ec73e456ba4d8178b",
+      "sha256": "38b82ea7d94e4f375b91bbb4531b84ff92c047c1f303abcdf2088e73fe5f4484",
       "origin": "deterministic-manga-forge"
     },
     {
       "id": "music-bindery",
       "runtime_path": "res://assets/audio/music_bindery.wav",
-      "sha256": "aeed8bf405f0bef0a00adfba0fc95ed127af1f1465b69a496b1c3f7a0cdf681e",
+      "sha256": "2c288c80a07339ce19a036af6a3c75039c0fc38d741368dfffbf8da623b452d1",
       "origin": "deterministic-manga-forge"
     },
     {
       "id": "music-editor",
       "runtime_path": "res://assets/audio/music_editor.wav",
-      "sha256": "ae7e4ec6ba47ffabe12c230210a0cd965c4255589fa867eb198c9694fbee1245",
+      "sha256": "abef776f257771bc475c0f7c24edbb81e40ac11469a69a09ecd9f0428ada18f9",
       "origin": "deterministic-manga-forge"
     },
     {
       "id": "music-finale",
       "runtime_path": "res://assets/audio/music_finale.wav",
-      "sha256": "09ff57e55c6bbf902360d9d436612c6ffad3caebc34e2f0bd6086320b0509b74",
+      "sha256": "8d1d842614b3bb792e3976da3a7684820933ae4a6599278ec59d4e427e18c882",
       "origin": "deterministic-manga-forge"
     },
     {
@@ -150,19 +150,19 @@
     {
       "id": "slash",
       "runtime_path": "res://assets/audio/slash.wav",
-      "sha256": "372e8246793799e18c582285c2869a4c8d74c3c6b0ef22e646921cc761508c9f",
+      "sha256": "fad8e8ba959c2641e68bdb7b2561792c6b8128c4f44549184d89caef2b5e1fd2",
       "origin": "deterministic-manga-forge"
     },
     {
       "id": "slash-heavy",
       "runtime_path": "res://assets/audio/slash_heavy.wav",
-      "sha256": "a31d6f7db946c23cb544989b5ce7e5690e755a7b8f1ad82d139b3eb688749ddd",
+      "sha256": "15169effebbeae8f181b1a4afbbf9dd265170d56d28a4c90effbe5bc1f0d7956",
       "origin": "deterministic-manga-forge"
     },
     {
       "id": "slash-light",
       "runtime_path": "res://assets/audio/slash_light.wav",
-      "sha256": "25cbd64da392ef07fd3a161f4c21a9a04610a20dc7a03fa05ca541d232d2bdd7",
+      "sha256": "5afca31bb3a63587cf82f770bc0c04485bab091c95bb359416294af9c66a8f7a",
       "origin": "deterministic-manga-forge"
     },
     {

@@ -105,9 +105,19 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	match mode:
 		FxMode.SLASH:
-			draw_arc(Vector2.ZERO, radius * 0.72, -arc_radians * 0.5, arc_radians * 0.5, 18, INK, 8.0, true)
-			draw_arc(Vector2.ZERO, radius * 0.72, -arc_radians * 0.5, arc_radians * 0.5, 18, tint, 4.0, true)
-			draw_arc(Vector2.ZERO, radius * 0.52, -arc_radians * 0.46, arc_radians * 0.46, 14, tint, 1.0, true)
+			var progress := clampf(age / lifetime, 0.0, 1.0)
+			var sweep := minf(1.0, progress * 2.8)
+			var arc_start := -arc_radians * 0.5
+			var leading_edge := lerpf(arc_start + 0.035, arc_radians * 0.5, sweep)
+			var live_span := arc_radians * lerpf(0.16, 0.68, minf(1.0, progress * 3.5))
+			var trailing_edge := maxf(arc_start, leading_edge - live_span)
+			var live_radius := radius * lerpf(0.58, 0.76, minf(1.0, progress * 2.4))
+			var contact_pulse := sin(PI * minf(1.0, progress * 1.9))
+			draw_arc(Vector2.ZERO, live_radius, trailing_edge, leading_edge, 18, INK, 7.0 + contact_pulse * 2.0, true)
+			draw_arc(Vector2.ZERO, live_radius, trailing_edge, leading_edge, 18, tint, 3.2 + contact_pulse * 1.8, true)
+			draw_arc(Vector2.ZERO, live_radius * 0.72, trailing_edge + 0.05, leading_edge, 14, tint.lightened(0.24), 1.0, true)
+			var edge_direction := Vector2.from_angle(leading_edge)
+			draw_line(edge_direction * live_radius * 0.48, edge_direction * live_radius * 1.04, PAPER, 1.5)
 		FxMode.BURST:
 			for angle in burst_angles:
 				var inner := Vector2.from_angle(angle) * radius * 0.2

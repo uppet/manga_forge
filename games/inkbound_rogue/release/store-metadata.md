@@ -11,9 +11,10 @@ decide which ending the Grand Archive deserves.
 - Fast top-down melee with directional slashes, invulnerable dashes, five
   weapon-specific active Ink Arts, hit freeze, gamepad vibration, and readable
   manga impact effects.
-- Adaptive audio moves between three 16-second act loops and dedicated Red
-  Editor, Binder, and First Author themes. Distinct weapon, Ink Art, spatial
-  enemy-warning, pickup, boss, and menu cues keep dense pages readable.
+- Adaptive audio moves between three 32-second act scores and dedicated
+  24-second Red Editor, Binder, and First Author themes. Dry paper, wood, brush,
+  and blade-material layers replace arcade-like oscillator sweeps; distinct Ink
+  Art, spatial enemy-warning, pickup, boss, and menu cues keep dense pages readable.
 - A five-form starting Armory makes each draft immediately build-defining:
   retain Marginalia's flexible transformation pool or commit to a restored form
   and its unique Ink Art from Page 1.
