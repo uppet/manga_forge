@@ -166,9 +166,15 @@ func _run_smoke_test() -> void:
 	game._set_input_mode(false)
 	var vibration_before := bool(game.settings["vibration"])
 	game.hud.show_settings()
-	if not game.hud.settings_visible or game.hud.settings_buttons.size() != 9:
+	if not game.hud.settings_visible or game.hud.settings_buttons.size() != 11:
 		_fail("controller-accessible settings panel did not open")
 		return
+	var assist_before := float(game.settings["aim_assist"])
+	game.hud._adjust_setting("aim_assist", 1)
+	if is_equal_approx(float(game.settings["aim_assist"]), assist_before):
+		_fail("controller aim-assist adjustment did not propagate")
+		return
+	game.hud._adjust_setting("aim_assist", -1)
 	game.hud._adjust_setting("vibration", 1)
 	if bool(game.settings["vibration"]) == vibration_before:
 		_fail("settings adjustment did not propagate to the game runtime")

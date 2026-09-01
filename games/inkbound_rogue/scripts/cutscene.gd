@@ -296,9 +296,11 @@ func _animate_panel() -> void:
 	camera_tween.tween_property(title_label, "position:x", 14.0, 0.38).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	camera_tween.tween_property(title_label, "modulate:a", 1.0, 0.32)
 	_run_panel_transition(_tone_color(str(panel.get("tone", "paper"))))
-	flash.modulate.a = 0.22
+	var game := get_parent()
+	var reduced_flashes: bool = game.has_method("reduced_flashes_enabled") and game.reduced_flashes_enabled()
+	flash.modulate.a = 0.07 if reduced_flashes else 0.22
 	var flash_tween := create_tween()
-	flash_tween.tween_property(flash, "modulate:a", 0.0, 0.28)
+	flash_tween.tween_property(flash, "modulate:a", 0.0, 0.4 if reduced_flashes else 0.28)
 
 
 func _layout_focus_inset(mode: String, focus: Vector2, tone_color: Color) -> void:

@@ -215,8 +215,10 @@ var settings: Dictionary = {
 	"music": 0.65,
 	"sfx": 0.85,
 	"vibration": true,
+	"aim_assist": 0.45,
 	"screen_shake": 1.0,
 	"hit_stop": true,
+	"reduced_flashes": false,
 	"fullscreen": false,
 	"language": Localization.LANGUAGE_AUTO,
 }
@@ -378,6 +380,41 @@ func _playtest_recorder() -> Node:
 
 func uses_deterministic_simulation() -> bool:
 	return deterministic_simulation
+
+
+func reduced_flashes_enabled() -> bool:
+	return settings.get("reduced_flashes", false) == true
+
+
+func assisted_aim_direction(origin: Vector2, raw_direction: Vector2, max_distance: float = 84.0) -> Vector2:
+	# This is deliberately a direction correction, not lock-on or auto-fire. It
+	# preserves the player's right-stick intent while making short melee strokes
+	# less brittle on a controller.
+	var direction := raw_direction.normalized() if raw_direction.length_squared() > 0.001 else Vector2.RIGHT
+	var strength := float(settings.get("aim_assist", 0.45))
+	if strength <= 0.001 or max_distance <= 0.0:
+		return direction
+	var maximum_angle := deg_to_rad(32.0)
+	var best_direction := direction
+	var best_score := INF
+	for candidate in get_tree().get_nodes_in_group("enemies"):
+		if not is_instance_valid(candidate) or not (candidate is Node2D) or candidate.get("dead") == true:
+			continue
+		var offset: Vector2 = (candidate as Node2D).global_position - origin
+		var distance := offset.length()
+		if distance <= 0.001 or distance > max_distance:
+			continue
+		var candidate_direction := offset / distance
+		var angle := absf(direction.angle_to(candidate_direction))
+		if angle > maximum_angle:
+			continue
+		var score := angle / maximum_angle + distance / max_distance * 0.18
+		if score < best_score:
+			best_score = score
+			best_direction = candidate_direction
+	if best_score == INF:
+		return direction
+	return direction.lerp(best_direction, strength).normalized()
 
 
 func record_playtest_event(kind: String, data: Dictionary = {}) -> void:
@@ -2075,8 +2112,14 @@ func _on_setting_adjusted(setting_id: String, direction: int) -> void:
 	match setting_id:
 		"master", "music", "sfx":
 			settings[setting_id] = clampf(snappedf(float(settings[setting_id]) + 0.1 * signi(direction), 0.1), 0.0, 1.0)
-		"vibration", "hit_stop", "fullscreen":
+		"vibration", "hit_stop", "reduced_flashes", "fullscreen":
 			settings[setting_id] = not bool(settings[setting_id])
+		"aim_assist":
+			var levels := [0.0, 0.25, 0.45]
+			var current_index := levels.find(float(settings[setting_id]))
+			if current_index < 0:
+				current_index = 2
+			settings[setting_id] = levels[posmod(current_index + signi(direction), levels.size())]
 		"screen_shake":
 			var levels := [0.0, 0.5, 1.0]
 			var current_index := levels.find(float(settings[setting_id]))
@@ -2120,7 +2163,10 @@ func _sanitize_settings() -> void:
 		settings[volume_id] = clampf(float(settings.get(volume_id, 1.0)), 0.0, 1.0)
 	settings["vibration"] = bool(settings.get("vibration", true))
 	settings["hit_stop"] = bool(settings.get("hit_stop", true))
+	settings["reduced_flashes"] = bool(settings.get("reduced_flashes", false))
 	settings["fullscreen"] = bool(settings.get("fullscreen", false))
+	var assist := float(settings.get("aim_assist", 0.45))
+	settings["aim_assist"] = 0.0 if assist < 0.125 else (0.25 if assist < 0.35 else 0.45)
 	var language := str(settings.get("language", Localization.LANGUAGE_AUTO))
 	settings["language"] = language if language in Localization.LANGUAGE_CHOICES else Localization.LANGUAGE_AUTO
 	var shake := float(settings.get("screen_shake", 1.0))

@@ -214,11 +214,19 @@ func _physics_process(delta: float) -> void:
 			dash_buffer_time = 0.0
 		if controls_enabled and (Input.is_action_pressed("attack") or attack_buffer_time > 0.0):
 			var aim := stick_aim if using_gamepad else get_global_mouse_position() - global_position
-			if perform_attack(aim if aim.length_squared() > 0.04 else last_direction):
+			if aim.length_squared() <= 0.04:
+				aim = last_direction
+			if using_gamepad and attack_cooldown <= 0.0:
+				aim = _assisted_gamepad_aim(aim, attack_reach + 16.0)
+			if perform_attack(aim):
 				attack_buffer_time = 0.0
 		if controls_enabled and ink_art_buffer_time > 0.0:
 			var art_aim := stick_aim if using_gamepad else get_global_mouse_position() - global_position
-			if perform_ink_art(art_aim if art_aim.length_squared() > 0.04 else last_direction):
+			if art_aim.length_squared() <= 0.04:
+				art_aim = last_direction
+			if using_gamepad:
+				art_aim = _assisted_gamepad_aim(art_aim, 168.0)
+			if perform_ink_art(art_aim):
 				ink_art_buffer_time = 0.0
 
 	var game_parent := get_parent()
@@ -230,6 +238,13 @@ func _physics_process(delta: float) -> void:
 		global_position = game_parent.clamp_to_arena(global_position, 18.0)
 	_update_visual(delta)
 	_notify_ink_art_changed()
+
+
+func _assisted_gamepad_aim(direction: Vector2, max_distance: float) -> Vector2:
+	var game := get_parent()
+	if game.has_method("assisted_aim_direction"):
+		return game.assisted_aim_direction(global_position, direction, max_distance)
+	return direction.normalized() if direction.length_squared() > 0.001 else last_direction
 
 
 func _update_visual(delta: float) -> void:
@@ -512,12 +527,18 @@ func take_damage(amount: float, source_direction: Vector2 = Vector2.ZERO, source
 	if game.has_method("vibrate"):
 		game.vibrate(0.42, 0.75, 0.14)
 	var tween := create_tween()
-	tween.set_loops(3)
-	tween.tween_property(sprite, "modulate", CRIMSON, 0.06)
-	tween.tween_property(sprite, "modulate", Color.WHITE, 0.06)
+	var flash_cycles := damage_flash_cycles()
+	tween.set_loops(flash_cycles)
+	tween.tween_property(sprite, "modulate", CRIMSON.lerp(Color.WHITE, 0.45) if flash_cycles == 1 else CRIMSON, 0.08 if flash_cycles == 1 else 0.06)
+	tween.tween_property(sprite, "modulate", Color.WHITE, 0.12 if flash_cycles == 1 else 0.06)
 	if health <= 0.0:
 		died.emit()
 	return true
+
+
+func damage_flash_cycles() -> int:
+	var game := get_parent()
+	return 1 if game.has_method("reduced_flashes_enabled") and game.reduced_flashes_enabled() else 3
 
 
 func gain_xp(amount: int) -> void:

@@ -22,7 +22,7 @@ Before uploading a playtest depot:
    `host_game.py session-test`, `host_game.py supply-test`, `host_game.py balance`,
    `host_game.py persona-test`, `host_game.py daily-test`,
    `host_game.py progression`, `host_game.py routes`, `host_game.py manual-test`,
-   `host_game.py cast-test`, `host_game.py audio-test`, `host_game.py combat-feel-test`, `host_game.py restoration-test`,
+   `host_game.py cast-test`, `host_game.py audio-test`, `host_game.py combat-feel-test`, `host_game.py accessibility-test`, `host_game.py restoration-test`,
    `host_game.py proof-test`, `host_game.py playtest-recorder-test`, and
    `host_game.py soak`.
 2. Run `host_game.py capture-session`, `host_game.py capture-upgrades`,

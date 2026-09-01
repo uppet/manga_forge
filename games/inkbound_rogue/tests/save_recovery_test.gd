@@ -26,11 +26,15 @@ func _run_save_test() -> void:
 	var first = _new_test_game("save_atomic_test")
 	first.best_score = 111
 	first.meta_shards = 7
+	first.settings["aim_assist"] = 0.25
+	first.settings["reduced_flashes"] = true
 	if not first._save_run() or first.save_generation != 1:
 		_fail("first atomic save did not commit generation 1")
 		return
 	first.best_score = 222
 	first.meta_shards = 9
+	first.settings["aim_assist"] = 0.0
+	first.settings["reduced_flashes"] = false
 	if not first._save_run() or first.save_generation != 2:
 		_fail("second atomic save did not commit generation 2")
 		return
@@ -48,6 +52,9 @@ func _run_save_test() -> void:
 	var recovered = _new_test_game("save_atomic_test")
 	if not recovered.save_recovered or recovered.best_score != 111 or recovered.save_generation != 1:
 		_fail("corrupt primary did not recover the validated backup")
+		return
+	if not is_equal_approx(float(recovered.settings.get("aim_assist", -1.0)), 0.25) or recovered.settings.get("reduced_flashes", false) != true:
+		_fail("backup recovery did not preserve controller/accessibility settings")
 		return
 	if not FileAccess.file_exists(recovered.corrupt_save_path):
 		_fail("corrupt primary was not quarantined for inspection")
@@ -83,6 +90,9 @@ func _run_save_test() -> void:
 	if migrated.save_incompatible or migrated.best_score != 555 or not migrated.recent_runs.is_empty():
 		_fail("schema-11 profile did not migrate into the schema-12 runtime")
 		return
+	if not is_equal_approx(float(migrated.settings.get("aim_assist", -1.0)), 0.45) or migrated.settings.get("reduced_flashes", true) == true:
+		_fail("older profile did not receive safe defaults for new accessibility settings")
+		return
 	if not migrated._save_run():
 		_fail("migrated schema-11 profile could not be committed as schema 12")
 		return
@@ -110,7 +120,7 @@ func _run_save_test() -> void:
 
 	for profile_name in TEST_NAMESPACES:
 		_cleanup_namespace(profile_name)
-	print("INKBOUND_SAVE_OK atomic=ok backup=ok recovery=ok quarantine=ok future=protected migration=11to12 schema=12")
+	print("INKBOUND_SAVE_OK atomic=ok backup=ok recovery=ok quarantine=ok future=protected migration=11to12 schema=12 accessibility_settings=preserved/defaulted")
 	paused = false
 	quit(0)
 

@@ -121,7 +121,9 @@ and two persistent endings. Completed runs continue as harder drafts.
 
 Gamepads work by default and can be connected or disconnected while the game is
 running. Xbox, PlayStation, Switch Pro, and compatible XInput/SDL controllers use
-the same position-based layout:
+the same position-based layout. Standard controller aim assist softly bends an
+attack toward an enemy within 32 degrees and the active attack's useful range;
+it never attacks, locks a target, or changes keyboard/mouse aim:
 
 - Left stick / D-pad: move
 - Right stick: aim
@@ -168,7 +170,10 @@ Keyboard and mouse remain fully supported:
 The HUD automatically switches prompts to the most recently used input device.
 Combat hits, critical strikes, damage, and dashes provide gamepad vibration when
 supported by the connected controller. Master/music/SFX volume, fullscreen,
-vibration, screen shake, impact-freeze, and language preferences persist with the profile.
+vibration, controller aim assist (Off/Gentle/Standard), screen shake,
+impact-freeze, reduced flashes, and language preferences persist with the profile.
+Reduced flashes preserves warning shapes, scale changes, sounds, and colors while
+removing rapid white/accent alternation from charge and damage feedback.
 Options also exposes eighteen runtime binding slots for movement, slash, dash, Ink Art,
 pause, and menu access across keyboard/mouse and gamepad. `Y`/Triangle or
 Backspace restores the complete default layout.
@@ -214,6 +219,7 @@ godot --path . --script res://tests/localization_test.gd
 godot --headless --path . --script res://tests/combat_cast_test.gd
 godot --headless --path . --script res://tests/audio_system_test.gd
 godot --headless --path . --script res://tests/combat_feel_test.gd
+godot --headless --path . --script res://tests/accessibility_test.gd
 godot --headless --path . --script res://tests/restoration_board_test.gd
 godot --headless --path . --script res://tests/proof_depth_test.gd
 godot --headless --path . --script res://tests/daily_chronicle_test.gd
@@ -230,7 +236,7 @@ The Windows host workflow exposes the same gates through `host_game.py test`,
 `host_game.py session-test`, `host_game.py supply-test`, `host_game.py art-test`, `host_game.py encounter-test`,
 `host_game.py hazard-test`, `host_game.py loadout-test`, `host_game.py relic-test`,
 `host_game.py cutscene-test`, `host_game.py manual-test`, `host_game.py localization-test`, `host_game.py cast-test`,
-`host_game.py audio-test`, `host_game.py combat-feel-test`, `host_game.py restoration-test`, `host_game.py proof-test`,
+`host_game.py audio-test`, `host_game.py combat-feel-test`, `host_game.py accessibility-test`, `host_game.py restoration-test`, `host_game.py proof-test`,
 `host_game.py daily-test`, `host_game.py persona-test`, `host_game.py routes`,
 `host_game.py playtest-recorder-test`, and `host_game.py soak`.
 `host_game.py capture-session` renders a ten-frame title, Armory, Story Archive,

@@ -226,6 +226,19 @@ func _elite_color() -> Color:
 	return Color.WHITE
 
 
+func reduced_flashes_enabled() -> bool:
+	var game := get_parent()
+	return game.has_method("reduced_flashes_enabled") and game.reduced_flashes_enabled()
+
+
+func charge_warning_color(accent: Color, phase: int) -> Color:
+	# Shape, scale, sound and ground telegraphs stay intact. The accessibility
+	# option only removes the rapid white/accent alternation.
+	if reduced_flashes_enabled():
+		return accent.lerp(Color.WHITE, 0.28)
+	return accent if phase % 2 == 0 else Color.WHITE
+
+
 func _physics_process(delta: float) -> void:
 	if dead or not is_instance_valid(target):
 		return
@@ -312,9 +325,10 @@ func _physics_process(delta: float) -> void:
 					author_game.play_spatial_sound("enemy_dash", global_position, 0.72)
 			if dash_charge > 0.0:
 				desired *= 0.08
-				sprite.modulate = CRIMSON if int(dash_charge * 24.0) % 2 == 0 else Color.WHITE
+				sprite.modulate = charge_warning_color(CRIMSON, int(dash_charge * 24.0))
 			elif dash_timer > 2.58:
 				desired *= 4.6
+				sprite.modulate = _elite_color() if is_elite else Color.WHITE
 
 	var separation := Vector2.ZERO
 	var nearby_enemies := get_tree().get_nodes_in_group("enemies")
@@ -391,7 +405,7 @@ func _dasher_movement(desired: Vector2, distance: float) -> Vector2:
 			game.play_spatial_sound("enemy_dash", global_position, 1.08)
 	if dash_charge > 0.0:
 		desired *= 0.12
-		sprite.modulate = CRIMSON if int(dash_charge * 18.0) % 2 == 0 else Color.WHITE
+		sprite.modulate = charge_warning_color(CRIMSON, int(dash_charge * 18.0))
 	elif dash_timer > 1.5:
 		desired *= 4.2
 		sprite.modulate = _elite_color() if is_elite else Color.WHITE
@@ -410,7 +424,7 @@ func _errata_movement(direction: Vector2, movement_speed: float) -> Vector2:
 			game.play_spatial_sound("teleport", global_position, 1.0)
 	if teleport_pending:
 		if teleport_charge > 0.0:
-			sprite.modulate = Color(0.55, 0.42, 0.65, 1.0) if int(teleport_charge * 28.0) % 2 == 0 else Color.WHITE
+			sprite.modulate = charge_warning_color(Color(0.55, 0.42, 0.65, 1.0), int(teleport_charge * 28.0))
 			return Vector2.ZERO
 		teleport_pending = false
 		var player_facing = target.get("last_direction")
@@ -437,7 +451,7 @@ func _duelist_movement(direction: Vector2, distance: float, movement_speed: floa
 		if game.has_method("play_spatial_sound"):
 			game.play_spatial_sound("parry", global_position, 0.82)
 	if parry_window > 0.0:
-		sprite.modulate = STEEL if int(parry_window * 24.0) % 2 == 0 else Color.WHITE
+		sprite.modulate = charge_warning_color(STEEL, int(parry_window * 24.0))
 		return direction.rotated(PI * 0.5) * movement_speed * 0.28
 	if counter_rush > 0.0:
 		return direction * movement_speed * 3.6
@@ -491,7 +505,7 @@ func _update_status(delta: float) -> void:
 		periodic += burn_damage
 	if periodic > 0.0:
 		health -= periodic
-		sprite.modulate = CRIMSON
+		sprite.modulate = CRIMSON.lerp(Color.WHITE, 0.45) if reduced_flashes_enabled() else CRIMSON
 		var tween := create_tween()
 		tween.tween_property(sprite, "modulate", _elite_color() if is_elite else Color.WHITE, 0.1)
 		if health <= 0.0:
@@ -584,8 +598,11 @@ func take_damage(amount: float, impulse: Vector2, critical: bool = false) -> voi
 	if game.has_method("impact"):
 		game.impact(global_position, critical, "CRIT!" if critical else "KRAK!", 7.0 if critical else 4.0)
 	var tween := create_tween()
-	tween.tween_property(sprite, "modulate", CRIMSON if critical else PAPER, 0.025)
-	tween.tween_property(sprite, "modulate", _elite_color() if is_elite else Color.WHITE, 0.08)
+	var hit_color := CRIMSON if critical else PAPER
+	if reduced_flashes_enabled():
+		hit_color = hit_color.lerp(_elite_color() if is_elite else Color.WHITE, 0.48)
+	tween.tween_property(sprite, "modulate", hit_color, 0.07 if reduced_flashes_enabled() else 0.025)
+	tween.tween_property(sprite, "modulate", _elite_color() if is_elite else Color.WHITE, 0.11 if reduced_flashes_enabled() else 0.08)
 	if health <= 0.0:
 		die()
 

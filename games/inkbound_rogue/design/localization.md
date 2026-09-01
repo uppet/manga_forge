@@ -33,9 +33,10 @@ The same font is used by Controls and canvas-drawn combat/hazard callouts.
 - explicit Chinese selection, runtime English switching, and persistence;
 - compatibility with older profiles lacking the language field;
 - CJK glyph availability through the configured system font;
-- translated title, settings row, techniques, event choices, and story text;
+- translated title, language/controller/accessibility settings, techniques,
+  event choices, and story text;
 - contained settings and technique-card layout.
 
-`tests/capture_localization_ui.gd` writes four renderer proofs for the Chinese
-title, settings, upgrade cards, and prologue. The Windows host entry points are
+`tests/capture_localization_ui.gd` writes five renderer proofs for the Chinese
+title, settings, upgrade cards, prologue, and combat HUD. The Windows host entry points are
 `host_game.py localization-test` and `host_game.py capture-localization`.

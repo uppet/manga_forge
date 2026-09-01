@@ -218,8 +218,10 @@ const SETTINGS_ROWS := [
 	["music", "MUSIC VOLUME"],
 	["sfx", "SFX VOLUME"],
 	["vibration", "GAMEPAD VIBRATION"],
+	["aim_assist", "CONTROLLER AIM ASSIST"],
 	["screen_shake", "SCREEN SHAKE"],
 	["hit_stop", "IMPACT FREEZE"],
+	["reduced_flashes", "REDUCED FLASHES"],
 	["fullscreen", "DISPLAY MODE"],
 	["language", "LANGUAGE"],
 	["controls", "CONTROL BINDINGS"],
@@ -1033,25 +1035,25 @@ func _refresh_manual() -> void:
 
 func _build_settings() -> void:
 	settings_panel = ColorRect.new()
-	settings_panel.position = Vector2(36, 14)
-	settings_panel.size = Vector2(408, 242)
+	settings_panel.position = Vector2(36, 8)
+	settings_panel.size = Vector2(408, 254)
 	settings_panel.color = Color(0.015, 0.012, 0.02, 0.992)
 	settings_panel.visible = false
 	add_child(settings_panel)
-	var title := _make_child_label(settings_panel, "OPTIONS & ACCESSIBILITY", Vector2(12, 7), Vector2(384, 27), 17, WHITE)
+	var title := _make_child_label(settings_panel, "OPTIONS & ACCESSIBILITY", Vector2(12, 5), Vector2(384, 25), 16, WHITE)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var help := _make_child_label(settings_panel, "D-PAD / ARROWS SELECT   LEFT/RIGHT ADJUST", Vector2(12, 31), Vector2(384, 13), 8, GOLD)
+	var help := _make_child_label(settings_panel, "D-PAD / ARROWS SELECT   LEFT/RIGHT ADJUST", Vector2(12, 28), Vector2(384, 13), 8, GOLD)
 	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	for index in range(SETTINGS_ROWS.size()):
 		var button := Button.new()
-		button.position = Vector2(24, 43 + index * 19)
-		button.size = Vector2(360, 18)
-		button.add_theme_font_size_override("font_size", 9)
+		button.position = Vector2(24, 40 + index * 15)
+		button.size = Vector2(360, 15)
+		button.add_theme_font_size_override("font_size", 8)
 		button.focus_mode = Control.FOCUS_NONE
 		button.pressed.connect(_adjust_setting.bind(SETTINGS_ROWS[index][0], 1))
 		settings_panel.add_child(button)
 		settings_buttons.append(button)
-	var close := _make_child_label(settings_panel, "B/○  ·  START/ESC  BACK", Vector2(154, 220), Vector2(230, 14), 8, PAPER)
+	var close := _make_child_label(settings_panel, "B/○  ·  START/ESC  BACK", Vector2(154, 232), Vector2(230, 14), 8, PAPER)
 	close.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 
@@ -2149,8 +2151,11 @@ func _refresh_settings() -> void:
 		match setting_id:
 			"master", "music", "sfx":
 				value_text = "%d%%" % int(round(float(settings_values.get(setting_id, 1.0)) * 100.0))
-			"vibration", "hit_stop":
+			"vibration", "hit_stop", "reduced_flashes":
 				value_text = Localization.text("ON" if bool(settings_values.get(setting_id, true)) else "OFF")
+			"aim_assist":
+				var strength := float(settings_values.get(setting_id, 0.45))
+				value_text = Localization.text("STANDARD" if strength > 0.35 else ("GENTLE" if strength > 0.1 else "OFF"))
 			"screen_shake":
 				var strength := float(settings_values.get(setting_id, 1.0))
 				value_text = Localization.text("FULL" if strength > 0.75 else ("HALF" if strength > 0.1 else "OFF"))

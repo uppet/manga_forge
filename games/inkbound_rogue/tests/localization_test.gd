@@ -102,9 +102,13 @@ func _validate_chinese_runtime() -> bool:
 	var language_row: int = game.hud.SETTINGS_ROWS.find(["language", "LANGUAGE"])
 	if language_row < 0 or game.hud.settings_buttons[language_row].text.find("语言") < 0 or game.hud.settings_buttons[language_row].text.find("简体中文") < 0:
 		return _fail("Chinese language option is not visible in Settings")
+	var aim_row: int = game.hud.SETTINGS_ROWS.find(["aim_assist", "CONTROLLER AIM ASSIST"])
+	var flashes_row: int = game.hud.SETTINGS_ROWS.find(["reduced_flashes", "REDUCED FLASHES"])
+	if aim_row < 0 or flashes_row < 0 or game.hud.settings_buttons[aim_row].text.find("手柄瞄准辅助") < 0 or game.hud.settings_buttons[flashes_row].text.find("减弱闪烁") < 0:
+		return _fail("controller/accessibility settings are not visible in Chinese")
 	var last_button: Button = game.hud.settings_buttons[game.hud.settings_buttons.size() - 1]
 	if last_button.position.y + last_button.size.y > game.hud.settings_panel.size.y - 22.0:
-		return _fail("ninth settings row overlaps the footer")
+		return _fail("eleventh settings row overlaps the footer")
 
 	game.hud.hide_settings()
 	game.hud.set_xp(2, 5, 3)
