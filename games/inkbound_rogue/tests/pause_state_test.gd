@@ -140,6 +140,7 @@ func _advance_test(_delta: float) -> void:
 				game.player.ink_art_cooldown = 0.0
 				game.player.ink_art_uses = 0
 				Input.action_press("special")
+				Input.action_press("move_right")
 				_send_upgrade_gamepad()
 				if not game.choosing_upgrade or not paused or not game.hud.upgrade_visible or not game.hud.upgrade_transitioning or game.hud.upgrade_transition_phase != "closing":
 					_fail("upgrade closing animation did not retain modal pause")
@@ -165,6 +166,21 @@ func _advance_test(_delta: float) -> void:
 			if game.player.ink_art_uses != 0 or not game.player.gameplay_input_release_gate:
 				_fail("B/Circle upgrade choice leaked into the Ink Art action")
 				return
+			if game.player.velocity.x <= 0.0:
+				_fail("held movement remained frozen behind the modal input gate")
+				return
+			Input.action_release("special")
+			game.player._physics_process(1.0 / 60.0)
+			if game.player.gameplay_input_release_gate:
+				_fail("movement input prevented the overlapping combat action from re-arming")
+				return
+			Input.action_press("attack")
+			game.player.suppress_gameplay_input_until_released()
+			game.player._refresh_gameplay_input_gate(game.player.MODAL_INPUT_GATE_MAX_SECONDS + 0.01)
+			if game.player.gameplay_input_release_gate:
+				_fail("lost release event left the modal input gate permanently armed")
+				return
+			Input.action_release("attack")
 			snapshot = _capture()
 			_next_phase()
 		5:
@@ -172,7 +188,7 @@ func _advance_test(_delta: float) -> void:
 				if game.elapsed <= float(snapshot["elapsed"]) or game.player.attack_cooldown >= float(snapshot["attack_cooldown"]) or game.player.ink_art_uses != 0:
 					_fail("simulation did not advance after upgrade selection")
 					return
-				Input.action_release("special")
+				Input.action_release("move_right")
 				_send_upgrade_gamepad_release()
 				game.player.controls_enabled = false
 				game.offer_relic_draft("PAUSE REGRESSION RELIC")
@@ -237,7 +253,7 @@ func _advance_test(_delta: float) -> void:
 				if game.elapsed <= float(snapshot["elapsed"]):
 					_fail("simulation did not resume after focus restore")
 					return
-				print("INKBOUND_PAUSE_OK menu=frozen upgrade=frozen elastic=open+close overshoot=%.3f/%.3f input_locked=ok relic=frozen focus=frozen background_gamepad=ignored restore=explicit keyboard=ok gamepad=ok frames=%d" % [upgrade_open_peak_scale, upgrade_close_peak_scale, FROZEN_FRAMES * 4])
+				print("INKBOUND_PAUSE_OK menu=frozen upgrade=frozen elastic=open+close overshoot=%.3f/%.3f input_locked=ok modal_gate=per-action movement=live timeout=recovered relic=frozen focus=frozen background_gamepad=ignored restore=explicit keyboard=ok gamepad=ok frames=%d" % [upgrade_open_peak_scale, upgrade_close_peak_scale, FROZEN_FRAMES * 4])
 				_cleanup(0)
 				return
 

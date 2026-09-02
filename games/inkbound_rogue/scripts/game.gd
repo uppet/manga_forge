@@ -441,6 +441,8 @@ func _set_application_focus(focused: bool) -> void:
 	if application_focused == focused:
 		return
 	application_focused = focused
+	if is_instance_valid(player):
+		player.clear_suppressed_gameplay_input()
 	record_playtest_event("focus_changed", {"focused": focused, "run_started": run_started, "wave": wave})
 	if is_instance_valid(hud):
 		hud.set_input_enabled(focused)
@@ -2917,6 +2919,8 @@ func _set_input_mode(gamepad_active: bool) -> void:
 func _on_joy_connection_changed(device: int, connected: bool) -> void:
 	if not application_focused:
 		return
+	if is_instance_valid(player):
+		player.clear_suppressed_gameplay_input()
 	if connected:
 		record_playtest_event("gamepad_connection", {"device": device, "connected": true, "name": Input.get_joy_name(device).left(80)})
 		_set_input_mode(true)

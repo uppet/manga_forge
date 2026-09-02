@@ -17,10 +17,8 @@ const CRIMSON := Color("d33037")
 const ATTACK_BUFFER_SECONDS := 0.13
 const DASH_BUFFER_SECONDS := 0.12
 const INK_ART_BUFFER_SECONDS := 0.14
-const GAMEPLAY_INPUT_ACTIONS := [
-	"move_left", "move_right", "move_up", "move_down",
-	"attack", "dash", "special",
-]
+const MODAL_INPUT_GATE_ACTIONS := [&"attack", &"dash", &"special"]
+const MODAL_INPUT_GATE_MAX_SECONDS := 0.75
 
 var max_health := 8.0
 var health := 8.0
@@ -50,6 +48,8 @@ var dash_trail_timer := 0.0
 var controls_enabled := true
 var using_gamepad := false
 var gameplay_input_release_gate := false
+var gameplay_input_gate_actions: Array[StringName] = []
+var gameplay_input_gate_time := 0.0
 var upgrade_stacks: Dictionary = {}
 var build_milestones: Array[String] = []
 var relics: Array[String] = []
@@ -145,6 +145,7 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_refresh_gameplay_input_gate(delta)
 	attack_cooldown = maxf(0.0, attack_cooldown - delta)
 	dash_cooldown = maxf(0.0, dash_cooldown - delta)
 	ink_art_cooldown = maxf(0.0, ink_art_cooldown - delta)
@@ -184,8 +185,9 @@ func _physics_process(delta: float) -> void:
 			if chain_game.has_method("apply_status_nearby"):
 				chain_game.apply_status_nearby(global_position, 64.0, 0.0, 0.0, 0.35)
 	else:
-		var combat_controls_enabled := controls_enabled and not _gameplay_input_is_gated()
-		var input_vector := Input.get_vector("move_left", "move_right", "move_up", "move_down") if combat_controls_enabled else Vector2.ZERO
+		# A modal choice can share X/B/RT with combat, but it must never freeze
+		# movement. Only the still-held overlapping action is suppressed below.
+		var input_vector := Input.get_vector("move_left", "move_right", "move_up", "move_down") if controls_enabled else Vector2.ZERO
 		velocity = Vector2.ZERO
 		if input_vector.length_squared() > 0.01:
 			standstill_time = 0.0
@@ -200,25 +202,31 @@ func _physics_process(delta: float) -> void:
 				var aura_game := get_parent()
 				if aura_game.has_method("damage_nearby"):
 					aura_game.damage_nearby(global_position, 44.0, damage * 0.28, Vector2.ZERO)
-		var stick_aim := Input.get_vector("aim_left", "aim_right", "aim_up", "aim_down") if combat_controls_enabled else Vector2.ZERO
+		var stick_aim := Input.get_vector("aim_left", "aim_right", "aim_up", "aim_down") if controls_enabled else Vector2.ZERO
 		if stick_aim.length_squared() > 0.04:
 			last_direction = stick_aim.normalized()
 
-		if combat_controls_enabled:
-			if Input.is_action_just_pressed("dash"):
+		if controls_enabled:
+			if not _gameplay_action_is_gated(&"dash") and Input.is_action_just_pressed("dash"):
 				dash_buffer_time = DASH_BUFFER_SECONDS
-			if Input.is_action_just_pressed("attack"):
+			if not _gameplay_action_is_gated(&"attack") and Input.is_action_just_pressed("attack"):
 				attack_buffer_time = ATTACK_BUFFER_SECONDS
-			if Input.is_action_just_pressed("special"):
+			if not _gameplay_action_is_gated(&"special") and Input.is_action_just_pressed("special"):
 				ink_art_buffer_time = INK_ART_BUFFER_SECONDS
 		else:
 			attack_buffer_time = 0.0
 			dash_buffer_time = 0.0
 			ink_art_buffer_time = 0.0
-
-		if combat_controls_enabled and dash_buffer_time > 0.0 and start_dash(input_vector):
+		if _gameplay_action_is_gated(&"attack"):
+			attack_buffer_time = 0.0
+		if _gameplay_action_is_gated(&"dash"):
 			dash_buffer_time = 0.0
-		if combat_controls_enabled and (Input.is_action_pressed("attack") or attack_buffer_time > 0.0):
+		if _gameplay_action_is_gated(&"special"):
+			ink_art_buffer_time = 0.0
+
+		if controls_enabled and not _gameplay_action_is_gated(&"dash") and dash_buffer_time > 0.0 and start_dash(input_vector):
+			dash_buffer_time = 0.0
+		if controls_enabled and not _gameplay_action_is_gated(&"attack") and (Input.is_action_pressed("attack") or attack_buffer_time > 0.0):
 			var aim := stick_aim if using_gamepad else get_global_mouse_position() - global_position
 			if aim.length_squared() <= 0.04:
 				aim = last_direction
@@ -226,7 +234,7 @@ func _physics_process(delta: float) -> void:
 				aim = _assisted_gamepad_aim(aim, attack_reach + 16.0)
 			if perform_attack(aim):
 				attack_buffer_time = 0.0
-		if combat_controls_enabled and ink_art_buffer_time > 0.0:
+		if controls_enabled and not _gameplay_action_is_gated(&"special") and ink_art_buffer_time > 0.0:
 			var art_aim := stick_aim if using_gamepad else get_global_mouse_position() - global_position
 			if art_aim.length_squared() <= 0.04:
 				art_aim = last_direction
@@ -247,20 +255,36 @@ func _physics_process(delta: float) -> void:
 
 
 func suppress_gameplay_input_until_released() -> void:
-	gameplay_input_release_gate = true
+	clear_suppressed_gameplay_input()
+	for action in MODAL_INPUT_GATE_ACTIONS:
+		if Input.is_action_pressed(action):
+			gameplay_input_gate_actions.append(action)
+	gameplay_input_release_gate = not gameplay_input_gate_actions.is_empty()
+	gameplay_input_gate_time = MODAL_INPUT_GATE_MAX_SECONDS if gameplay_input_release_gate else 0.0
 	attack_buffer_time = 0.0
 	dash_buffer_time = 0.0
 	ink_art_buffer_time = 0.0
 
 
-func _gameplay_input_is_gated() -> bool:
+func _refresh_gameplay_input_gate(delta: float) -> void:
 	if not gameplay_input_release_gate:
-		return false
-	for action in GAMEPLAY_INPUT_ACTIONS:
-		if Input.is_action_pressed(action):
-			return true
+		return
+	gameplay_input_gate_time = maxf(0.0, gameplay_input_gate_time - maxf(0.0, delta))
+	for index in range(gameplay_input_gate_actions.size() - 1, -1, -1):
+		if not Input.is_action_pressed(gameplay_input_gate_actions[index]):
+			gameplay_input_gate_actions.remove_at(index)
+	if gameplay_input_gate_actions.is_empty() or gameplay_input_gate_time <= 0.0:
+		clear_suppressed_gameplay_input()
+
+
+func _gameplay_action_is_gated(action: StringName) -> bool:
+	return gameplay_input_release_gate and action in gameplay_input_gate_actions
+
+
+func clear_suppressed_gameplay_input() -> void:
 	gameplay_input_release_gate = false
-	return false
+	gameplay_input_gate_actions.clear()
+	gameplay_input_gate_time = 0.0
 
 
 func _assisted_gamepad_aim(direction: Vector2, max_distance: float) -> Vector2:
