@@ -259,6 +259,7 @@ const SETTINGS_ROWS := [
 	["reduced_flashes", "REDUCED FLASHES"],
 	["fullscreen", "DISPLAY MODE"],
 	["language", "LANGUAGE"],
+	["analytics_consent", "ANONYMOUS ANALYTICS"],
 	["controls", "CONTROL BINDINGS"],
 ]
 
@@ -1135,8 +1136,8 @@ func _refresh_manual() -> void:
 
 func _build_settings() -> void:
 	settings_panel = ColorRect.new()
-	settings_panel.position = Vector2(36, 8)
-	settings_panel.size = Vector2(408, 254)
+	settings_panel.position = Vector2(36, 4)
+	settings_panel.size = Vector2(408, 262)
 	settings_panel.color = Color(0.015, 0.012, 0.02, 0.992)
 	settings_panel.visible = false
 	add_child(settings_panel)
@@ -1153,7 +1154,7 @@ func _build_settings() -> void:
 		button.pressed.connect(_adjust_setting.bind(SETTINGS_ROWS[index][0], 1))
 		settings_panel.add_child(button)
 		settings_buttons.append(button)
-	var close := _make_child_label(settings_panel, "B/○  ·  START/ESC  BACK", Vector2(154, 232), Vector2(230, 14), 8, PAPER)
+	var close := _make_child_label(settings_panel, "B/○  ·  START/ESC  BACK", Vector2(154, 244), Vector2(230, 14), 8, PAPER)
 	close.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 
@@ -2706,7 +2707,7 @@ func _refresh_settings() -> void:
 		match setting_id:
 			"master", "music", "sfx":
 				value_text = "%d%%" % int(round(float(settings_values.get(setting_id, 1.0)) * 100.0))
-			"vibration", "hit_stop", "reduced_flashes":
+			"vibration", "hit_stop", "reduced_flashes", "analytics_consent":
 				value_text = Localization.text("ON" if bool(settings_values.get(setting_id, true)) else "OFF")
 			"aim_assist":
 				var strength := float(settings_values.get(setting_id, 0.45))

@@ -14,6 +14,7 @@ config/icon="res://assets/generated/icon.png"
 [autoload]
 
 PlaytestSession="*res://scripts/playtest_session.gd"
+GameAnalyticsClient="*res://scripts/gameanalytics_client.gd"
 
 [display]
 

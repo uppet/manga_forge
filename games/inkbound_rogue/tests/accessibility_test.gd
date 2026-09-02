@@ -78,10 +78,11 @@ func _run_test() -> void:
 	game.hud.debug_finish_popup_transition()
 	var aim_row: int = game.hud.SETTINGS_ROWS.find(["aim_assist", "CONTROLLER AIM ASSIST"])
 	var flashes_row: int = game.hud.SETTINGS_ROWS.find(["reduced_flashes", "REDUCED FLASHES"])
-	if aim_row < 0 or flashes_row < 0:
+	var analytics_row: int = game.hud.SETTINGS_ROWS.find(["analytics_consent", "ANONYMOUS ANALYTICS"])
+	if aim_row < 0 or flashes_row < 0 or analytics_row < 0:
 		_fail("accessibility options are absent from the controller-navigable Settings list")
 		return
-	if game.hud.settings_buttons[aim_row].text.find("手柄瞄准辅助") < 0 or game.hud.settings_buttons[flashes_row].text.find("减弱闪烁") < 0:
+	if game.hud.settings_buttons[aim_row].text.find("手柄瞄准辅助") < 0 or game.hud.settings_buttons[flashes_row].text.find("减弱闪烁") < 0 or game.hud.settings_buttons[analytics_row].text.find("匿名使用数据") < 0:
 		_fail("accessibility options are not translated into Simplified Chinese")
 		return
 	var last_button: Button = game.hud.settings_buttons[game.hud.settings_buttons.size() - 1]

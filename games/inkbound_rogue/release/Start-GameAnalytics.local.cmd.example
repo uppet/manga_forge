@@ -1,0 +1,24 @@
+@echo off
+setlocal
+rem Copy this file beside InkboundRogue.exe and rename it to:
+rem Start-GameAnalytics.local.cmd (the renamed file is ignored by Git).
+rem Use the Windows game's Game Key and Secret Key from GameAnalytics.
+set "INKBOUND_GA_GAME_KEY=PASTE_32_CHARACTER_GAME_KEY"
+set "INKBOUND_GA_SECRET_KEY=PASTE_40_CHARACTER_SECRET_KEY"
+set "INKBOUND_GA_ENVIRONMENT=production"
+set "INKBOUND_GA_ENABLED=1"
+set "INKBOUND_GA_DEBUG=0"
+
+if not exist "%~dp0InkboundRogue.exe" (
+  echo InkboundRogue.exe was not found beside this launcher.
+  pause
+  exit /b 2
+)
+if "%INKBOUND_GA_GAME_KEY%"=="PASTE_32_CHARACTER_GAME_KEY" (
+  echo Fill in the GameAnalytics keys before running this launcher.
+  pause
+  exit /b 3
+)
+
+start "" /wait "%~dp0InkboundRogue.exe"
+endlocal

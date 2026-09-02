@@ -190,7 +190,7 @@ func _run_smoke_test() -> void:
 	var vibration_before := bool(game.settings["vibration"])
 	game.hud.show_settings()
 	game.hud.debug_finish_popup_transition()
-	if not game.hud.settings_visible or game.hud.settings_buttons.size() != 11:
+	if not game.hud.settings_visible or game.hud.settings_buttons.size() != 12:
 		_fail("controller-accessible settings panel did not open")
 		return
 	var assist_before := float(game.settings["aim_assist"])

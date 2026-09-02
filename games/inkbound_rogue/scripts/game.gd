@@ -221,6 +221,7 @@ var settings: Dictionary = {
 	"reduced_flashes": false,
 	"fullscreen": false,
 	"language": Localization.LANGUAGE_AUTO,
+	"analytics_consent": false,
 }
 var custom_bindings: Dictionary = {}
 var default_binding_events: Dictionary = {}
@@ -344,6 +345,7 @@ func _ready() -> void:
 	_apply_meta_progression()
 	_evaluate_achievements(false)
 	_apply_settings()
+	_configure_gameanalytics()
 	_set_input_mode(not Input.get_connected_joypads().is_empty())
 
 	cutscene = CutsceneScript.new()
@@ -377,6 +379,16 @@ func _ready() -> void:
 
 func _playtest_recorder() -> Node:
 	return get_node_or_null("/root/PlaytestSession")
+
+
+func _gameanalytics_client() -> Node:
+	return get_node_or_null("/root/GameAnalyticsClient")
+
+
+func _configure_gameanalytics() -> void:
+	var analytics := _gameanalytics_client()
+	if analytics != null:
+		analytics.configure_from_environment(bool(settings.get("analytics_consent", false)), test_mode)
 
 
 func uses_deterministic_simulation() -> bool:
@@ -422,6 +434,9 @@ func record_playtest_event(kind: String, data: Dictionary = {}) -> void:
 	var recorder := _playtest_recorder()
 	if recorder != null and bool(recorder.get("enabled")):
 		recorder.record_event(kind, data)
+	var analytics := _gameanalytics_client()
+	if analytics != null:
+		analytics.record_game_event(kind, data)
 
 
 func request_playtest_survey(reason: String) -> void:
@@ -2139,7 +2154,7 @@ func _on_setting_adjusted(setting_id: String, direction: int) -> void:
 	match setting_id:
 		"master", "music", "sfx":
 			settings[setting_id] = clampf(snappedf(float(settings[setting_id]) + 0.1 * signi(direction), 0.1), 0.0, 1.0)
-		"vibration", "hit_stop", "reduced_flashes", "fullscreen":
+		"vibration", "hit_stop", "reduced_flashes", "fullscreen", "analytics_consent":
 			settings[setting_id] = not bool(settings[setting_id])
 		"aim_assist":
 			var levels := [0.0, 0.25, 0.45]
@@ -2159,6 +2174,12 @@ func _on_setting_adjusted(setting_id: String, direction: int) -> void:
 				current_language = 0
 			settings[setting_id] = Localization.LANGUAGE_CHOICES[posmod(current_language + signi(direction), Localization.LANGUAGE_CHOICES.size())]
 	_apply_settings()
+	if setting_id == "analytics_consent":
+		_configure_gameanalytics()
+		hud.show_device_notice(Localization.text(
+			"ANONYMOUS ANALYTICS ENABLED · GAMEPLAY EVENTS ONLY" if bool(settings[setting_id])
+			else "ANONYMOUS ANALYTICS DISABLED · LOCAL QUEUE ERASED"
+		))
 	hud.set_settings(settings)
 	record_playtest_event("setting_changed", {"setting": setting_id, "value": settings.get(setting_id), "direction": signi(direction)})
 	_refresh_run_objective()
@@ -2192,6 +2213,7 @@ func _sanitize_settings() -> void:
 	settings["hit_stop"] = bool(settings.get("hit_stop", true))
 	settings["reduced_flashes"] = bool(settings.get("reduced_flashes", false))
 	settings["fullscreen"] = bool(settings.get("fullscreen", false))
+	settings["analytics_consent"] = bool(settings.get("analytics_consent", false))
 	var assist := float(settings.get("aim_assist", 0.45))
 	settings["aim_assist"] = 0.0 if assist < 0.125 else (0.25 if assist < 0.35 else 0.45)
 	var language := str(settings.get("language", Localization.LANGUAGE_AUTO))
@@ -3149,7 +3171,14 @@ func _on_continue_requested() -> void:
 		record_playtest_event("continue_failed")
 		hud.show_device_notice("SAVED DRAFT COULD NOT BE LOADED")
 		return
-	record_playtest_event("run_continued", {"page": wave, "elapsed": elapsed, "health": player.health, "weapon": player.weapon_form})
+	record_playtest_event("run_continued", {
+		"page": wave,
+		"elapsed": elapsed,
+		"health": player.health,
+		"weapon": player.weapon_form,
+		"difficulty": difficulty_id,
+		"contract": contract_id,
+	})
 
 
 func _restore_route_modifiers(route_id: String) -> void:

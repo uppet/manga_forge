@@ -230,6 +230,7 @@ def p1_suite(config: dict[str, Any], game: str) -> None:
         ("balance", "balance_matrix_test.gd", "headless", 180),
         ("personas", "player_persona_test.gd", "headless", 240),
         ("recorder", "playtest_recorder_test.gd", "headless", 120),
+        ("gameanalytics", "gameanalytics_test.gd", "headless", 120),
         ("soak", "soak_test.gd", "headless", 180),
     ]
     invocations = "\n".join(
@@ -245,7 +246,7 @@ REPORT_DIR="$REPORT_ROOT/$RUN_ID"
 SUMMARY="$REPORT_DIR/summary.log"
 mkdir -p "$REPORT_DIR"
 printf '%s\n' "$RUN_ID" > "$REPORT_ROOT/latest.txt"
-unset INKBOUND_PLAYTEST INKBOUND_PLAYTEST_SESSION INKBOUND_PLAYTEST_PARTICIPANT INKBOUND_PLAYTEST_DIR INKBOUND_BUILD_ID INKBOUND_GIT_COMMIT INKBOUND_BOOT_SMOKE
+unset INKBOUND_PLAYTEST INKBOUND_PLAYTEST_SESSION INKBOUND_PLAYTEST_PARTICIPANT INKBOUND_PLAYTEST_DIR INKBOUND_BUILD_ID INKBOUND_GIT_COMMIT INKBOUND_BOOT_SMOKE INKBOUND_GA_GAME_KEY INKBOUND_GA_SECRET_KEY INKBOUND_GA_ENVIRONMENT INKBOUND_GA_ENABLED INKBOUND_GA_DEBUG
 run_gate() {{
   LABEL="$1"
   MODE="$2"
@@ -550,6 +551,16 @@ timeout 240s "$GODOT" --headless --path "$GAME" --script res://tests/player_pers
     remote(config, command, 300)
 
 
+def gameanalytics_test(config: dict[str, Any], game: str) -> None:
+    game_root = posix_game_root(config, game)
+    command = godot_resolver(config) + f"""
+GAME='{game_root}'
+unset INKBOUND_GA_GAME_KEY INKBOUND_GA_SECRET_KEY INKBOUND_GA_ENVIRONMENT INKBOUND_GA_ENABLED INKBOUND_GA_DEBUG
+timeout 120s "$GODOT" --headless --path "$GAME" --script res://tests/gameanalytics_test.gd
+"""
+    remote(config, command, 180)
+
+
 def progression(config: dict[str, Any], game: str) -> None:
     game_root = posix_game_root(config, game)
     command = godot_resolver(config) + f"""
@@ -581,6 +592,7 @@ test -s \"$GAME/build/windows/InkboundRogue.exe\"
 cp \"$GAME/release/THIRD_PARTY_NOTICES.txt\" \"$GAME/build/windows/THIRD_PARTY_NOTICES.txt\"
 cp \"$GAME/release/version.json\" \"$GAME/build/windows/version.json\"
 cp \"$GAME/release/Start-Recorded-Playtest.cmd\" \"$GAME/build/windows/Start-Recorded-Playtest.cmd\"
+cp \"$GAME/release/Start-GameAnalytics.local.cmd.example\" \"$GAME/build/windows/Start-GameAnalytics.local.cmd.example\"
 test \"$(tr -cd '\\r' < \"$GAME/build/windows/Start-Recorded-Playtest.cmd\" | wc -c)\" -gt 20
 ITCH=\"$GAME/build/itch-windows\"
 mkdir -p \"$ITCH\"
@@ -799,7 +811,7 @@ echo "gracefully restarted $TARGET"
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "p1-suite", "test", "save-test", "pause-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "recorded-launcher-test", "capture-session", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
+    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "p1-suite", "test", "save-test", "pause-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "gameanalytics-test", "recorded-launcher-test", "capture-session", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
     parser.add_argument("--game", default=DEFAULT_GAME)
     parser.add_argument("--participant", default="anonymous", help="anonymous facilitator-assigned playtest code")
     parser.add_argument("--reuse-build", action="store_true", help="launch the existing exported build without sync/export")
@@ -857,6 +869,8 @@ def main() -> int:
         daily_test(config, args.game)
     elif args.command == "persona-test":
         persona_test(config, args.game)
+    elif args.command == "gameanalytics-test":
+        gameanalytics_test(config, args.game)
     elif args.command == "playtest-recorder-test":
         game_root = posix_game_root(config, args.game)
         command = godot_resolver(config) + f"""

@@ -226,6 +226,7 @@ godot --headless --path . --script res://tests/daily_chronicle_test.gd
 godot --headless --path . --script res://tests/balance_matrix_test.gd
 godot --headless --path . --script res://tests/player_persona_test.gd
 godot --headless --path . --script res://tests/playtest_recorder_test.gd
+godot --headless --path . --script res://tests/gameanalytics_test.gd
 godot --headless --path . --script res://tests/progression_test.gd
 godot --headless --path . --script res://tests/route_system_test.gd
 godot --headless --path . --script res://tests/soak_test.gd
@@ -238,7 +239,7 @@ The Windows host workflow exposes the same gates through `host_game.py test`,
 `host_game.py cutscene-test`, `host_game.py manual-test`, `host_game.py localization-test`, `host_game.py cast-test`,
 `host_game.py audio-test`, `host_game.py combat-feel-test`, `host_game.py accessibility-test`, `host_game.py restoration-test`, `host_game.py proof-test`,
 `host_game.py daily-test`, `host_game.py persona-test`, `host_game.py routes`,
-`host_game.py playtest-recorder-test`, `host_game.py soak`, and
+`host_game.py playtest-recorder-test`, `host_game.py gameanalytics-test`, `host_game.py soak`, and
 `host_game.py recorded-soak`. `host_game.py release-audit` verifies complete
 asset provenance and, when present, the isolated three-file Steam depot and
 four-file itch.io recorded-playtest bundle.
@@ -247,7 +248,7 @@ seconds so a failed Godot test cannot linger indefinitely. `host_game.py
 process-status` reports every game/Godot process with elapsed time, CPU, memory,
 and command line; `host_game.py cleanup-tests` terminates only this project's
 `res://tests/` processes and never matches an editor or exported game.
-`host_game.py p1-suite` first mirrors/imports current source, then runs 26 core
+`host_game.py p1-suite` first mirrors/imports current source, then runs 27 core
 gates serially in one delegate session and finishes with a zero-process check.
 It keeps a compact summary and one diagnostic log per gate under
 `build/p1-suite/<UTC timestamp>/`; `build/p1-suite/latest.txt` identifies the
@@ -320,3 +321,18 @@ python3 tools/windows/host_game.py playtest-report
 The resulting JSON and Markdown live under `build/playtest/reports/`. See
 `design/playtest-recorder.md` for privacy boundaries, facilitator procedure,
 artifact layout, and interpretation limits.
+
+## Optional GameAnalytics telemetry
+
+Remote analytics is disabled by default and is separate from the local
+playtest recorder. It becomes active only when valid local credentials are
+present and the player turns on `ANONYMOUS ANALYTICS` in Options. Copy
+`release/Start-GameAnalytics.local.cmd.example` beside an exported executable,
+rename it to `Start-GameAnalytics.local.cmd`, and fill in the Windows game's
+GameAnalytics keys. The renamed file is ignored by Git.
+
+The client queues a small semantic event set under `user://gameanalytics/` and
+never sends raw input, world positions, participant codes, notes, screenshots,
+or high-frequency combat events. Turning the option off immediately stops the
+client and erases its local identity and queue. Configuration, event taxonomy,
+validation steps, and production caveats are in `design/gameanalytics.md`.
