@@ -224,10 +224,16 @@ func _process(delta: float) -> void:
 			return
 		boot_smoke_frame += 1
 		if boot_smoke_frame >= 120:
-			print("INKBOUND_EXPORTED_BOOT_OK version=%s renderer=%s frames=%d" % [
+			var analytics_info := {"embedded": false, "config_fingerprint": "none"}
+			var analytics := get_node_or_null("/root/GameAnalyticsClient")
+			if analytics != null:
+				analytics_info = analytics.build_credential_info()
+			print("INKBOUND_EXPORTED_BOOT_OK version=%s renderer=%s frames=%d analytics_embedded=%s analytics_config=%s" % [
 				str(ProjectSettings.get_setting("application/config/version", "unknown")),
 				RenderingServer.get_video_adapter_name().left(120),
 				boot_smoke_frame,
+				str(bool(analytics_info.get("embedded", false))).to_lower(),
+				str(analytics_info.get("config_fingerprint", "none")),
 			])
 			boot_smoke_frame = -1
 			get_tree().quit(0)

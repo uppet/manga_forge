@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime
+import hashlib
 import json
 import re
 import shutil
@@ -19,12 +20,107 @@ from delegate_client import DelegateClient, DelegateConfig
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = Path(__file__).resolve().parent
 DEFAULT_GAME = "inkbound_rogue"
+GAMEANALYTICS_LOCAL_CONFIG = CONFIG_DIR / "gameanalytics.local.json"
 
 
 def load_config() -> dict[str, Any]:
     configured = CONFIG_DIR / "host_config.json"
     path = configured if configured.exists() else CONFIG_DIR / "host_config.example.json"
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_gameanalytics_build_credentials(game: str, path: Path = GAMEANALYTICS_LOCAL_CONFIG) -> dict[str, str] | None:
+    if not path.exists():
+        return None
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"invalid GameAnalytics local config: {path}") from exc
+    if not isinstance(document, dict) or not isinstance(document.get(game), dict):
+        raise ValueError(f"GameAnalytics local config has no object for game: {game}")
+    entry = document[game]
+    game_key = str(entry.get("game_key", "")).strip().lower()
+    secret_key = str(entry.get("secret_key", "")).strip().lower()
+    environment = str(entry.get("environment", "production")).strip().lower()
+    if re.fullmatch(r"[a-f0-9]{32}", game_key) is None:
+        raise ValueError("GameAnalytics game_key must be exactly 32 hexadecimal characters")
+    if re.fullmatch(r"[a-f0-9]{40}", secret_key) is None:
+        raise ValueError("GameAnalytics secret_key must be exactly 40 hexadecimal characters")
+    if environment not in {"sandbox", "production"}:
+        raise ValueError("GameAnalytics environment must be sandbox or production")
+    fingerprint = hashlib.sha256(f"{environment}:{game_key}:{secret_key}".encode("ascii")).hexdigest()[:16]
+    return {
+        "game_key": game_key,
+        "secret_key": secret_key,
+        "environment": environment,
+        "fingerprint": fingerprint,
+    }
+
+
+def render_gameanalytics_credentials(credentials: dict[str, str] | None) -> str:
+    if credentials is None:
+        embedded = "false"
+        game_key = ""
+        secret_key = ""
+        environment = "production"
+        fingerprint = "none"
+    else:
+        embedded = "true"
+        game_key = credentials["game_key"]
+        secret_key = credentials["secret_key"]
+        environment = credentials["environment"]
+        fingerprint = credentials["fingerprint"]
+    return "\n".join(
+        [
+            "extends RefCounted",
+            "",
+            "# Generated in the Windows runtime by tools/windows/host_game.py.",
+            "# Never copy this generated file back into the Git source tree.",
+            f"const EMBEDDED := {embedded}",
+            f"const GAME_KEY := {json.dumps(game_key)}",
+            f"const SECRET_KEY := {json.dumps(secret_key)}",
+            f"const ENVIRONMENT := {json.dumps(environment)}",
+            f"const CONFIG_FINGERPRINT := {json.dumps(fingerprint)}",
+            "",
+        ]
+    )
+
+
+def inject_gameanalytics_build_credentials(
+    config: dict[str, Any],
+    game: str,
+    credentials_path: Path = GAMEANALYTICS_LOCAL_CONFIG,
+) -> dict[str, Any]:
+    credentials = load_gameanalytics_build_credentials(game, credentials_path)
+    destination = Path(config["wsl_runtime_root"]) / "games" / game
+    generated_path = destination / "scripts" / "gameanalytics_credentials.gd"
+    generated_path.parent.mkdir(parents=True, exist_ok=True)
+    generated_path.write_text(render_gameanalytics_credentials(credentials), encoding="utf-8", newline="\n")
+    metadata: dict[str, Any] = {
+        "embedded": credentials is not None,
+        "environment": credentials["environment"] if credentials is not None else "none",
+        "config_fingerprint": credentials["fingerprint"] if credentials is not None else "none",
+        "source": "tools/windows/gameanalytics.local.json",
+    }
+    build_root = destination / "build" / "windows"
+    build_root.mkdir(parents=True, exist_ok=True)
+    (build_root / "gameanalytics-build.json").write_text(
+        json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    print(
+        "gameanalytics_build_credentials="
+        + (f"embedded environment={metadata['environment']} fingerprint={metadata['config_fingerprint']}" if metadata["embedded"] else "not_embedded")
+    )
+    return metadata
+
+
+def scrub_gameanalytics_runtime_credentials(config: dict[str, Any], game: str) -> None:
+    generated_path = Path(config["wsl_runtime_root"]) / "games" / game / "scripts" / "gameanalytics_credentials.gd"
+    if generated_path.parent.is_dir():
+        generated_path.write_text(render_gameanalytics_credentials(None), encoding="utf-8", newline="\n")
+        print("gameanalytics_runtime_credentials=scrubbed")
 
 
 def posix_game_root(config: dict[str, Any], game: str) -> str:
@@ -202,6 +298,7 @@ test ! -e "$OUTPUT/PERF-SOAK/incomplete.flag"
 
 
 def p1_suite(config: dict[str, Any], game: str) -> None:
+    gameanalytics_build_test()
     sync(config, game)
     game_root = posix_game_root(config, game)
     gates = [
@@ -561,6 +658,14 @@ timeout 120s "$GODOT" --headless --path "$GAME" --script res://tests/gameanalyti
     remote(config, command, 180)
 
 
+def gameanalytics_build_test() -> None:
+    subprocess.run(
+        [sys.executable, str(CONFIG_DIR / "tests" / "test_gameanalytics_build.py")],
+        check=True,
+        cwd=REPO_ROOT,
+    )
+
+
 def progression(config: dict[str, Any], game: str) -> None:
     game_root = posix_game_root(config, game)
     command = godot_resolver(config) + f"""
@@ -581,18 +686,20 @@ timeout 120s "$GODOT" --headless --path "$GAME" --script res://tests/route_syste
 
 def export(config: dict[str, Any], game: str) -> None:
     sync(config, game)
+    analytics_build = inject_gameanalytics_build_credentials(config, game)
+    expected_analytics_embedded = "true" if analytics_build["embedded"] else "false"
+    expected_analytics_fingerprint = analytics_build["config_fingerprint"]
     game_root = posix_game_root(config, game)
     command = godot_resolver(config) + f"""
 set -e
 GAME='{game_root}'
 mkdir -p \"$GAME/build/windows\"
-rm -f \"$GAME/build/windows/InkboundRogue.exe\" \"$GAME/build/windows/InkboundRogue.tmp\"
+rm -f \"$GAME/build/windows/InkboundRogue.exe\" \"$GAME/build/windows/InkboundRogue.tmp\" \"$GAME/build/windows/Start-GameAnalytics.local.cmd.example\"
 \"$GODOT\" --headless --path \"$GAME\" --export-release 'Windows Desktop' \"$GAME/build/windows/InkboundRogue.exe\"
 test -s \"$GAME/build/windows/InkboundRogue.exe\"
 cp \"$GAME/release/THIRD_PARTY_NOTICES.txt\" \"$GAME/build/windows/THIRD_PARTY_NOTICES.txt\"
 cp \"$GAME/release/version.json\" \"$GAME/build/windows/version.json\"
 cp \"$GAME/release/Start-Recorded-Playtest.cmd\" \"$GAME/build/windows/Start-Recorded-Playtest.cmd\"
-cp \"$GAME/release/Start-GameAnalytics.local.cmd.example\" \"$GAME/build/windows/Start-GameAnalytics.local.cmd.example\"
 test \"$(tr -cd '\\r' < \"$GAME/build/windows/Start-Recorded-Playtest.cmd\" | wc -c)\" -gt 20
 ITCH=\"$GAME/build/itch-windows\"
 mkdir -p \"$ITCH\"
@@ -610,11 +717,18 @@ cp \"$GAME/build/windows/version.json\" \"$DEPOT/version.json\"
 test \"$(find \"$DEPOT\" -mindepth 1 -maxdepth 1 | wc -l)\" -eq 3
 BOOT_STATUS=0
 export INKBOUND_BOOT_SMOKE=1
-timeout 30s \"$GAME/build/windows/InkboundRogue.exe\" || BOOT_STATUS=$?
+export INKBOUND_GA_ENABLED=0
+BOOT_LOG=\"$GAME/build/windows/export-boot.log\"
+timeout 30s \"$GAME/build/windows/InkboundRogue.exe\" > \"$BOOT_LOG\" 2>&1 || BOOT_STATUS=$?
+cat \"$BOOT_LOG\"
 echo "export_boot_status=$BOOT_STATUS"
 test "$BOOT_STATUS" -eq 0
+grep -F \"analytics_embedded={expected_analytics_embedded} analytics_config={expected_analytics_fingerprint}\" \"$BOOT_LOG\"
 """
-    remote(config, command, 1200)
+    try:
+        remote(config, command, 1200)
+    finally:
+        scrub_gameanalytics_runtime_credentials(config, game)
     depot_root = Path(config["wsl_runtime_root"]) / "games" / game / "build" / "steam-depot"
     itch_root = Path(config["wsl_runtime_root"]) / "games" / game / "build" / "itch-windows"
     subprocess.run(
@@ -811,7 +925,7 @@ echo "gracefully restarted $TARGET"
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "p1-suite", "test", "save-test", "pause-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "gameanalytics-test", "recorded-launcher-test", "capture-session", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
+    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "p1-suite", "test", "save-test", "pause-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "gameanalytics-test", "gameanalytics-build-test", "recorded-launcher-test", "capture-session", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
     parser.add_argument("--game", default=DEFAULT_GAME)
     parser.add_argument("--participant", default="anonymous", help="anonymous facilitator-assigned playtest code")
     parser.add_argument("--reuse-build", action="store_true", help="launch the existing exported build without sync/export")
@@ -871,6 +985,8 @@ def main() -> int:
         persona_test(config, args.game)
     elif args.command == "gameanalytics-test":
         gameanalytics_test(config, args.game)
+    elif args.command == "gameanalytics-build-test":
+        gameanalytics_build_test()
     elif args.command == "playtest-recorder-test":
         game_root = posix_game_root(config, args.game)
         command = godot_resolver(config) + f"""

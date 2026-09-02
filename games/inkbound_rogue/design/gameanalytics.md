@@ -5,7 +5,7 @@
 Inkbound Rogue 的远程统计是可选能力，不替代现有的本地试玩记录器。游戏默认关闭统计；同时满足以下条件才会连接 GameAnalytics：
 
 1. 玩家在“选项”中主动开启“匿名使用数据”；
-2. 启动进程具有有效的 `INKBOUND_GA_GAME_KEY` 和 `INKBOUND_GA_SECRET_KEY`；
+2. 构建时已经向 EXE 的内嵌 PCK 注入有效的 Game Key 和 Secret Key；
 3. `INKBOUND_GA_ENABLED` 没有被设为 `0`；
 4. 当前不是自动化测试模式。
 
@@ -21,23 +21,28 @@ Inkbound Rogue 的远程统计是可选能力，不替代现有的本地试玩�
 
 先在 GameAnalytics 账号中为 Windows 建立一个测试用游戏项目。测试项目与将来的正式项目分开，可以避免验证事件污染正式报表。
 
-1. 导出游戏：`python3 tools/windows/host_game.py export`。导出流程会把示例启动器放进 `build/windows/`。
-2. 将 `Start-GameAnalytics.local.cmd.example` 改名为 `Start-GameAnalytics.local.cmd`。
-3. 填入该 Windows 游戏的 Game Key（32 位十六进制）和 Secret Key（40 位十六进制）。账号项目的 keys 必须使用 `production` endpoint；只有官方 sandbox keys 才能使用 `sandbox`。
-4. 双击这个本地启动器。它只给本次游戏进程设置环境变量，不修改 Windows 的永久环境。
-5. 进入“选项”，将“匿名使用数据”切为“开”。若未开启，即便 keys 存在也不会创建匿名 ID 或发起请求。
-6. 开一局并完成一次升级选择，然后在 GameAnalytics 的 Realtime / Live Events 中检查 `user`、`progression` 和 `design` 事件。
-7. 验证完成后可先在选项中关闭；本地队列和匿名 ID 会立即删除。
+1. 在仓库根目录执行 `cp tools/windows/gameanalytics.local.json.example tools/windows/gameanalytics.local.json`。
+2. 只在新建的 `gameanalytics.local.json` 中填写该 Windows 游戏的 Game Key（32 位十六进制）和 Secret Key（40 位十六进制）。账号项目的 keys 必须使用 `production` endpoint；只有官方 sandbox keys 才能使用 `sandbox`。
+3. 执行 `python3 tools/windows/host_game.py gameanalytics-build-test` 验证注入器。
+4. 执行 `python3 tools/windows/host_game.py export`。同步完成后，导出器只临时改写 `S:\\bld\\manga-forge-runtime\\games\\inkbound_rogue\\scripts\\gameanalytics_credentials.gd`，然后由 Godot 编译进 EXE；本机 JSON 不会被复制过去，导出成功或失败后 runtime 脚本都会恢复为空占位。
+5. 检查 `build/windows/gameanalytics-build.json`：应为 `"embedded": true`，并包含不泄露 Key 的 16 位配置指纹。`export-boot.log` 也必须出现相同指纹，否则 export 会失败。
+6. 直接双击 `InkboundRogue.exe`，不再需要 GameAnalytics 启动脚本或玩家环境变量。
+7. 进入“选项”，将“匿名使用数据”切为“开”。若未开启，即便 EXE 内已有 keys 也不会创建匿名 ID 或发起请求。
+8. 开一局并完成一次升级选择，然后在 GameAnalytics 的 Realtime / Live Events 中检查 `user`、`progression` 和 `design` 事件。
 
-不要把真实 keys 写进 Git、问题单、试玩日志或聊天记录。`*.local.cmd` 已加入 `.gitignore`。这里的 Secret Key 是游戏采集签名 key，仍会存在于最终客户端的运行环境中；不要把它与 GameAnalytics 账号密码或其他服务密钥复用。
+不要把真实 keys 写进 Git、问题单、试玩日志或聊天记录。`*.local.json` 已加入 `.gitignore`，而 Git 中的 `gameanalytics_credentials.gd` 永远是空占位文件。这里的 Secret Key 会进入最终客户端，因此有能力逆向 EXE/PCK 的人仍可能提取它；这是客户端采集签名 key，不要把它与 GameAnalytics 账号密码、管理 API key 或其他服务密钥复用。
 
-## 环境变量
+## 构建注入与开发覆盖
+
+`host_game.py export` 每次都会先同步 Git 中的空占位文件，再读取未跟踪的 `tools/windows/gameanalytics.local.json` 并覆盖 Windows runtime 副本。如果本地配置不存在，仍可生成不含统计凭据的普通构建，但输出会明确标记 `gameanalytics_build_credentials=not_embedded`，构建清单中的 `embedded` 也会是 `false`。
+
+以下环境变量只保留给开发者临时覆盖和紧急停用；正常玩家启动 EXE 不需要设置它们：
 
 | 变量 | 值 | 说明 |
 | --- | --- | --- |
 | `INKBOUND_GA_GAME_KEY` | 32 位小写/大写十六进制 | Windows 游戏的 Game Key |
 | `INKBOUND_GA_SECRET_KEY` | 40 位小写/大写十六进制 | 事件 HMAC 签名 key |
-| `INKBOUND_GA_ENVIRONMENT` | `sandbox` / `production` | 默认 `sandbox`；账号项目 keys 使用 `production` |
+| `INKBOUND_GA_ENVIRONMENT` | `sandbox` / `production` | 临时覆盖内嵌 endpoint；账号项目 keys 使用 `production` |
 | `INKBOUND_GA_ENABLED` | `0` / `1` | `0` 是运维总开关，不能代替玩家同意 |
 | `INKBOUND_GA_DEBUG` | `0` / `1` | 仅输出重试原因，从不输出 key 或事件正文 |
 
@@ -62,10 +67,11 @@ Inkbound Rogue 的远程统计是可选能力，不替代现有的本地试玩�
 - 队列上限 500 条，位于 `user://gameanalytics/queue.json`；匿名安装 ID、会话号和未正常结束会话位于 `user://gameanalytics/state.json`。
 - 关闭“匿名使用数据”会停止在途请求，并删除上述两个文件。
 - 自动化测试强制关闭网络；`gameanalytics_test.gd` 使用独立 dry-run 目录验证 HMAC、事件白名单、队列上限和 opt-out 删除。
+- `test_gameanalytics_build.py` 使用临时目录验证 Key 长度、注入位置、配置指纹及清单不泄露原始 Key。
 
 ## 发布前仍需完成
 
 - 用测试项目的真实 keys 做一次 Windows 客户端到 Live Events 的闭环；当前仓库不含账号 keys，因此 CI 只能验证本地协议契约。
 - 审核面向玩家的隐私说明、GameAnalytics 数据处理条款和各发行地区要求。
-- 决定正式构建如何注入每个平台的 keys。当前 `.local.cmd` 适合内部测试，不是最终商店启动方式。
+- 为未来新增的平台分别准备本机 keys，并确认发行流水线选择了对应平台配置。
 - 在正式仪表盘确认事件 ID 的基数和漏斗价值，再决定是否增加事件。禁止为了“数据更多”加入高频战斗流。

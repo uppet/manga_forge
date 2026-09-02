@@ -7,4 +7,4 @@ build/
 dist/
 *.log
 host_config.json
-*.local.cmd
+*.local.json

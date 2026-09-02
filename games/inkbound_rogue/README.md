@@ -326,10 +326,13 @@ artifact layout, and interpretation limits.
 
 Remote analytics is disabled by default and is separate from the local
 playtest recorder. It becomes active only when valid local credentials are
-present and the player turns on `ANONYMOUS ANALYTICS` in Options. Copy
-`release/Start-GameAnalytics.local.cmd.example` beside an exported executable,
-rename it to `Start-GameAnalytics.local.cmd`, and fill in the Windows game's
-GameAnalytics keys. The renamed file is ignored by Git.
+embedded at export time and the player turns on `ANONYMOUS ANALYTICS` in
+Options. Copy `tools/windows/gameanalytics.local.json.example` to
+`tools/windows/gameanalytics.local.json`, fill in the Windows game's keys, and
+run `host_game.py export`. The local JSON is ignored by Git and is never copied
+to the Windows runtime; only a generated credential resource is compiled into
+the executable's embedded PCK. The generated runtime source is scrubbed back to
+an empty placeholder after every successful or failed export.
 
 The client queues a small semantic event set under `user://gameanalytics/` and
 never sends raw input, world positions, participant codes, notes, screenshots,

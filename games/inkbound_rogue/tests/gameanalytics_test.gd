@@ -10,6 +10,9 @@ var failed := false
 func _initialize() -> void:
 	analytics = AnalyticsScript.new()
 	root.add_child(analytics)
+	var build_info: Dictionary = analytics.build_credential_info()
+	if bool(build_info.get("embedded", true)) or str(build_info.get("config_fingerprint", "")) != "none":
+		return _fail("Git-safe source placeholder unexpectedly contains embedded credentials")
 	storage_root = "res://build/gameanalytics-test/%d" % Time.get_ticks_msec()
 	analytics.debug_configure(storage_root, 12)
 	var initial: Dictionary = analytics.debug_snapshot()

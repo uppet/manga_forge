@@ -11,6 +11,7 @@ const MAX_QUEUED_EVENTS := 500
 const RETRY_MIN_SECONDS := 5.0
 const RETRY_MAX_SECONDS := 120.0
 const DEFAULT_STORAGE_ROOT := "user://gameanalytics"
+const EmbeddedCredentials = preload("res://scripts/gameanalytics_credentials.gd")
 
 var consented := false
 var active := false
@@ -38,6 +39,8 @@ var session_ended := false
 var current_progression_path := ""
 var debug_logging := false
 var max_queue_events := MAX_QUEUED_EVENTS
+var credential_source := "none"
+var config_fingerprint := "none"
 
 
 func _ready() -> void:
@@ -61,11 +64,24 @@ func configure_from_environment(allow_collection: bool, runtime_test_mode: bool 
 	if OS.get_environment("INKBOUND_GA_ENABLED") == "0":
 		status = "environment_disabled"
 		return
-	var requested_game_key := OS.get_environment("INKBOUND_GA_GAME_KEY").strip_edges().to_lower()
-	var requested_secret_key := OS.get_environment("INKBOUND_GA_SECRET_KEY").strip_edges().to_lower()
+	var environment_game_key := OS.get_environment("INKBOUND_GA_GAME_KEY").strip_edges()
+	var environment_secret_key := OS.get_environment("INKBOUND_GA_SECRET_KEY").strip_edges()
 	var requested_environment := OS.get_environment("INKBOUND_GA_ENVIRONMENT").strip_edges().to_lower()
+	var requested_game_key := environment_game_key
+	var requested_secret_key := environment_secret_key
+	credential_source = "environment"
+	config_fingerprint = "environment"
+	if environment_game_key.is_empty() and environment_secret_key.is_empty():
+		requested_game_key = str(EmbeddedCredentials.GAME_KEY)
+		requested_secret_key = str(EmbeddedCredentials.SECRET_KEY)
+		credential_source = "embedded" if bool(EmbeddedCredentials.EMBEDDED) else "none"
+		config_fingerprint = str(EmbeddedCredentials.CONFIG_FINGERPRINT)
+		if requested_environment.is_empty():
+			requested_environment = str(EmbeddedCredentials.ENVIRONMENT).to_lower()
 	if requested_environment.is_empty():
-		requested_environment = "sandbox"
+		requested_environment = "production"
+	requested_game_key = requested_game_key.to_lower()
+	requested_secret_key = requested_secret_key.to_lower()
 	if not _valid_hex_key(requested_game_key, 32) or not _valid_hex_key(requested_secret_key, 40):
 		status = "missing_credentials"
 		return
@@ -87,6 +103,8 @@ func debug_configure(test_storage_root: String, maximum_events: int = MAX_QUEUED
 	_disable_runtime()
 	consented = true
 	dry_run = true
+	credential_source = "dry_run"
+	config_fingerprint = "test"
 	storage_root = test_storage_root
 	game_key = "0123456789abcdef0123456789abcdef"
 	secret_key = "0123456789abcdef0123456789abcdef01234567"
@@ -162,7 +180,17 @@ func debug_snapshot() -> Dictionary:
 		"user_id": user_id,
 		"session_id": session_id,
 		"session_num": session_num,
+		"credential_source": credential_source,
+		"config_fingerprint": config_fingerprint,
 		"queue": queue.duplicate(true),
+	}
+
+
+func build_credential_info() -> Dictionary:
+	return {
+		"embedded": bool(EmbeddedCredentials.EMBEDDED),
+		"environment": str(EmbeddedCredentials.ENVIRONMENT),
+		"config_fingerprint": str(EmbeddedCredentials.CONFIG_FINGERPRINT),
 	}
 
 
