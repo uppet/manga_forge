@@ -190,7 +190,7 @@ func _run_smoke_test() -> void:
 	var vibration_before := bool(game.settings["vibration"])
 	game.hud.show_settings()
 	game.hud.debug_finish_popup_transition()
-	if not game.hud.settings_visible or game.hud.settings_buttons.size() != 12:
+	if not game.hud.settings_visible or game.hud.settings_buttons.size() != game.hud.SETTINGS_ROWS.size():
 		_fail("controller-accessible settings panel did not open")
 		return
 	var assist_before := float(game.settings["aim_assist"])
@@ -560,7 +560,7 @@ func _run_smoke_test() -> void:
 		return
 	var manifest_file := FileAccess.open("res://asset-manifest.json", FileAccess.READ)
 	var manifest_data = JSON.parse_string(manifest_file.get_as_text()) if manifest_file != null else null
-	if not (manifest_data is Dictionary) or int(manifest_data.get("schema_version", 0)) != 3 or int(manifest_data.get("asset_count", 0)) != 73:
+	if not (manifest_data is Dictionary) or int(manifest_data.get("schema_version", 0)) != 3 or int(manifest_data.get("asset_count", 0)) != 93:
 		_fail("asset provenance manifest identity or coverage count drifted")
 		return
 	var ai_asset_count := 0
@@ -576,7 +576,7 @@ func _run_smoke_test() -> void:
 				return
 		ai_asset_count += 1 if asset_entry.get("generative_ai", false) == true else 0
 		live_ai_asset_count += 1 if asset_entry.get("live_generation", false) == true else 0
-	if ai_asset_count != 14 or live_ai_asset_count != 0:
+	if ai_asset_count != 29 or live_ai_asset_count != 0:
 		_fail("pre-generated/live AI asset inventory drifted")
 		return
 	for runtime_asset in [
@@ -585,6 +585,11 @@ func _run_smoke_test() -> void:
 		"res://assets/audio/music_story_hai_mian.ogg",
 		"res://assets/audio/music_ending_keep_hai_mian.ogg",
 		"res://assets/audio/music_ending_rewrite_hai_mian.ogg",
+		"res://assets/audio/voice/nara_ink_art_marginalia_jp.wav",
+		"res://assets/audio/voice/nara_ink_art_greatbrush_jp.wav",
+		"res://assets/audio/voice/nara_ink_art_needlepoint_jp.wav",
+		"res://assets/audio/voice/nara_ink_art_seal_caster_jp.wav",
+		"res://assets/audio/voice/nara_ink_art_twin_stroke_jp.wav",
 		"res://assets/audio/music_archive.wav",
 		"res://assets/audio/music_bindery.wav",
 		"res://assets/audio/music_finale.wav",

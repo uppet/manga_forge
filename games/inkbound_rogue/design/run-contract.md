@@ -82,12 +82,16 @@ thank-you page; any keyboard, mouse, or controller button returns to the title.
   particles, camera shake, and comic typography.
 - Three thirty-two-second act loops crossfade into three dedicated twenty-four-second
   boss themes. The user music gain is applied once without a hidden attenuation
-  cap. Twenty-five cues distinguish weapon forms, Ink Arts, positional
+  cap. Thirty cues distinguish weapon forms, a shared Ink Art charge and five
+  form-specific releases, positional
   enemy warnings, supplies, UI navigation, pause, and saving, with squad-safe
   cooldowns and persistent volume settings.
 - Dash with cooldown and brief invulnerability.
 - Five weapon-specific active Ink Arts with cooldown, area, damage, recovery,
-  echo, sustain, keyboard/mouse, gamepad, HUD, and checkpoint integration.
+  echo, sustain, keyboard/mouse, gamepad, HUD, and checkpoint integration. Each
+  production cast freezes the battlefield for an optional full-screen cut-in
+  followed by a correctly scaled five-pose startup; damage and its dedicated
+  material cue occur on the authored release frame rather than before it.
 - Five-form starting Armory with persistent progression locks, explicit
   flexibility-versus-certainty tradeoff, controller navigation, cancel-safe New
   Game confirmation, checkpoint recovery, and run-history attribution.
@@ -158,9 +162,10 @@ The relic-agency gate must print `INKBOUND_RELIC_DRAFT_OK` for field, event,
 Directive, queue, controller, checkpoint, run-summary, and exhausted-pool paths.
 The combat-cast gate must print `INKBOUND_CAST_OK` for all sixteen clipped atlas
 regions, transparent alpha, unique actor mapping, ground shadows, and dynamic poses.
-The audio gate must print `INKBOUND_AUDIO_OK` for 25 cues, six exact-length
-loops, adaptive boss transitions, production crossfade, spatial warnings, weapon
-timbres, supply feedback, UI feedback, and anti-spam cooldowns.
+The audio gate must print `INKBOUND_AUDIO_OK` for 30 cues, five Japanese Ink Art
+voices, five production-length music tracks, adaptive music transitions,
+production crossfade, spatial warnings, weapon timbres, supply feedback, UI
+feedback, and anti-spam cooldowns.
 The persistent-upgrade gate must print `INKBOUND_RESTORATION_OK` for six branches,
 thirty ranks, mastery effects, rank locks, two-axis controller navigation,
 schema-12 persistence, and schema-9 migration. Its Windows renderer companion

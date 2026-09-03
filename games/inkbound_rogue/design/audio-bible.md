@@ -27,16 +27,34 @@ cue effectively inaudible beneath combat sounds.
 ## Cue language
 
 - Marginalia and Twin-Stroke use a dry, broadband blade-air cut; Greatbrush uses
-  a slower low-bodied stroke, Needlepoint a short bright edge, and Seal-Caster a
+  a slower low-bodied stroke, Needlepoint a short narrow edge, and Seal-Caster a
   paper drag plus stamp. Weapon cues lead with shaped noise and material
   transients rather than swept oscillator tones. Edge chirp and handle/body
   resonance support the cut, but tonal beeps never become its identity.
-- Every Ink Art shares a recognizable rising ink release, pitch-shifted by form.
+- Every Ink Art begins with a shared wet brush draw under the character cut-in,
+  then resolves with one of five authored material cues: four circular cuts,
+  heavy brush-period impact, needle puncture and brake, seal stamp with twelve
+  paper waves, or paired cross-cuts. Weapon identity comes from timing, impact,
+  paper, bristle, and restrained metal resonance rather than electronic sweeps.
+- Every Ink Art also has one pre-generated Japanese Nara performance on a
+  persistent-pause voice player. With cut-ins enabled, excess dramatic silence
+  is capped and each five-pose sequence is timed to finish within 0.15 seconds
+  of its pitch-preserving 2.0x voice while the final imperative lands on the
+  authored release frame. The cut-in and all five startup frame durations are
+  shortened by the same factor so neither audio nor animation trails the other.
+  Disabling cut-ins retains the fast startup and allows the voice to finish over
+  resumed combat. The SFX slider controls all five performances.
 - Enemy projectile casts, dash charges, teleport windups, parries, shields, and
-  Archivist restoration are positional warnings, not decorative noise.
-- Ink Bomb and combat supplies use separate burst and power-up families.
+  Archivist restoration are positional warnings, not decorative noise. Their
+  silhouettes use paper snaps, cloth movement, hollow knocks, and restrained
+  metal resonance while remaining distinct from pickup sounds.
+- Ink Bomb and combat supplies use separate burst and power-up families. Pickup,
+  healing, level-up, and relic cues avoid rising arpeggios: muted token contact,
+  wax/paper movement, and low resonances communicate reward without sounding
+  playful.
 - Menu movement, confirm, cancel, and Save & Return have short non-positional
-  cues that remain audible during pause.
+  cues that remain audible during pause. These use page flicks and dry wood
+  clicks rather than UI beeps.
 
 High-frequency combat cues have per-family millisecond cooldowns. This prevents
 large squads from allocating unbounded simultaneous players while retaining the
@@ -45,8 +63,10 @@ new cues.
 
 ## Validation
 
-`audio_system_test.gd` verifies all 25 sound cues, all five Hai Mian stereo music
+`audio_system_test.gd` verifies all 30 sound cues, five 2.0x Japanese Ink Art voices,
+all five Hai Mian stereo music
 cues and their production-length floors, cyclic menu/battle versus linear
-story/endings, menu/run/boss/story/ending state mapping, weapon mappings, six
-enemy warning families, supply and UI cues, persistent-pause players, cooldown
-coverage, and a production-mode two-player crossfade.
+story/endings, menu/run/boss/story/ending state mapping, weapon mappings, the
+shared Ink Art charge and five release cues, six enemy warning families, supply
+and UI cues, persistent-pause players, cooldown coverage, and a production-mode
+two-player crossfade.

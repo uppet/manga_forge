@@ -2,6 +2,8 @@ extends SceneTree
 
 const EXPECTED_SOUNDS := [
 	"slash", "slash_heavy", "slash_light", "seal_cast", "ink_art", "hit", "dash",
+	"ink_art_palimpsest", "ink_art_final_period", "ink_art_red_line",
+	"ink_art_seal_storm", "ink_art_cross_revision",
 	"enemy_cast", "enemy_dash", "teleport", "parry", "shield", "heal",
 	"ink_burst", "powerup", "pickup", "level_up", "hurt", "relic",
 	"boss_warning", "boss_down", "ui_move", "ui_confirm", "ui_cancel", "save",
@@ -46,7 +48,7 @@ func _process(_delta: float) -> bool:
 		return false
 	if not validated or frames < 6 or Time.get_ticks_msec() - audio_released_at_msec < 250:
 		return false
-	print("INKBOUND_AUDIO_OK sounds=25 music=5 hai_mian_stereo=menu+battle+story+keep+rewrite loop_crossfade=1.5s state_crossfade=0.55s linear_story_endings=3 weapons=5 physical_blade_layers=4 material_score=paper/wood/brush enemy_cues=6 pickups=2 ui=4 spatial=ok cooldowns=ok")
+	print("INKBOUND_AUDIO_OK sounds=30 voices=5 language=ja voice_tempo=2.0x music=5 hai_mian_stereo=menu+battle+story+keep+rewrite loop_crossfade=1.5s state_crossfade=0.55s linear_story_endings=3 weapons=5 physical_blade_layers=4 ink_art_layers=charge+5_release material_score=paper/wood/brush enemy_cues=6 pickups=2 ui=4 spatial=ok cooldowns=ok")
 	_cleanup(0)
 	return true
 
@@ -57,6 +59,16 @@ func _validate_catalog() -> bool:
 	for sound_id in EXPECTED_SOUNDS:
 		if not game.SOUNDS.has(sound_id) or game.SOUNDS[sound_id].get_length() <= 0.05:
 			return _fail("missing or empty sound cue %s" % sound_id)
+	if game.ink_art_cinematic.VOICES.size() != 5:
+		return _fail("Ink Art Japanese voice catalog count drifted")
+	for form in ["MARGINALIA", "GREATBRUSH", "NEEDLEPOINT", "SEAL-CASTER", "TWIN-STROKE"]:
+		if not game.ink_art_cinematic.VOICES.has(form):
+			return _fail("missing Ink Art Japanese voice for %s" % form)
+		var voice_length: float = game.ink_art_cinematic.VOICES[form].get_length()
+		if voice_length < 1.2 or voice_length > 1.55:
+			return _fail("Ink Art Japanese voice has an invalid runtime length for %s" % form)
+	if game.ink_art_cinematic.voice_player == null or game.ink_art_cinematic.voice_player.process_mode != Node.PROCESS_MODE_ALWAYS:
+		return _fail("Ink Art voice player does not survive the cinematic pause")
 	var physical_cut_lengths := {"slash": 0.23, "slash_heavy": 0.35, "slash_light": 0.14, "seal_cast": 0.27}
 	for sound_id in physical_cut_lengths:
 		if game.SOUNDS[sound_id].get_length() < float(physical_cut_lengths[sound_id]):
@@ -119,8 +131,21 @@ func _validate_combat_cues() -> bool:
 			return _fail("%s uses the wrong attack timbre" % weapon_form)
 	game.player.ink_art_cooldown = 0.0
 	game.player.perform_ink_art(Vector2.RIGHT, true)
-	if game.last_sound_id != "ink_art":
-		return _fail("Ink Art has no dedicated release cue")
+	if game.last_sound_id != "ink_art_cross_revision":
+		return _fail("Cross Revision has no dedicated release cue")
+	var art_release_cues := {
+		"MARGINALIA": "ink_art_palimpsest",
+		"GREATBRUSH": "ink_art_final_period",
+		"NEEDLEPOINT": "ink_art_red_line",
+		"SEAL-CASTER": "ink_art_seal_storm",
+		"TWIN-STROKE": "ink_art_cross_revision",
+	}
+	for weapon_form in art_release_cues:
+		game.player.weapon_form = weapon_form
+		game.player.ink_art_cooldown = 0.0
+		game.player.perform_ink_art(Vector2.RIGHT, true)
+		if game.last_sound_id != art_release_cues[weapon_form]:
+			return _fail("%s uses the wrong Ink Art release cue" % weapon_form)
 
 	var scribe = game.spawn_enemy("scribe", game.player.global_position + Vector2(90, 0))
 	scribe.shoot_projectiles(Vector2.LEFT)

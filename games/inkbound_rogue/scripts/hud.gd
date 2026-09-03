@@ -99,6 +99,8 @@ var upgrade_transition_tween: Tween
 var pending_upgrade_index := -1
 var popup_transitions: Dictionary = {}
 var popup_button_states: Dictionary = {}
+var popup_modal_stack: Array[Control] = []
+var modal_button_states: Dictionary = {}
 var relic_draft_visible := false
 var game_over_visible := false
 var using_gamepad := false
@@ -256,6 +258,7 @@ const SETTINGS_ROWS := [
 	["aim_assist", "CONTROLLER AIM ASSIST"],
 	["screen_shake", "SCREEN SHAKE"],
 	["hit_stop", "IMPACT FREEZE"],
+	["ink_art_cutins", "INK ART CUT-INS"],
 	["reduced_flashes", "REDUCED FLASHES"],
 	["fullscreen", "DISPLAY MODE"],
 	["language", "LANGUAGE"],
@@ -324,12 +327,12 @@ func _wire_button_audio() -> void:
 
 
 func _on_ui_button_down(button: Button) -> void:
-	if not button.disabled:
+	if not button.disabled and _button_is_in_active_modal(button):
 		ui_sound_requested.emit("ui_confirm")
 
 
 func _on_ui_button_hovered(button: Button) -> void:
-	if button.visible and not button.disabled:
+	if button.visible and not button.disabled and _button_is_in_active_modal(button):
 		ui_sound_requested.emit("ui_move")
 		var title_index := title_navigation_buttons.find(button)
 		if title_visible and not _title_overlay_visible() and title_index >= 0:
@@ -1136,26 +1139,50 @@ func _refresh_manual() -> void:
 
 func _build_settings() -> void:
 	settings_panel = ColorRect.new()
-	settings_panel.position = Vector2(36, 4)
-	settings_panel.size = Vector2(408, 262)
+	settings_panel.position = Vector2(36, 2)
+	settings_panel.size = Vector2(408, 266)
 	settings_panel.color = Color(0.015, 0.012, 0.02, 0.992)
 	settings_panel.visible = false
 	add_child(settings_panel)
-	var title := _make_child_label(settings_panel, "OPTIONS & ACCESSIBILITY", Vector2(12, 5), Vector2(384, 25), 16, WHITE)
+	var title := _make_child_label(settings_panel, "OPTIONS & ACCESSIBILITY", Vector2(12, 2), Vector2(384, 22), 15, WHITE)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var help := _make_child_label(settings_panel, "D-PAD / ARROWS SELECT   LEFT/RIGHT ADJUST", Vector2(12, 28), Vector2(384, 13), 8, GOLD)
+	var help := _make_child_label(settings_panel, "D-PAD / ARROWS SELECT   LEFT/RIGHT ADJUST", Vector2(12, 23), Vector2(384, 12), 8, GOLD)
 	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	for index in range(SETTINGS_ROWS.size()):
 		var button := Button.new()
-		button.position = Vector2(24, 40 + index * 15)
+		button.position = Vector2(24, 35 + index * 15)
 		button.size = Vector2(360, 15)
 		button.add_theme_font_size_override("font_size", 8)
+		button.add_theme_stylebox_override("normal", _compact_settings_button_style(Color(0.08, 0.065, 0.09, 0.58), Color(0.32, 0.27, 0.34, 0.72)))
+		button.add_theme_stylebox_override("hover", _compact_settings_button_style(Color(0.18, 0.125, 0.13, 0.82), GOLD.darkened(0.38)))
+		button.add_theme_stylebox_override("pressed", _compact_settings_button_style(Color(0.25, 0.11, 0.12, 0.92), CRIMSON.darkened(0.2)))
+		button.add_theme_stylebox_override("disabled", _compact_settings_button_style(Color(0.04, 0.035, 0.05, 0.42), Color(0.16, 0.14, 0.18, 0.45)))
+		# Apply the authored compact size after the style overrides: assigning it
+		# against Godot's default Button style first would clamp every row to the
+		# default 32 px minimum before the compact style is installed.
+		button.size = Vector2(360, 15)
 		button.focus_mode = Control.FOCUS_NONE
 		button.pressed.connect(_adjust_setting.bind(SETTINGS_ROWS[index][0], 1))
 		settings_panel.add_child(button)
 		settings_buttons.append(button)
-	var close := _make_child_label(settings_panel, "B/○  ·  START/ESC  BACK", Vector2(154, 244), Vector2(230, 14), 8, PAPER)
+	var close := _make_child_label(settings_panel, "B/○  ·  START/ESC  BACK", Vector2(154, 248), Vector2(230, 14), 8, PAPER)
 	close.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+
+
+func _compact_settings_button_style(background: Color, edge: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = edge
+	style.border_width_bottom = 1
+	style.content_margin_left = 4.0
+	style.content_margin_top = 1.0
+	style.content_margin_right = 4.0
+	style.content_margin_bottom = 1.0
+	style.corner_radius_top_left = 2
+	style.corner_radius_top_right = 2
+	style.corner_radius_bottom_left = 2
+	style.corner_radius_bottom_right = 2
+	return style
 
 
 func _build_bindings() -> void:
@@ -1507,6 +1534,12 @@ func _show_popup(panel: Control, scale_effect: bool = true) -> void:
 	_cancel_popup_transition(panel)
 	var panel_id := panel.get_instance_id()
 	panel.visible = true
+	# A popup is modal for every input device, not only for events routed through
+	# _unhandled_input. Explicitly stop pointer propagation and disable every
+	# Button outside the top popup so exposed margins cannot click or hover the
+	# title/pause UI behind it.
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_push_modal_panel(panel)
 	panel.pivot_offset = panel.size * 0.5
 	panel.scale = POPUP_START_SCALE if scale_effect else Vector2.ONE
 	panel.modulate = Color(1.0, 1.0, 1.0, 0.0)
@@ -1532,6 +1565,7 @@ func _hide_popup(panel: Control, callback: Callable = Callable(), scale_effect: 
 			callback.call()
 		return
 	if not panel.visible:
+		_pop_modal_panel(panel)
 		if callback.is_valid():
 			callback.call()
 		return
@@ -1567,6 +1601,8 @@ func _finish_popup_transition(panel_id: int) -> void:
 		if phase == "out":
 			panel.visible = false
 	_unlock_popup_buttons(panel_id)
+	if phase == "out" and is_instance_valid(panel):
+		_pop_modal_panel(panel)
 	if phase == "out" and callback.is_valid():
 		callback.call()
 
@@ -1583,6 +1619,7 @@ func _cancel_popup_transition(panel: Control) -> void:
 	panel.scale = Vector2.ONE
 	panel.modulate = Color.WHITE
 	_unlock_popup_buttons(panel_id)
+	_apply_modal_input_isolation()
 
 
 func _lock_popup_buttons(panel: Control) -> void:
@@ -1617,6 +1654,78 @@ func _popup_transition_phase(panel: Control) -> String:
 	return str(popup_transitions.get(panel.get_instance_id(), {}).get("phase", ""))
 
 
+func _push_modal_panel(panel: Control) -> void:
+	_prune_modal_panels()
+	popup_modal_stack.erase(panel)
+	popup_modal_stack.append(panel)
+	_capture_modal_button_states()
+	_apply_modal_input_isolation()
+
+
+func _pop_modal_panel(panel: Control) -> void:
+	popup_modal_stack.erase(panel)
+	_apply_modal_input_isolation()
+
+
+func _prune_modal_panels() -> void:
+	for index in range(popup_modal_stack.size() - 1, -1, -1):
+		if not is_instance_valid(popup_modal_stack[index]):
+			popup_modal_stack.remove_at(index)
+
+
+func _active_modal_panel() -> Control:
+	_prune_modal_panels()
+	for index in range(popup_modal_stack.size() - 1, -1, -1):
+		var panel := popup_modal_stack[index]
+		if panel.visible:
+			return panel
+	return null
+
+
+func _capture_modal_button_states() -> void:
+	for node in find_children("*", "Button", true, false):
+		var button := node as Button
+		var button_id := button.get_instance_id()
+		if not modal_button_states.has(button_id):
+			modal_button_states[button_id] = {
+				"button": button,
+				"disabled": button.disabled,
+			}
+
+
+func _apply_modal_input_isolation() -> void:
+	_prune_modal_panels()
+	var active_panel := _active_modal_panel()
+	if active_panel == null:
+		for state_value in modal_button_states.values():
+			var state: Dictionary = state_value
+			var button: Button = state.get("button")
+			if is_instance_valid(button):
+				button.disabled = bool(state.get("disabled", false))
+		modal_button_states.clear()
+		return
+	_capture_modal_button_states()
+	for state_value in modal_button_states.values():
+		var state: Dictionary = state_value
+		var button: Button = state.get("button")
+		if is_instance_valid(button):
+			button.disabled = bool(state.get("disabled", false)) or not active_panel.is_ancestor_of(button)
+	# Transition locks are stricter than modal ownership. Reapply them after the
+	# baseline pass so a newly stacked popup cannot unlock a button mid-fade.
+	for locked_states_value in popup_button_states.values():
+		var locked_states: Array = locked_states_value
+		for locked_state_value in locked_states:
+			var locked_state: Dictionary = locked_state_value
+			var locked_button: Button = locked_state.get("button")
+			if is_instance_valid(locked_button):
+				locked_button.disabled = true
+
+
+func _button_is_in_active_modal(button: Button) -> bool:
+	var active_panel := _active_modal_panel()
+	return active_panel == null or active_panel.is_ancestor_of(button)
+
+
 func _hide_popup_immediate(panel: Control) -> void:
 	if not is_instance_valid(panel):
 		return
@@ -1624,6 +1733,7 @@ func _hide_popup_immediate(panel: Control) -> void:
 	panel.visible = false
 	panel.scale = Vector2.ONE
 	panel.modulate = Color.WHITE
+	_pop_modal_panel(panel)
 
 
 func debug_finish_popup_transition(panel: Control = null) -> void:
@@ -2707,7 +2817,7 @@ func _refresh_settings() -> void:
 		match setting_id:
 			"master", "music", "sfx":
 				value_text = "%d%%" % int(round(float(settings_values.get(setting_id, 1.0)) * 100.0))
-			"vibration", "hit_stop", "reduced_flashes", "analytics_consent":
+			"vibration", "hit_stop", "ink_art_cutins", "reduced_flashes", "analytics_consent":
 				value_text = Localization.text("ON" if bool(settings_values.get(setting_id, true)) else "OFF")
 			"aim_assist":
 				var strength := float(settings_values.get(setting_id, 0.45))

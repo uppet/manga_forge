@@ -9,6 +9,7 @@ const FxScript = preload("res://scripts/comic_fx.gd")
 const ArenaScript = preload("res://scripts/arena.gd")
 const HudScript = preload("res://scripts/hud.gd")
 const CutsceneScript = preload("res://scripts/cutscene.gd")
+const InkArtCinematicScript = preload("res://scripts/ink_art_cinematic.gd")
 const DirectiveZoneScript = preload("res://scripts/directive_zone.gd")
 const RouteHazardScript = preload("res://scripts/route_hazard.gd")
 const Content = preload("res://scripts/content_db.gd")
@@ -25,6 +26,11 @@ const SOUNDS := {
 	"slash_light": preload("res://assets/audio/slash_light.wav"),
 	"seal_cast": preload("res://assets/audio/seal_cast.wav"),
 	"ink_art": preload("res://assets/audio/ink_art.wav"),
+	"ink_art_palimpsest": preload("res://assets/audio/ink_art_palimpsest.wav"),
+	"ink_art_final_period": preload("res://assets/audio/ink_art_final_period.wav"),
+	"ink_art_red_line": preload("res://assets/audio/ink_art_red_line.wav"),
+	"ink_art_seal_storm": preload("res://assets/audio/ink_art_seal_storm.wav"),
+	"ink_art_cross_revision": preload("res://assets/audio/ink_art_cross_revision.wav"),
 	"hit": preload("res://assets/audio/hit.wav"),
 	"dash": preload("res://assets/audio/dash.wav"),
 	"enemy_cast": preload("res://assets/audio/enemy_cast.wav"),
@@ -77,6 +83,7 @@ var player: InkboundPlayer
 var camera: Camera2D
 var hud: InkboundHUD
 var cutscene: InkboundCutscene
+var ink_art_cinematic: InkboundInkArtCinematic
 var route_hazard
 var rng := RandomNumberGenerator.new()
 
@@ -113,6 +120,8 @@ var route_score_multiplier := 1.0
 var route_shard_multiplier := 1.0
 var shake_strength := 0.0
 var hit_stop_active := false
+var ink_art_cinematic_active := false
+var pending_ink_art: Dictionary = {}
 var test_mode := false
 var deterministic_simulation := false
 var enemy_spawn_serial := 0
@@ -218,6 +227,7 @@ var settings: Dictionary = {
 	"aim_assist": 0.45,
 	"screen_shake": 1.0,
 	"hit_stop": true,
+	"ink_art_cutins": true,
 	"reduced_flashes": false,
 	"fullscreen": false,
 	"language": Localization.LANGUAGE_AUTO,
@@ -352,6 +362,10 @@ func _ready() -> void:
 	add_child(cutscene)
 	cutscene.finished.connect(_on_cutscene_finished)
 	cutscene.choice_selected.connect(_on_story_choice)
+	ink_art_cinematic = InkArtCinematicScript.new()
+	add_child(ink_art_cinematic)
+	ink_art_cinematic.release_requested.connect(_on_ink_art_cinematic_release)
+	ink_art_cinematic.sequence_finished.connect(_on_ink_art_cinematic_finished)
 	hud.set_input_enabled(application_focused)
 	cutscene.set_input_enabled(application_focused)
 
@@ -460,9 +474,9 @@ func _set_application_focus(focused: bool) -> void:
 		player.clear_suppressed_gameplay_input()
 	record_playtest_event("focus_changed", {"focused": focused, "run_started": run_started, "wave": wave})
 	if is_instance_valid(hud):
-		hud.set_input_enabled(focused)
+		hud.set_input_enabled(focused and not ink_art_cinematic_active)
 	if is_instance_valid(cutscene):
-		cutscene.set_input_enabled(focused)
+		cutscene.set_input_enabled(focused and not ink_art_cinematic_active)
 	if not focused:
 		for device in Input.get_connected_joypads():
 			Input.stop_joy_vibration(device)
@@ -1121,6 +1135,126 @@ func apply_status_nearby(at: Vector2, radius: float, bleed: float, burn: float, 
 	return hits
 
 
+func can_request_ink_art() -> bool:
+	return not ink_art_cinematic_active and pending_ink_art.is_empty()
+
+
+func request_ink_art(
+	form: String,
+	art_id: String,
+	at: Vector2,
+	direction: Vector2,
+	art_damage: float,
+	radius: float,
+	resolve_callback: Callable
+) -> bool:
+	if not can_request_ink_art():
+		return false
+	var aim := direction.normalized() if direction.length_squared() > 0.001 else Vector2.RIGHT
+	var charge_pitch: float = float({
+		"GREATBRUSH": 0.78,
+		"NEEDLEPOINT": 1.16,
+		"SEAL-CASTER": 0.96,
+		"TWIN-STROKE": 1.04,
+	}.get(form, 0.9))
+	play_sound("ink_art", charge_pitch)
+	# Fast deterministic tests retain immediate damage semantics. Production
+	# gameplay defers the hit until the authored release frame of the five-pose
+	# startup, so the visual anticipation and gameplay result cannot disagree.
+	if test_mode or not is_instance_valid(ink_art_cinematic):
+		var immediate_hits := execute_ink_art(art_id, at, aim, art_damage, radius, false)
+		if resolve_callback.is_valid():
+			resolve_callback.call(immediate_hits)
+		return true
+	pending_ink_art = {
+		"form": form,
+		"art_id": art_id,
+		"position": at,
+		"direction": aim,
+		"damage": art_damage,
+		"radius": radius,
+		"callback": resolve_callback,
+		"resolved": false,
+	}
+	ink_art_cinematic_active = true
+	if is_instance_valid(hud):
+		hud.set_input_enabled(false)
+	if is_instance_valid(cutscene):
+		cutscene.set_input_enabled(false)
+	var started := ink_art_cinematic.play(
+		form,
+		player,
+		aim,
+		bool(settings.get("ink_art_cutins", true)),
+		bool(settings.get("reduced_flashes", false)),
+		float(settings.get("sfx", 0.85))
+	)
+	if not started:
+		ink_art_cinematic_active = false
+		pending_ink_art.clear()
+		if is_instance_valid(hud):
+			hud.set_input_enabled(application_focused)
+		if is_instance_valid(cutscene):
+			cutscene.set_input_enabled(application_focused)
+		return false
+	record_playtest_event("ink_art_cinematic_started", {
+		"art": art_id,
+		"weapon": form,
+		"cutin": bool(settings.get("ink_art_cutins", true)),
+	})
+	_sync_pause_state()
+	return true
+
+
+func _on_ink_art_cinematic_release(form: String, frame_index: int) -> void:
+	if not ink_art_cinematic_active or pending_ink_art.is_empty() or bool(pending_ink_art.get("resolved", false)):
+		return
+	if form != str(pending_ink_art.get("form", "")):
+		return
+	pending_ink_art["resolved"] = true
+	var hits := execute_ink_art(
+		str(pending_ink_art["art_id"]),
+		pending_ink_art["position"],
+		pending_ink_art["direction"],
+		float(pending_ink_art["damage"]),
+		float(pending_ink_art["radius"]),
+		false
+	)
+	var resolve_callback: Callable = pending_ink_art.get("callback", Callable())
+	if resolve_callback.is_valid():
+		resolve_callback.call(hits)
+	record_playtest_event("ink_art_cinematic_released", {
+		"art": str(pending_ink_art["art_id"]),
+		"weapon": form,
+		"frame": frame_index,
+		"hits": hits,
+	})
+
+
+func _on_ink_art_cinematic_finished(form: String) -> void:
+	if not ink_art_cinematic_active:
+		return
+	if not bool(pending_ink_art.get("resolved", false)):
+		_on_ink_art_cinematic_release(form, 4)
+	ink_art_cinematic_active = false
+	pending_ink_art.clear()
+	_suppress_modal_selection_input()
+	if is_instance_valid(hud):
+		hud.set_input_enabled(application_focused)
+	if is_instance_valid(cutscene):
+		cutscene.set_input_enabled(application_focused)
+	_sync_pause_state()
+
+
+func _ink_art_release_sound(art_id: String) -> String:
+	return {
+		"final-period": "ink_art_final_period",
+		"red-line": "ink_art_red_line",
+		"seal-storm": "ink_art_seal_storm",
+		"cross-revision": "ink_art_cross_revision",
+	}.get(art_id, "ink_art_palimpsest")
+
+
 func execute_ink_art(art_id: String, at: Vector2, direction: Vector2, art_damage: float, radius: float, echo: bool = false) -> int:
 	var aim := direction.normalized() if direction.length_squared() > 0.001 else Vector2.RIGHT
 	var hits := 0
@@ -1160,7 +1294,7 @@ func execute_ink_art(art_id: String, at: Vector2, direction: Vector2, art_damage
 	if not echo:
 		var art_name := str(player.ink_art_profile().get("name", "INK ART"))
 		spawn_word(player.global_position + Vector2(0, -36), "%s!  %d" % [art_name, hits], GOLD)
-		play_sound("relic", 0.72)
+		play_sound(_ink_art_release_sound(art_id))
 		vibrate(0.34, 0.82, 0.18)
 		shake_strength = maxf(shake_strength, 9.0 * float(settings.get("screen_shake", 1.0)))
 	else:
@@ -1370,6 +1504,8 @@ func _claim_sound_request(sound_id: String) -> bool:
 
 
 func _sound_base_volume(sound_id: String) -> float:
+	if sound_id.begins_with("ink_art_"):
+		return -4.0
 	if sound_id in ["hit", "slash", "slash_heavy", "slash_light", "ink_burst"]:
 		return -5.0
 	if sound_id in ["ui_move", "ui_confirm", "ui_cancel", "save"]:
@@ -2154,7 +2290,7 @@ func _on_setting_adjusted(setting_id: String, direction: int) -> void:
 	match setting_id:
 		"master", "music", "sfx":
 			settings[setting_id] = clampf(snappedf(float(settings[setting_id]) + 0.1 * signi(direction), 0.1), 0.0, 1.0)
-		"vibration", "hit_stop", "reduced_flashes", "fullscreen", "analytics_consent":
+		"vibration", "hit_stop", "ink_art_cutins", "reduced_flashes", "fullscreen", "analytics_consent":
 			settings[setting_id] = not bool(settings[setting_id])
 		"aim_assist":
 			var levels := [0.0, 0.25, 0.45]
@@ -2211,6 +2347,7 @@ func _sanitize_settings() -> void:
 		settings[volume_id] = clampf(float(settings.get(volume_id, 1.0)), 0.0, 1.0)
 	settings["vibration"] = bool(settings.get("vibration", true))
 	settings["hit_stop"] = bool(settings.get("hit_stop", true))
+	settings["ink_art_cutins"] = bool(settings.get("ink_art_cutins", true))
 	settings["reduced_flashes"] = bool(settings.get("reduced_flashes", false))
 	settings["fullscreen"] = bool(settings.get("fullscreen", false))
 	settings["analytics_consent"] = bool(settings.get("analytics_consent", false))
@@ -2721,7 +2858,7 @@ func _on_relic_selected(index: int) -> void:
 func _toggle_pause() -> void:
 	if not application_focused:
 		return
-	if choosing_upgrade or choosing_relic or choosing_event or game_over or run_won or (is_instance_valid(cutscene) and cutscene.active):
+	if ink_art_cinematic_active or choosing_upgrade or choosing_relic or choosing_event or game_over or run_won or (is_instance_valid(cutscene) and cutscene.active):
 		return
 	manually_paused = not manually_paused
 	record_playtest_event("manual_pause", {"paused": manually_paused, "page": wave})
@@ -2769,7 +2906,7 @@ func _on_save_return_requested() -> void:
 
 func _simulation_should_pause() -> bool:
 	var story_active := is_instance_valid(cutscene) and cutscene.active
-	return not application_focused or not run_started or manually_paused or manual_open or choosing_upgrade or choosing_relic or choosing_event or game_over or run_won or story_active
+	return not application_focused or not run_started or manually_paused or manual_open or choosing_upgrade or choosing_relic or choosing_event or ink_art_cinematic_active or game_over or run_won or story_active
 
 
 func _sync_pause_state() -> void:
@@ -2913,7 +3050,7 @@ func _add_input_event(action: StringName, event: InputEvent) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if not application_focused:
+	if not application_focused or ink_art_cinematic_active:
 		return
 	if event is InputEventJoypadButton and event.pressed:
 		_set_input_mode(true)

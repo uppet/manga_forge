@@ -8,3 +8,17 @@ dist/
 *.log
 host_config.json
 *.local.json
+
+# Local audition/cinematic review media. Keep the small Markdown production
+# records in Git; approved runtime derivatives live under assets/.
+games/inkbound_rogue/design/previews/**/*.gif
+games/inkbound_rogue/design/previews/**/*.m4a
+games/inkbound_rogue/design/previews/**/*.mp3
+games/inkbound_rogue/design/previews/**/*.mp4
+games/inkbound_rogue/design/previews/**/*.png
+games/inkbound_rogue/design/previews/**/*.wav
+games/inkbound_rogue/design/previews/voice-edge-prototype-v1/
+games/inkbound_rogue/design/previews/voice-openai-prototype-v1/
+games/inkbound_rogue/design/previews/voice-openai-prototype-v2-ferocious/
+games/inkbound_rogue/design/previews/voice-openai-prototype-v3-dual-impact/
+games/inkbound_rogue/design/previews/voice-openai-realtime-v1/

@@ -63,6 +63,7 @@ const ZH_CN := {
 	"CONTROLLER AIM ASSIST": "手柄瞄准辅助",
 	"SCREEN SHAKE": "画面震动",
 	"IMPACT FREEZE": "打击停顿",
+	"INK ART CUT-INS": "墨术全屏特写",
 	"REDUCED FLASHES": "减弱闪烁",
 	"DISPLAY MODE": "显示模式",
 	"ANONYMOUS ANALYTICS": "匿名使用数据",

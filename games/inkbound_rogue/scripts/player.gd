@@ -115,6 +115,7 @@ var attack_pose_duration := 0.0
 var attack_frame_index := -1
 var idle_texture: Texture2D
 var attack_textures: Array[Texture2D] = []
+var ink_art_cinematic_pose_active := false
 
 
 func _ready() -> void:
@@ -295,6 +296,9 @@ func _assisted_gamepad_aim(direction: Vector2, max_distance: float) -> Vector2:
 
 
 func _update_visual(delta: float) -> void:
+	if ink_art_cinematic_pose_active:
+		queue_redraw()
+		return
 	if last_direction.x != 0.0:
 		sprite.flip_h = last_direction.x < 0.0
 	var motion_phase := Time.get_ticks_msec() * 0.018
@@ -347,6 +351,41 @@ func _start_attack_animation(duration: float) -> void:
 	attack_frame_index = 0
 	if not attack_textures.is_empty():
 		sprite.texture = attack_textures[0]
+
+
+func begin_ink_art_cinematic_pose(direction: Vector2) -> void:
+	ink_art_cinematic_pose_active = true
+	attack_pose_time = 0.0
+	attack_pose_duration = 0.0
+	attack_frame_index = -1
+	velocity = Vector2.ZERO
+	if direction.length_squared() > 0.001:
+		last_direction = direction.normalized()
+	sprite.rotation = 0.0
+	sprite.flip_h = last_direction.x < 0.0
+
+
+func set_ink_art_cinematic_frame(texture: Texture2D, pose_scale: float, offset: Vector2, direction: Vector2) -> void:
+	if not ink_art_cinematic_pose_active or texture == null:
+		return
+	sprite.texture = texture
+	sprite.scale = Vector2.ONE * clampf(pose_scale, 0.05, 0.22)
+	sprite.position = offset
+	sprite.rotation = 0.0
+	sprite.flip_h = direction.x < 0.0
+	queue_redraw()
+
+
+func end_ink_art_cinematic_pose() -> void:
+	ink_art_cinematic_pose_active = false
+	attack_pose_time = 0.0
+	attack_pose_duration = 0.0
+	attack_frame_index = -1
+	sprite.texture = idle_texture
+	sprite.scale = visual_base_scale
+	sprite.position = Vector2(0.0, -5.0)
+	sprite.rotation = 0.0
+	queue_redraw()
 
 
 func _attack_animation_duration() -> float:
@@ -491,19 +530,32 @@ func perform_ink_art(direction: Vector2, force: bool = false) -> bool:
 		direction = last_direction
 	direction = direction.normalized()
 	last_direction = direction
-	_start_attack_animation(0.3)
 	var profile := ink_art_profile()
 	var game := get_parent()
 	if not game.has_method("execute_ink_art"):
+		return false
+	if game.has_method("can_request_ink_art") and not game.can_request_ink_art():
 		return false
 	ink_art_cooldown = ink_art_cooldown_total()
 	ink_art_uses += 1
 	var art_damage := damage * float(profile.get("damage", 2.5)) * ink_art_damage_multiplier
 	var art_radius := float(profile.get("radius", 78.0)) + ink_art_radius_bonus
-	var hit_count: int = game.execute_ink_art(str(profile["id"]), global_position, direction, art_damage, art_radius, false)
-	if game.has_method("play_sound"):
-		var art_pitch: float = float({"GREATBRUSH": 0.78, "NEEDLEPOINT": 1.28, "SEAL-CASTER": 1.05, "TWIN-STROKE": 1.14}.get(weapon_form, 0.94))
-		game.play_sound("ink_art", art_pitch)
+	var resolve_callback := _finish_ink_art.bind(profile, direction, art_damage, art_radius)
+	if game.has_method("request_ink_art"):
+		if not game.request_ink_art(weapon_form, str(profile["id"]), global_position, direction, art_damage, art_radius, resolve_callback):
+			ink_art_cooldown = 0.0
+			ink_art_uses = maxi(0, ink_art_uses - 1)
+			return false
+	else:
+		_start_attack_animation(0.3)
+		var hit_count: int = game.execute_ink_art(str(profile["id"]), global_position, direction, art_damage, art_radius, false)
+		resolve_callback.call(hit_count)
+	_notify_ink_art_changed(true)
+	return true
+
+
+func _finish_ink_art(hit_count: int, profile: Dictionary, direction: Vector2, art_damage: float, art_radius: float) -> void:
+	var game := get_parent()
 	if game.has_method("vibrate"):
 		game.vibrate(0.28, 0.62, 0.16)
 	if ink_art_heal and hit_count >= 5:
@@ -514,8 +566,6 @@ func perform_ink_art(direction: Vector2, force: bool = false) -> bool:
 		game.queue_ink_art_echo(str(profile["id"]), global_position, direction, art_damage * 0.45, art_radius * 0.92)
 	if game.has_method("record_playtest_event"):
 		game.record_playtest_event("ink_art", {"art": str(profile["id"]), "weapon": weapon_form, "hits": hit_count, "health": health})
-	_notify_ink_art_changed(true)
-	return true
 
 
 func recharge_ink_art(amount: float) -> void:

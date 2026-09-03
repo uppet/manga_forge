@@ -42,7 +42,12 @@ and two persistent endings. Completed runs continue as harder drafts.
 - Five weapon-specific active Ink Arts add a second combat cadence: Marginalia's
   Palimpsest Ring, Greatbrush's Final Period, Needlepoint's Red Line,
   Seal-Caster's Seal Storm, and Twin-Stroke's Cross Revision. Six techniques
-  modify their damage, area, recovery, hit refunds, echo, and sustain.
+  modify their damage, area, recovery, hit refunds, echo, and sustain. Each cast
+  freezes the battlefield, presents an optional weapon-specific full-screen
+  cut-in, returns to a correctly scaled five-frame battle startup, and releases
+  damage with its matching material sound on the authored impact frame. The
+  cut-in can be disabled independently in Options without removing the battle
+  animation or changing the combat result.
 - XP, recovery, permanent Memory shards, relic drops, rarity weighting, and
   duplicate-drop effects. Five rare combat pickups provide an Ink Bomb, arena
   magnet, Red Frenzy, five-point Ward, or six-second Hourglass slowdown. A
@@ -109,8 +114,9 @@ and two persistent endings. Completed runs continue as harder drafts.
   player position, health, XP, weapon build, relics, route, enemies, run counters,
   and supply-pity state; corrupted current drafts recover from a rotated backup.
   New Game requires confirmation when it would replace a saved draft.
-- Twenty-five deterministic sound cues distinguish all five weapon rhythms,
-  Ink Arts, enemy casts, dash warnings, teleport, parry, shield, restoration,
+- Thirty deterministic sound cues distinguish all five weapon rhythms, the
+  shared Ink Art charge and five weapon-specific releases, enemy casts, dash
+  warnings, teleport, parry, shield, restoration,
   combat supplies, boss entry/defeat, menu navigation, and Save & Return. Enemy
   warnings are spatial and rate-limited so large squads remain readable.
   Blade cuts are led by shaped air, edge, paper, and handle transients rather
@@ -275,8 +281,8 @@ of only checking menu visibility. Release metadata, legal notices, version ident
 and inert Steam depot templates live under `release/`; real App/Depot IDs are
 never stored in the repository.
 
-`asset-manifest.json` schema 3 integrity-hashes all 73 player-consumed PNG/WAV/OGG
-assets and distinguishes 59 deterministic procedural outputs from fourteen
+`asset-manifest.json` schema 3 integrity-hashes all 88 player-consumed PNG/WAV/OGG
+assets and distinguishes 64 deterministic procedural outputs from twenty-four
 pre-generated AI-assisted assets. `release/ai-content-disclosure.md` keeps the
 Steam survey draft and unresolved publisher sign-offs explicit; the shipped
 game performs no live AI generation.

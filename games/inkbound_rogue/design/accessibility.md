@@ -33,11 +33,23 @@ warning sounds, hostile-projectile cyan trails, danger-zone geometry, or hit
 confirmation. Threat information therefore remains readable without relying on
 rapid luminance alternation.
 
+## Ink Art cut-ins
+
+`settings.ink_art_cutins` defaults to On and controls only the full-screen
+weapon portrait. Turning it Off skips directly to the five-frame in-world
+startup, shortening the real-time interruption while leaving simulated combat
+time, startup release frame, damage, invulnerability, and release-cue alignment
+unchanged. Reduced Flashes also lowers the opacity and shortens the persistence
+of Ink Art transition flashes.
+
 ## Regression gates
 
 `tests/accessibility_test.gd` verifies the aim cone/range, blend rather than
-lock-on, Off behavior, damage-flash cycle count, stable enemy warnings, Chinese
-labels, and settings-panel containment. `tests/save_recovery_test.gd` verifies
-that both settings survive backup recovery and that older profiles receive safe
-defaults. Run them on the Windows host with `host_game.py accessibility-test`
-and `host_game.py save-test`.
+lock-on, Off behavior, damage-flash cycle count, stable enemy warnings, the
+cut-in toggle, Chinese labels, modal input isolation, and settings-panel
+containment. `tests/save_recovery_test.gd` verifies that these settings survive
+backup recovery and that older profiles receive safe defaults.
+`tests/ink_art_test.gd` verifies all five cut-ins, startup frames, release
+timings, scale bounds, dedicated cues, and the cut-in-disabled path. Run them on
+the Windows host with `host_game.py accessibility-test`, `host_game.py
+save-test`, and `host_game.py art-test`.

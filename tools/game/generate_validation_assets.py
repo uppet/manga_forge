@@ -83,6 +83,25 @@ AI_ASSISTED_ASSETS = {
         "source_commit": "not-applicable-user-supplied",
     },
     **{
+        GAME_ROOT / "assets" / "audio" / "voice" / filename: {
+            "id": "voice-" + Path(filename).stem.replace("_", "-"),
+            "origin": "openai-realtime-audio-generation",
+            "provenance_record": "games/inkbound_rogue/assets/audio/nara-ink-art-japanese.provenance.md",
+            "prompt_record_status": "production-brief-retained-in-project-conversation",
+            "derivation": "owner-approved OpenAI Realtime Japanese performance; runtime EQ/peak match, long dramatic silences capped at 160 ms, and pitch-preserving 2.0x tempo",
+            "human_review_status": "runtime-and-regression-reviewed-demo-owner-approval-recorded",
+            "rights_review_status": "publisher-confirmation-required-before-commercial-release",
+            "source_commit": "not-applicable-generated-in-project-conversation",
+        }
+        for filename in (
+            "nara_ink_art_marginalia_jp.wav",
+            "nara_ink_art_greatbrush_jp.wav",
+            "nara_ink_art_needlepoint_jp.wav",
+            "nara_ink_art_seal_caster_jp.wav",
+            "nara_ink_art_twin_stroke_jp.wav",
+        )
+    },
+    **{
         GAME_ROOT / "assets" / "cutscenes" / filename: {
             "id": Path(filename).stem,
             "provenance_record": "games/inkbound_rogue/assets/cutscenes/README.md",
@@ -97,6 +116,30 @@ AI_ASSISTED_ASSETS = {
             "ending-choice-v2.png",
             "ending-keep-v2.png",
             "ending-rewrite-v2.png",
+        )
+    },
+    **{
+        GAME_ROOT / "assets" / "ink_art" / filename: {
+            "id": "ink-art-" + Path(filename).stem,
+            "origin": "openai-image-generation",
+            "provenance_record": "games/inkbound_rogue/assets/ink_art/README.md",
+            "prompt_record_status": "shared-constraints-and-weapon-brief-retained",
+            "derivation": "runtime-sized derivative of the approved weapon-specific Ink Art preview source",
+            "human_review_status": "preview-approved-runtime-integration-review-pending",
+            "rights_review_status": "publisher-confirmation-required-before-commercial-release",
+            "source_commit": "not-applicable-generated-in-project-conversation",
+        }
+        for filename in (
+            "marginalia-cutin.png",
+            "marginalia-startup.png",
+            "greatbrush-cutin.png",
+            "greatbrush-startup.png",
+            "needlepoint-cutin.png",
+            "needlepoint-startup.png",
+            "seal-caster-cutin.png",
+            "seal-caster-startup.png",
+            "twin-stroke-cutin.png",
+            "twin-stroke-startup.png",
         )
     },
 }
@@ -623,130 +666,306 @@ def sound_assets() -> dict[str, bytes]:
 
         return sample
 
-    slash = blade_cut(0.24, 0.88, 0.54, 104.0, 0.43)
-    slash_heavy = blade_cut(0.36, 1.02, 0.68, 72.0, 0.48)
-    slash_light = blade_cut(0.15, 0.68, 0.74, 138.0, 0.38)
+    slash = blade_cut(0.24, 0.74, 0.36, 88.0, 0.45)
+    slash_heavy = blade_cut(0.36, 0.92, 0.44, 56.0, 0.52)
+    slash_light = blade_cut(0.15, 0.58, 0.46, 112.0, 0.40)
 
-    hit_state = {"fast": 0.0, "slow": 0.0}
+    def noise_state() -> dict[str, float]:
+        return {"fast": 0.0, "slow": 0.0}
+
+    def material_noise(
+        state: dict[str, float],
+        rng: random.Random,
+        fast_rate: float = 0.34,
+        slow_rate: float = 0.045,
+    ) -> tuple[float, float, float]:
+        """Return dry edge, cloth/paper body, and low material movement."""
+
+        raw = rng.uniform(-1.0, 1.0)
+        state["fast"] += (raw - state["fast"]) * fast_rate
+        state["slow"] += (state["fast"] - state["slow"]) * slow_rate
+        return raw - state["fast"], state["fast"] - state["slow"], state["slow"]
+
+    def strike(t: float, at: float, width: float) -> float:
+        return math.exp(-((t - at) / width) ** 2)
+
+    def tail(t: float, at: float, rate: float) -> float:
+        return math.exp(-(t - at) * rate) if t >= at else 0.0
+
+    hit_state = noise_state()
 
     def hit(t: float, rng: random.Random) -> float:
-        raw = rng.uniform(-1.0, 1.0)
-        hit_state["fast"] += (raw - hit_state["fast"]) * 0.48
-        hit_state["slow"] += (hit_state["fast"] - hit_state["slow"]) * 0.075
-        crack = raw - hit_state["fast"]
-        material = hit_state["fast"] - hit_state["slow"]
-        edge_env = math.exp(-t * 92.0)
-        body_env = math.exp(-t * 25.0)
-        return edge_env * crack * 0.92 + body_env * material * 0.68 + body_env * math.sin(math.tau * 78.0 * t) * 0.16
+        edge, body, low = material_noise(hit_state, rng, 0.43, 0.07)
+        crack = math.exp(-t * 88.0)
+        weight = math.exp(-t * 24.0)
+        resonance = math.sin(math.tau * 82.0 * t) * 0.18 + math.sin(math.tau * 127.0 * t) * 0.07
+        return crack * edge * 0.58 + weight * body * 0.62 + weight * low * 0.18 + weight * resonance
+
+    dash_state = noise_state()
 
     def dash(t: float, rng: random.Random) -> float:
-        env = max(0.0, 1.0 - t / 0.22)
-        return env * (0.4 * rng.uniform(-1.0, 1.0) + 0.3 * math.sin(math.tau * (520.0 - 900.0 * t) * t))
+        edge, cloth, low = material_noise(dash_state, rng, 0.28, 0.035)
+        whoosh = math.sin(math.pi * min(1.0, t / 0.22)) ** 0.7
+        foot = tail(t, 0.018, 42.0)
+        flap = strike(t, 0.095, 0.018) + strike(t, 0.155, 0.022) * 0.6
+        return whoosh * (cloth * 0.72 + edge * 0.13) + foot * math.sin(math.tau * 66.0 * t) * 0.22 + flap * low * 0.36
 
-    def pickup(t: float, _rng: random.Random) -> float:
-        env = max(0.0, 1.0 - t / 0.24)
-        frequency = 520.0 if t < 0.08 else (780.0 if t < 0.16 else 1040.0)
-        return 0.5 * env * math.sin(math.tau * frequency * t)
+    pickup_state = noise_state()
 
-    def level_up(t: float, _rng: random.Random) -> float:
-        notes = (440.0, 554.37, 659.25, 880.0)
-        note = notes[min(int(t / 0.12), len(notes) - 1)]
-        env = max(0.0, 1.0 - t / 0.55)
-        return 0.45 * env * (math.sin(math.tau * note * t) + 0.3 * math.sin(math.tau * note * 2.0 * t))
+    def pickup(t: float, rng: random.Random) -> float:
+        edge, paper, _low = material_noise(pickup_state, rng, 0.42, 0.055)
+        token = tail(t, 0.025, 18.0)
+        catch = strike(t, 0.025, 0.008) + strike(t, 0.135, 0.012) * 0.48
+        resonance = math.sin(math.tau * 196.0 * t) + math.sin(math.tau * 293.0 * t) * 0.22
+        return catch * edge * 0.36 + token * resonance * 0.16 + max(0.0, 1.0 - t / 0.24) * paper * 0.24
+
+    level_state = noise_state()
+
+    def level_up(t: float, rng: random.Random) -> float:
+        edge, paper, low = material_noise(level_state, rng, 0.27, 0.026)
+        page = math.sin(math.pi * min(1.0, t / 0.55)) ** 1.25
+        first = tail(t, 0.035, 8.5)
+        second = tail(t, 0.285, 10.0)
+        resonance = first * (math.sin(math.tau * 110.0 * t) * 0.19 + math.sin(math.tau * 165.0 * t) * 0.08)
+        resonance += second * math.sin(math.tau * 82.5 * (t - 0.285)) * 0.14
+        return page * (paper * 0.34 + low * 0.14) + strike(t, 0.035, 0.012) * edge * 0.35 + resonance
+
+    hurt_state = noise_state()
 
     def hurt(t: float, rng: random.Random) -> float:
-        env = max(0.0, 1.0 - t / 0.28)
-        return env * (0.45 * math.sin(math.tau * (240.0 - 420.0 * t) * t) + 0.18 * rng.uniform(-1.0, 1.0))
+        edge, cloth, low = material_noise(hurt_state, rng, 0.39, 0.065)
+        impact = math.exp(-t * 42.0)
+        body = math.exp(-t * 14.0)
+        resonance = math.sin(math.tau * 62.0 * t) * 0.27 + math.sin(math.tau * 93.0 * t) * 0.11
+        return impact * edge * 0.42 + body * cloth * 0.46 + body * low * 0.2 + body * resonance
 
-    def relic(t: float, _rng: random.Random) -> float:
-        notes = (392.0, 587.33, 783.99, 1174.66)
-        note = notes[min(int(t / 0.11), len(notes) - 1)]
-        env = max(0.0, 1.0 - t / 0.52)
-        return 0.42 * env * (math.sin(math.tau * note * t) + 0.22 * math.sin(math.tau * note * 3.0 * t))
+    relic_state = noise_state()
+
+    def relic(t: float, rng: random.Random) -> float:
+        edge, wax, low = material_noise(relic_state, rng, 0.3, 0.032)
+        contact = strike(t, 0.028, 0.01)
+        ring = tail(t, 0.028, 6.8)
+        resonance = math.sin(math.tau * 146.0 * (t - 0.028)) * 0.2
+        resonance += math.sin(math.tau * 219.0 * (t - 0.028)) * 0.08
+        resonance += math.sin(math.tau * 287.0 * (t - 0.028)) * 0.035
+        return contact * (edge * 0.48 + low * 0.2) + ring * resonance + max(0.0, 1.0 - t / 0.52) * wax * 0.17
+
+    boss_warning_state = noise_state()
 
     def boss_warning(t: float, rng: random.Random) -> float:
-        env = max(0.0, 1.0 - t / 0.75)
-        pulse = 1.0 if int(t * 8.0) % 2 == 0 else 0.35
-        return env * pulse * (0.45 * math.sin(math.tau * 62.0 * t) + 0.12 * rng.uniform(-1.0, 1.0))
+        edge, body, low = material_noise(boss_warning_state, rng, 0.22, 0.018)
+        first = tail(t, 0.02, 8.0)
+        second = tail(t, 0.37, 8.5)
+        drum = first * (math.sin(math.tau * 48.0 * t) * 0.38 + math.sin(math.tau * 72.0 * t) * 0.12)
+        drum += second * math.sin(math.tau * 43.0 * (t - 0.37)) * 0.36
+        attacks = strike(t, 0.02, 0.012) + strike(t, 0.37, 0.014)
+        return drum + attacks * edge * 0.32 + max(0.0, 1.0 - t / 0.75) * (body * 0.16 + low * 0.13)
 
     seal_state = {"paper": 0.0, "ink": 0.0}
 
     def seal_cast(t: float, rng: random.Random) -> float:
         raw = rng.uniform(-1.0, 1.0)
-        seal_state["paper"] += (raw - seal_state["paper"]) * 0.52
-        seal_state["ink"] += (seal_state["paper"] - seal_state["ink"]) * 0.065
-        snap = math.exp(-t * 105.0) * (raw - seal_state["paper"])
+        seal_state["paper"] += (raw - seal_state["paper"]) * 0.42
+        seal_state["ink"] += (seal_state["paper"] - seal_state["ink"]) * 0.052
+        snap = math.exp(-t * 92.0) * (raw - seal_state["paper"])
         drag_env = min(1.0, t / 0.018) * max(0.0, 1.0 - t / 0.28) ** 1.6
         paper_drag = seal_state["paper"] - seal_state["ink"]
-        stamp = math.exp(-((t - 0.19) / 0.014) ** 2)
-        return snap * 0.82 + drag_env * paper_drag * 0.76 + stamp * (raw * 0.42 + math.sin(math.tau * 112.0 * t) * 0.15)
+        stamp = strike(t, 0.19, 0.016)
+        stamp_tail = tail(t, 0.19, 24.0)
+        return snap * 0.5 + drag_env * paper_drag * 0.62 + stamp * raw * 0.31 + stamp_tail * math.sin(math.tau * 78.0 * (t - 0.19)) * 0.2
+
+    ink_art_state = noise_state()
 
     def ink_art(t: float, rng: random.Random) -> float:
-        rise = min(1.0, t / 0.08)
-        fall = max(0.0, 1.0 - t / 0.62)
-        env = rise * fall
-        sweep = 120.0 + 680.0 * t
-        return env * (0.35 * math.sin(math.tau * sweep * t) + 0.2 * math.sin(math.tau * sweep * 1.5 * t) + 0.08 * rng.uniform(-1.0, 1.0))
+        edge, wet, low = material_noise(ink_art_state, rng, 0.2, 0.018)
+        draw = math.sin(math.pi * min(1.0, t / 0.47)) ** 1.4 if t <= 0.47 else 0.0
+        release = tail(t, 0.45, 11.0)
+        impact = strike(t, 0.45, 0.018)
+        resonance = release * (math.sin(math.tau * 58.0 * (t - 0.45)) * 0.3 + math.sin(math.tau * 87.0 * (t - 0.45)) * 0.1)
+        return draw * (wet * 0.5 + low * 0.25 + edge * 0.06) + impact * edge * 0.44 + resonance
+
+    palimpsest_state = noise_state()
+
+    def ink_art_palimpsest(t: float, rng: random.Random) -> float:
+        edge, brush, low = material_noise(palimpsest_state, rng, 0.3, 0.028)
+        circle = math.sin(math.pi * min(1.0, t / 0.46)) ** 1.2 if t <= 0.46 else 0.0
+        cuts = sum(strike(t, at, 0.012) for at in (0.025, 0.13, 0.235, 0.34))
+        body = tail(t, 0.025, 7.5)
+        resonance = body * (math.sin(math.tau * 68.0 * t) * 0.18 + math.sin(math.tau * 102.0 * t) * 0.065)
+        return circle * (brush * 0.42 + low * 0.17) + cuts * edge * 0.34 + resonance
+
+    final_period_state = noise_state()
+
+    def ink_art_final_period(t: float, rng: random.Random) -> float:
+        edge, bristle, low = material_noise(final_period_state, rng, 0.24, 0.02)
+        impact = math.exp(-t * 58.0)
+        debris = math.exp(-t * 7.2)
+        thump = debris * (
+            math.sin(math.tau * 42.0 * t) * 0.46
+            + math.sin(math.tau * 63.0 * t) * 0.17
+            + math.sin(math.tau * 91.0 * t) * 0.06
+        )
+        settling = strike(t, 0.24, 0.035) + strike(t, 0.43, 0.05) * 0.65
+        return impact * edge * 0.5 + debris * (bristle * 0.5 + low * 0.25) + settling * bristle * 0.38 + thump
+
+    red_line_state = noise_state()
+
+    def ink_art_red_line(t: float, rng: random.Random) -> float:
+        edge, air, low = material_noise(red_line_state, rng, 0.52, 0.095)
+        puncture = math.exp(-t * 105.0)
+        passage = math.sin(math.pi * min(1.0, t / 0.24)) * math.exp(-t * 5.5)
+        metal = tail(t, 0.012, 20.0) * (
+            math.sin(math.tau * 318.0 * t) * 0.15
+            + math.sin(math.tau * 477.0 * t) * 0.05
+        )
+        brake = strike(t, 0.27, 0.026)
+        return puncture * edge * 0.62 + passage * (air * 0.48 + low * 0.08) + metal + brake * (edge * 0.32 + low * 0.18)
+
+    seal_storm_state = noise_state()
+
+    def ink_art_seal_storm(t: float, rng: random.Random) -> float:
+        edge, paper, low = material_noise(seal_storm_state, rng, 0.39, 0.055)
+        stamp_attack = math.exp(-t * 82.0)
+        stamp_body = math.exp(-t * 12.0)
+        radial = 0.0
+        for index in range(12):
+            at = 0.08 + float(index) * 0.042
+            radial += strike(t, at, 0.009 + float(index) * 0.0004) * (1.0 - float(index) * 0.035)
+        resonance = stamp_body * (
+            math.sin(math.tau * 74.0 * t) * 0.22
+            + math.sin(math.tau * 111.0 * t) * 0.08
+        )
+        return stamp_attack * edge * 0.46 + stamp_body * (paper * 0.28 + low * 0.17) + radial * edge * 0.17 + resonance
+
+    cross_revision_state = noise_state()
+
+    def ink_art_cross_revision(t: float, rng: random.Random) -> float:
+        edge, blade_air, low = material_noise(cross_revision_state, rng, 0.43, 0.07)
+        first = strike(t, 0.025, 0.014)
+        second = strike(t, 0.19, 0.016)
+        crossed = strike(t, 0.235, 0.028)
+        tail_body = tail(t, 0.19, 10.0)
+        resonance = tail_body * (
+            math.sin(math.tau * 116.0 * (t - 0.19)) * 0.16
+            + math.sin(math.tau * 174.0 * (t - 0.19)) * 0.055
+        )
+        return (first + second * 0.92) * edge * 0.48 + crossed * (blade_air * 0.42 + low * 0.18) + resonance
+
+    enemy_cast_state = noise_state()
 
     def enemy_cast(t: float, rng: random.Random) -> float:
-        env = max(0.0, 1.0 - t / 0.32)
-        pulse = 1.0 if int(t * 24.0) % 2 == 0 else 0.42
-        return env * pulse * (0.32 * math.sin(math.tau * (180.0 + 520.0 * t) * t) + 0.1 * rng.uniform(-1.0, 1.0))
+        edge, paper, low = material_noise(enemy_cast_state, rng, 0.46, 0.07)
+        snaps = strike(t, 0.025, 0.009) + strike(t, 0.145, 0.012) * 0.72
+        warning = tail(t, 0.025, 10.0) * math.sin(math.tau * 96.0 * (t - 0.025))
+        return snaps * edge * 0.43 + max(0.0, 1.0 - t / 0.32) * paper * 0.26 + warning * 0.17 + low * 0.08
+
+    enemy_dash_state = noise_state()
 
     def enemy_dash(t: float, rng: random.Random) -> float:
-        env = max(0.0, 1.0 - t / 0.3)
-        return env * (0.4 * math.sin(math.tau * (420.0 - 720.0 * t) * t) + 0.22 * rng.uniform(-1.0, 1.0))
+        edge, cloth, low = material_noise(enemy_dash_state, rng, 0.31, 0.035)
+        breath = math.sin(math.pi * min(1.0, t / 0.3)) ** 0.75
+        step = tail(t, 0.035, 30.0)
+        return breath * (cloth * 0.58 + edge * 0.12) + step * math.sin(math.tau * 71.0 * (t - 0.035)) * 0.25 + strike(t, 0.035, 0.012) * low * 0.3
+
+    teleport_state = noise_state()
 
     def teleport(t: float, rng: random.Random) -> float:
-        env = math.sin(math.pi * min(1.0, t / 0.5))
-        return env * (0.28 * math.sin(math.tau * (160.0 + 1100.0 * t) * t) + 0.13 * rng.uniform(-1.0, 1.0))
+        edge, paper, low = material_noise(teleport_state, rng, 0.2, 0.015)
+        suction = math.sin(math.pi * min(1.0, t / 0.43)) ** 1.3 if t <= 0.43 else 0.0
+        close = tail(t, 0.41, 22.0)
+        hollow = close * (math.sin(math.tau * 83.0 * (t - 0.41)) * 0.22 + math.sin(math.tau * 124.0 * (t - 0.41)) * 0.08)
+        return suction * (paper * 0.42 + low * 0.2 + edge * 0.05) + strike(t, 0.41, 0.015) * edge * 0.35 + hollow
 
-    def parry(t: float, _rng: random.Random) -> float:
-        env = math.exp(-24.0 * t)
-        return env * (0.5 * math.sin(math.tau * 1760.0 * t) + 0.35 * math.sin(math.tau * 2637.0 * t))
+    parry_state = noise_state()
+
+    def parry(t: float, rng: random.Random) -> float:
+        edge, metal, _low = material_noise(parry_state, rng, 0.5, 0.11)
+        attack = math.exp(-t * 110.0)
+        ring = math.exp(-t * 22.0)
+        modes = math.sin(math.tau * 390.0 * t) * 0.3 + math.sin(math.tau * 655.0 * t) * 0.13 + math.sin(math.tau * 910.0 * t) * 0.055
+        return attack * edge * 0.5 + ring * metal * 0.18 + ring * modes
+
+    shield_state = noise_state()
 
     def shield(t: float, rng: random.Random) -> float:
-        env = math.exp(-18.0 * t)
-        return env * (0.45 * math.sin(math.tau * 118.0 * t) + 0.22 * rng.uniform(-1.0, 1.0))
+        edge, body, low = material_noise(shield_state, rng, 0.38, 0.07)
+        attack = math.exp(-t * 78.0)
+        ring = math.exp(-t * 17.0)
+        modes = math.sin(math.tau * 92.0 * t) * 0.28 + math.sin(math.tau * 184.0 * t) * 0.1 + math.sin(math.tau * 267.0 * t) * 0.04
+        return attack * edge * 0.4 + ring * body * 0.34 + ring * low * 0.13 + ring * modes
 
-    def heal(t: float, _rng: random.Random) -> float:
-        notes = (523.25, 659.25, 783.99)
-        note = notes[min(int(t / 0.13), len(notes) - 1)]
-        env = max(0.0, 1.0 - t / 0.46)
-        return 0.42 * env * (math.sin(math.tau * note * t) + 0.2 * math.sin(math.tau * note * 2.0 * t))
+    heal_state = noise_state()
+
+    def heal(t: float, rng: random.Random) -> float:
+        edge, paper, low = material_noise(heal_state, rng, 0.18, 0.018)
+        breath = math.sin(math.pi * min(1.0, t / 0.46)) ** 1.35
+        tone_env = min(1.0, t / 0.08) * max(0.0, 1.0 - t / 0.46) ** 1.15
+        warm = math.sin(math.tau * 174.0 * t) * 0.12 + math.sin(math.tau * 232.0 * t) * 0.045
+        close = strike(t, 0.34, 0.018)
+        return breath * (paper * 0.29 + low * 0.12) + tone_env * warm + close * edge * 0.22
+
+    ink_burst_state = noise_state()
 
     def ink_burst(t: float, rng: random.Random) -> float:
-        env = max(0.0, 1.0 - t / 0.65) ** 1.7
-        return env * (0.52 * math.sin(math.tau * (78.0 - 32.0 * t) * t) + 0.38 * rng.uniform(-1.0, 1.0))
+        edge, wet, low = material_noise(ink_burst_state, rng, 0.24, 0.02)
+        body = tail(t, 0.025, 7.0)
+        impact = strike(t, 0.025, 0.014)
+        splats = strike(t, 0.18, 0.026) + strike(t, 0.32, 0.032) * 0.7
+        rumble = body * (math.sin(math.tau * 48.0 * (t - 0.025)) * 0.34 + math.sin(math.tau * 73.0 * (t - 0.025)) * 0.1)
+        return impact * edge * 0.48 + body * (wet * 0.46 + low * 0.22) + splats * wet * 0.48 + rumble
 
-    def powerup(t: float, _rng: random.Random) -> float:
-        notes = (330.0, 440.0, 554.37, 659.25)
-        note = notes[min(int(t / 0.11), len(notes) - 1)]
-        env = max(0.0, 1.0 - t / 0.52)
-        return 0.38 * env * (math.sin(math.tau * note * t) + 0.22 * math.sin(math.tau * note * 3.0 * t))
+    powerup_state = noise_state()
+
+    def powerup(t: float, rng: random.Random) -> float:
+        edge, wax, low = material_noise(powerup_state, rng, 0.3, 0.035)
+        first = strike(t, 0.025, 0.011)
+        second = strike(t, 0.19, 0.014)
+        body = tail(t, 0.025, 7.5)
+        modes = math.sin(math.tau * 130.0 * t) * 0.17 + math.sin(math.tau * 195.0 * t) * 0.065
+        return (first + second * 0.7) * edge * 0.4 + body * modes + max(0.0, 1.0 - t / 0.52) * (wax * 0.19 + low * 0.08)
+
+    boss_down_state = noise_state()
 
     def boss_down(t: float, rng: random.Random) -> float:
-        env = max(0.0, 1.0 - t / 0.95)
-        fall = 180.0 - 120.0 * t
-        return env * (0.42 * math.sin(math.tau * fall * t) + 0.22 * math.sin(math.tau * fall * 0.5 * t) + 0.18 * rng.uniform(-1.0, 1.0))
+        edge, debris, low = material_noise(boss_down_state, rng, 0.21, 0.017)
+        impacts = ((0.025, 1.0, 49.0), (0.24, 0.72, 43.0), (0.49, 0.58, 38.0), (0.72, 0.42, 34.0))
+        total = max(0.0, 1.0 - t / 0.95) * (debris * 0.27 + low * 0.22)
+        for at, weight, frequency in impacts:
+            total += strike(t, at, 0.016 + at * 0.012) * edge * 0.34 * weight
+            total += tail(t, at, 8.0 + at * 3.0) * math.sin(math.tau * frequency * (t - at)) * 0.27 * weight
+        return total
 
-    def ui_move(t: float, _rng: random.Random) -> float:
-        env = max(0.0, 1.0 - t / 0.08)
-        return 0.32 * env * math.sin(math.tau * 760.0 * t)
+    ui_move_state = noise_state()
 
-    def ui_confirm(t: float, _rng: random.Random) -> float:
-        env = max(0.0, 1.0 - t / 0.15)
-        note = 620.0 if t < 0.065 else 930.0
-        return 0.35 * env * math.sin(math.tau * note * t)
+    def ui_move(t: float, rng: random.Random) -> float:
+        edge, paper, _low = material_noise(ui_move_state, rng, 0.52, 0.12)
+        env = math.exp(-t * 46.0)
+        return env * (edge * 0.28 + paper * 0.16 + math.sin(math.tau * 230.0 * t) * 0.1)
 
-    def ui_cancel(t: float, _rng: random.Random) -> float:
-        env = max(0.0, 1.0 - t / 0.13)
-        return 0.32 * env * math.sin(math.tau * (620.0 - 1800.0 * t) * t)
+    ui_confirm_state = noise_state()
 
-    def save(t: float, _rng: random.Random) -> float:
-        note = (392.0, 523.25, 783.99)[min(int(t / 0.11), 2)]
-        env = max(0.0, 1.0 - t / 0.38)
-        return 0.38 * env * (math.sin(math.tau * note * t) + 0.18 * math.sin(math.tau * note * 2.0 * t))
+    def ui_confirm(t: float, rng: random.Random) -> float:
+        edge, wood, low = material_noise(ui_confirm_state, rng, 0.46, 0.09)
+        attack = math.exp(-t * 72.0)
+        body = math.exp(-t * 25.0)
+        return attack * edge * 0.31 + body * wood * 0.2 + body * low * 0.08 + body * math.sin(math.tau * 190.0 * t) * 0.12
+
+    ui_cancel_state = noise_state()
+
+    def ui_cancel(t: float, rng: random.Random) -> float:
+        edge, paper, low = material_noise(ui_cancel_state, rng, 0.4, 0.065)
+        flick = max(0.0, 1.0 - t / 0.13) ** 1.5
+        knock = tail(t, 0.038, 31.0)
+        return flick * (paper * 0.34 + edge * 0.13) + knock * (low * 0.21 + math.sin(math.tau * 126.0 * (t - 0.038)) * 0.11)
+
+    save_state = noise_state()
+
+    def save(t: float, rng: random.Random) -> float:
+        edge, paper, low = material_noise(save_state, rng, 0.34, 0.045)
+        latch = strike(t, 0.025, 0.009) + strike(t, 0.225, 0.012) * 0.64
+        settle = max(0.0, 1.0 - t / 0.38) ** 1.25
+        resonance = tail(t, 0.025, 10.0) * (math.sin(math.tau * 130.0 * t) * 0.13 + math.sin(math.tau * 195.0 * t) * 0.045)
+        return latch * edge * 0.36 + settle * (paper * 0.25 + low * 0.09) + resonance
 
     music_states = {
         track: {"paper": 0.0, "brush": 0.0}
@@ -796,6 +1015,11 @@ def sound_assets() -> dict[str, bytes]:
         "slash_light.wav": wav_bytes(0.15, slash_light),
         "seal_cast.wav": wav_bytes(0.28, seal_cast),
         "ink_art.wav": wav_bytes(0.62, ink_art),
+        "ink_art_palimpsest.wav": wav_bytes(0.56, ink_art_palimpsest),
+        "ink_art_final_period.wav": wav_bytes(0.82, ink_art_final_period),
+        "ink_art_red_line.wav": wav_bytes(0.42, ink_art_red_line),
+        "ink_art_seal_storm.wav": wav_bytes(0.72, ink_art_seal_storm),
+        "ink_art_cross_revision.wav": wav_bytes(0.62, ink_art_cross_revision),
         "enemy_cast.wav": wav_bytes(0.32, enemy_cast),
         "enemy_dash.wav": wav_bytes(0.3, enemy_dash),
         "teleport.wav": wav_bytes(0.5, teleport),
