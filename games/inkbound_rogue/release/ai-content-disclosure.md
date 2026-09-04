@@ -18,10 +18,17 @@ Realtime was also used to pre-generate 14 Japanese player/enemy combat-feedback
 performances. A locally operated IndexTTS 2.5 pipeline generated six Japanese
 Nara Ink Art performances from one consistent reference voice.
 The project owner generated and supplied five AIGC-tagged 海绵音乐 tracks for
-menu, combat, story, and two endings. Human-authored code supplies all
+menu, combat, story, and two endings. OpenAI Codex (GPT-5) assisted during
+development with game design, code, UI text, localization, documentation,
+production tooling, validation, and asset integration under project-owner
+direction and review. Human-directed, offline-authored code supplies all
 gameplay, collision, animation timing, UI, dialogue, localization, progression,
 narrative choices, music-state mapping, and loop processing. The assets were
 reviewed in the running game and are integrity-hashed in the asset manifest.
+The project owner also identifies ComfyUI, Stable Diffusion, and MiniMax H3 as
+resource-production or previsualization tools. The current manifest does not
+yet map their exact checkpoints/jobs to individual runtime files, so this draft
+records their involvement without inventing a conflicting asset attribution.
 
 **Live-Generated AI: No.** The shipped executable makes no model/API requests
 and generates no text, images, audio, code, or other player-consumed content
@@ -62,6 +69,9 @@ prompt-record status, human review, and rights-review status.
 - Preserve the IndexTTS delivery manifest, model/dependency versions, and
   reference-voice authorization; review each component's terms before a paid or
   otherwise commercial public build.
+- Backfill the ComfyUI workflow JSON, Stable Diffusion checkpoint/license, and
+  MiniMax H3 job/output records; map any player-consumed output to its runtime
+  file and update the inventory before commercial distribution.
 - Keep the Steam Content Survey answer consistent with both the uploaded build
   and store imagery; revisit the survey whenever content changes.
 - Preserve the approved hashes and reviewer/date in a publisher-owned release

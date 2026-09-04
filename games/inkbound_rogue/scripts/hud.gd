@@ -272,7 +272,7 @@ const FIELD_MANUAL_PAGES := [
 	},
 	{
 		"title": "CREDITS & LEGAL",
-		"body": "DESIGN, NARRATIVE, CODE, AND PRODUCTION\nManga Forge project pipeline\n\nENGINE\nGodot Engine - Juan Linietsky, Ariel Manzur, and contributors - MIT License\n\nART & AUDIO\nOriginal project assets; selected narrative illustrations created with OpenAI image tools under project direction. Full notices ship beside the executable in THIRD_PARTY_NOTICES.txt.",
+		"body": "JOYER HUANG · CREATOR / DIRECTION\nOPENAI CODEX (GPT-5) · DEVELOPMENT\n\nGODOT 4.2.2 · MANGA FORGE · PYTHON · FFMPEG 4.4.2\nCOMFYUI · STABLE DIFFUSION · MINIMAX H3\nOPENAI IMAGE GENERATION · REALTIME (GPT-REALTIME-2.1)\nINDEXTTS 2.5 · HAI MIAN MUSIC\nFULL: THIRD_PARTY_NOTICES.TXT",
 	},
 ]
 
@@ -2138,15 +2138,23 @@ func _victory_credit_page_data(summary: Dictionary) -> Array[Dictionary]:
 	if chinese:
 		return [
 			{"title": "此页铭记于心", "body": _run_result_text_zh(summary), "duration": 4.2},
-			{"title": "制作人员", "body": "设计 · 叙事 · 程序 · 制作\nMANGA FORGE 项目流水线", "duration": 3.0},
-			{"title": "美术与声音", "body": "原创项目资产与人工指导下的视觉制作\n\n引擎\nGODOT ENGINE 与开源贡献者", "duration": 3.0},
+			{"title": "主创与协作", "body": "创作 · 创意指导 · 资源制作\nJOYER HUANG\n\n开发协作 · 程序 · 工具链\nOPENAI CODEX · GPT-5", "duration": 3.4},
+			{"title": "引擎与制作流水线", "body": "GODOT ENGINE 4.2.2\nMANGA FORGE\nPYTHON 3 资源工具\nFFMPEG 4.4.2", "duration": 3.2},
+			{"title": "视觉生成", "body": "OPENAI 图像生成\nSTABLE DIFFUSION · COMFYUI\nMINIMAX H3\n角色 · 剧情 · 墨术 · 动态演出预览\n\n由 JOYER HUANG 指导、筛选与整合", "duration": 3.8},
+			{"title": "语音生成", "body": "OPENAI REALTIME\nGPT-REALTIME-2.1\n本地 INDEXTTS 2.5\n\n日文战斗反馈与墨术语音", "duration": 3.4},
+			{"title": "音乐", "body": "海绵音乐 · HAI MIAN MUSIC\n五首预生成 AIGC 配乐\n\n由 JOYER HUANG 指导、筛选与整合", "duration": 3.4},
+			{"title": "开源贡献", "body": "GODOT ENGINE\nJUAN LINIETSKY · ARIEL MANZUR\n以及所有开源贡献者\n\n完整声明见 THIRD_PARTY_NOTICES.TXT", "duration": 3.4},
 			{"title": "试玩玩家", "body": "感谢每一位在页边留下意见的玩家。\n你们发现的问题，让下一份草稿变得更好。", "duration": 3.0},
 			{"title": "感谢游玩", "body": "NARA 的故事会在下一份草稿中继续。", "final": true},
 		]
 	return [
 		{"title": "THE PAGE REMEMBERS", "body": _run_result_text(summary), "duration": 4.2},
-		{"title": "STAFF", "body": "DESIGN · NARRATIVE · CODE · PRODUCTION\nMANGA FORGE PROJECT PIPELINE", "duration": 3.0},
-		{"title": "ART & AUDIO", "body": "ORIGINAL PROJECT ASSETS AND DIRECTED VISUAL PRODUCTION\n\nENGINE\nGODOT ENGINE AND OPEN-SOURCE CONTRIBUTORS", "duration": 3.0},
+		{"title": "CREATOR & COLLABORATOR", "body": "CREATION · CREATIVE DIRECTION · ASSET PRODUCTION\nJOYER HUANG\n\nDEVELOPMENT · CODE · TOOLING\nOPENAI CODEX · GPT-5", "duration": 3.4},
+		{"title": "ENGINE & PIPELINE", "body": "GODOT ENGINE 4.2.2\nMANGA FORGE\nPYTHON 3 ASSET TOOLING\nFFMPEG 4.4.2", "duration": 3.2},
+		{"title": "VISUAL GENERATION", "body": "OPENAI IMAGE GENERATION\nSTABLE DIFFUSION · COMFYUI\nMINIMAX H3\nCHARACTERS · STORY · INK ART · MOTION PREVIS\n\nDIRECTED, SELECTED, AND INTEGRATED BY JOYER HUANG", "duration": 3.8},
+		{"title": "VOICE GENERATION", "body": "OPENAI REALTIME\nGPT-REALTIME-2.1\nLOCAL INDEXTTS 2.5\n\nJAPANESE COMBAT AND INK ART VOICES", "duration": 3.4},
+		{"title": "MUSIC", "body": "HAI MIAN MUSIC · 海绵音乐\nFIVE PRE-GENERATED AIGC TRACKS\n\nDIRECTED, SELECTED, AND INTEGRATED BY JOYER HUANG", "duration": 3.4},
+		{"title": "OPEN-SOURCE CONTRIBUTORS", "body": "GODOT ENGINE\nJUAN LINIETSKY · ARIEL MANZUR\nAND ALL OPEN-SOURCE CONTRIBUTORS\n\nFULL NOTICE: THIRD_PARTY_NOTICES.TXT", "duration": 3.4},
 		{"title": "PLAYTESTERS", "body": "THANK YOU TO EVERY PLAYER WHO LEFT A NOTE IN THE MARGIN.\nYOUR FEEDBACK MADE THE NEXT DRAFT BETTER.", "duration": 3.0},
 		{"title": "THANK YOU FOR PLAYING", "body": "NARA'S STORY CONTINUES IN THE NEXT DRAFT.", "final": true},
 	]
@@ -2166,7 +2174,7 @@ func _show_victory_credit_page() -> void:
 	if victory_credits_final:
 		victory_credits_prompt.text = "按任意键返回开始菜单" if chinese else "PRESS ANY BUTTON TO RETURN TO THE TITLE"
 		return
-	victory_credits_prompt.text = "制作人员名单即将继续 · 按任意键跳至鸣谢" if chinese else "CREDITS CONTINUE · PRESS ANY BUTTON TO SKIP TO THANKS"
+	victory_credits_prompt.text = "按任意键继续" if chinese else "PRESS ANY BUTTON TO CONTINUE"
 	victory_credit_tween = create_tween()
 	victory_credit_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	victory_credit_tween.tween_interval(float(page.get("duration", 3.0)))

@@ -105,8 +105,13 @@ defined in `design/branding.md`.
   without changing run or ending state.
 - A five-page Field Manual opens automatically on the first New Game, pauses the
   draft whenever reopened, explains controls and build systems, and exposes
-  in-game credits and legal attribution. Its completion state persists without
-  invalidating older profiles.
+  in-game credits and legal attribution. The ending carousel separately credits
+  Joyer Huang, OpenAI Codex, Godot, Manga Forge, Python, FFmpeg, ComfyUI,
+  Stable Diffusion, MiniMax H3, OpenAI image generation, OpenAI Realtime,
+  IndexTTS, Hai Mian Music, open-source contributors, and playtesters. Its
+  completion state persists without
+  invalidating older profiles. The authoritative shipped-resource credit list
+  is `design/credits.md`.
 - Complete English and Simplified Chinese presentation covers the title shell,
   settings, HUD, Field Manual, techniques, relics, weapons, routes, contracts,
   Proof clauses, Daily Chronicle, bestiary, achievements, events, results, and
@@ -288,6 +293,8 @@ prompt, description, and rarity spacing before capturing the longest copy;
 `host_game.py capture-proof` renders all eleven Proof Depths and their cumulative clause;
 `host_game.py capture-daily` checks the date, seed, fixed rules, reward, and record panel;
 `host_game.py capture-manual` captures onboarding and credits pages.
+`host_game.py capture-credits` captures all nine ending/result pages in English
+and Simplified Chinese.
 `host_game.py capture-localization` renders Simplified Chinese title, settings,
 technique cards, and story subtitles with the Windows CJK font fallback chain.
 Use `host_game.py balance` for the four-build × three-difficulty × six-contract ×
@@ -299,8 +306,8 @@ of only checking menu visibility. Release metadata, legal notices, version ident
 and inert Steam depot templates live under `release/`; real App/Depot IDs are
 never stored in the repository.
 
-`asset-manifest.json` schema 3 integrity-hashes all 88 player-consumed PNG/WAV/OGG
-assets and distinguishes 64 deterministic procedural outputs from twenty-four
+`asset-manifest.json` schema 3 integrity-hashes all 108 player-consumed PNG/WAV/OGG
+assets and distinguishes 64 deterministic procedural outputs from forty-four
 pre-generated AI-assisted assets. `release/ai-content-disclosure.md` keeps the
 Steam survey draft and unresolved publisher sign-offs explicit; the shipped
 game performs no live AI generation.

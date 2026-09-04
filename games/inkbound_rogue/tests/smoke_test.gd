@@ -129,7 +129,7 @@ func _run_smoke_test() -> void:
 	if not game.manual_open or not game.hud.manual_visible or not paused or game.hud.FIELD_MANUAL_PAGES.size() != 5:
 		_fail("Field Manual did not enter its paused five-page modal state")
 		return
-	if game.hud.manual_body_label.text.find("Godot Engine") < 0 or game.hud.manual_body_label.text.find("THIRD_PARTY_NOTICES.txt") < 0:
+	if game.hud.manual_body_label.text.find("JOYER HUANG") < 0 or game.hud.manual_body_label.text.find("OPENAI CODEX") < 0 or game.hud.manual_body_label.text.find("COMFYUI") < 0 or game.hud.manual_body_label.text.find("STABLE DIFFUSION") < 0 or game.hud.manual_body_label.text.find("MINIMAX H3") < 0 or game.hud.manual_body_label.text.find("GPT-REALTIME-2.1") < 0 or game.hud.manual_body_label.text.find("INDEXTTS 2.5") < 0 or game.hud.manual_body_label.text.find("HAI MIAN MUSIC") < 0 or game.hud.manual_body_label.text.find("THIRD_PARTY_NOTICES.TXT") < 0:
 		_fail("in-game credits and legal summary are missing")
 		return
 	game.hud.hide_manual()
@@ -349,8 +349,18 @@ func _run_smoke_test() -> void:
 	game.run_won = true
 	game.hud.show_victory({"won": true, "ending": "keep", "wave": 12, "level": 10, "score": 12345, "kills": 120, "best_score": 12345, "memory_earned": 12, "archive_rank": 2})
 	game.hud.debug_finish_popup_transition()
-	if not game.hud.victory_credits_visible or game.hud.game_over_visible or game.hud.victory_credit_pages.size() < 5:
+	if not game.hud.victory_credits_visible or game.hud.game_over_visible or game.hud.victory_credit_pages.size() != 9:
 		_fail("victory did not begin the automatic staff carousel")
+		return
+	var credit_copy := ""
+	for credit_page in game.hud.victory_credit_pages:
+		credit_copy += "%s\n%s\n" % [str(credit_page.get("title", "")), str(credit_page.get("body", ""))]
+	for required_credit in ["JOYER HUANG", "OPENAI CODEX", "GODOT ENGINE 4.2.2", "MANGA FORGE", "PYTHON 3", "FFMPEG 4.4.2", "COMFYUI", "STABLE DIFFUSION", "MINIMAX H3", "OPENAI IMAGE GENERATION", "GPT-REALTIME-2.1", "INDEXTTS 2.5", "HAI MIAN MUSIC"]:
+		if credit_copy.find(required_credit) < 0:
+			_fail("victory credits omitted production credit: %s" % required_credit)
+			return
+	if game.hud.victory_credits_prompt.text != "PRESS ANY BUTTON TO CONTINUE":
+		_fail("non-final credits prompt does not use the neutral continue wording")
 		return
 	game.hud._skip_victory_credits_to_thanks()
 	if not game.hud.victory_credits_final or game.hud.victory_credits_title.text.find("THANK YOU") < 0:

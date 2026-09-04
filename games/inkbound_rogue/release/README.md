@@ -7,6 +7,10 @@ the exact Steam payload into the isolated `build/steam-depot/` directory:
 - `THIRD_PARTY_NOTICES.txt` — redistributable engine notice
 - `version.json` — product, build channel, and save-schema identity
 
+The canonical people, tool, model, and platform roster lives in
+`../design/credits.md`; its player-facing summary is compiled into the game and
+the redistributable notices above.
+
 `build/itch-windows/` is the isolated four-file itch.io P1 payload: the three
 files above plus `Start-Recorded-Playtest.cmd`. Distribute that complete
 directory (or a ZIP of it) so players can opt into local recording without

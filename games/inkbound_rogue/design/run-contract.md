@@ -62,7 +62,10 @@ a brief damage grace period. Save & Return reaches the title without committing
 the run; New Game requires confirmation before replacing the current draft.
 Final victory or defeat clears the checkpoint. A seven-entry Story Archive
 replays unlocked cinematics without applying run or ending side effects.
-Victory then runs a five-page staff carousel and stops on a bilingual player
+Victory then runs a nine-page result-and-credits carousel. It names the creator,
+development collaborator, engine, production pipeline, media tools, every
+credited generative model/platform used in the resource-production workflow,
+open-source contributors, and playtesters before stopping on a bilingual player
 thank-you page; any keyboard, mouse, or controller button returns to the title.
 
 ## Validation content

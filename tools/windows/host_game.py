@@ -650,6 +650,15 @@ timeout 120s "$GODOT" --path "$GAME" --script res://tests/capture_manual_ui.gd
     remote(config, command, 180)
 
 
+def capture_credits(config: dict[str, Any], game: str) -> None:
+    game_root = posix_game_root(config, game)
+    command = godot_resolver(config) + f"""
+GAME='{game_root}'
+timeout 120s "$GODOT" --path "$GAME" --script res://tests/capture_credits_ui.gd
+"""
+    remote(config, command, 180)
+
+
 def capture_localization(config: dict[str, Any], game: str) -> None:
     game_root = posix_game_root(config, game)
     command = godot_resolver(config) + f"""
@@ -955,7 +964,7 @@ echo "gracefully restarted $TARGET"
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "p1-suite", "test", "save-test", "pause-test", "quit-test", "defeat-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "gameanalytics-test", "gameanalytics-build-test", "recorded-launcher-test", "capture-session", "capture-ink-art", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
+    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "p1-suite", "test", "save-test", "pause-test", "quit-test", "defeat-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "gameanalytics-test", "gameanalytics-build-test", "recorded-launcher-test", "capture-session", "capture-ink-art", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-credits", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
     parser.add_argument("--game", default=DEFAULT_GAME)
     parser.add_argument("--participant", default="anonymous", help="anonymous facilitator-assigned playtest code")
     parser.add_argument("--reuse-build", action="store_true", help="launch the existing exported build without sync/export")
@@ -1046,6 +1055,8 @@ timeout 120s "$GODOT" --headless --path "$GAME" --script res://tests/playtest_re
         capture_cutscenes(config, args.game)
     elif args.command == "capture-manual":
         capture_manual(config, args.game)
+    elif args.command == "capture-credits":
+        capture_credits(config, args.game)
     elif args.command == "capture-localization":
         capture_localization(config, args.game)
     elif args.command == "balance":

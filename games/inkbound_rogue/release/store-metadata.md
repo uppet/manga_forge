@@ -86,9 +86,16 @@ hardware pass before publishing final requirements.
 
 ## Generative AI disclosure draft
 
-Pre-generated AI-assisted images are present: two character atlases and seven
-unlettered narrative backgrounds were created with OpenAI image generation
-under project direction. Gameplay, collision, animation timing, UI, dialogue,
-localization, progression, and choices are human-authored in the project. The
-runtime uses no live generative AI. The exact inventory and unresolved
-publisher sign-offs are in `ai-content-disclosure.md`.
+Pre-generated AI-assisted content and development assistance are present.
+OpenAI image generation produced two character atlases, seven unlettered story
+backgrounds, and ten Ink Art cinematic images. OpenAI Realtime
+`gpt-realtime-2.1` and a local IndexTTS 2.5 pipeline produced the shipped
+Japanese combat voices. 海绵音乐 / Hai Mian Music produced five AIGC soundtrack
+tracks. OpenAI Codex (GPT-5) assisted with game design, code, text,
+localization, production tooling, validation, and asset integration under the
+project owner's direction and review. ComfyUI, Stable Diffusion, and MiniMax H3
+also participated in the visual-resource/previsualization workflow; their
+precise file-level attribution is a documented pre-release backfill gate. All
+gameplay logic and shipped media are fixed offline content; the runtime uses no
+live generative AI. The exact inventory and unresolved publisher sign-offs are
+in `ai-content-disclosure.md`.

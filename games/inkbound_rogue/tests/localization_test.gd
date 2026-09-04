@@ -69,6 +69,18 @@ func _validate_chinese_runtime() -> bool:
 		return _fail("public title localization is incomplete")
 	if Localization.text("NEW GAME") != "新游戏" or Localization.text("RAZOR INK") != "锋刃墨":
 		return _fail("shell or content translation catalogue is incomplete")
+	var chinese_credits := ""
+	for credit_page in game.hud._victory_credit_page_data({"won": true, "ending": "keep"}):
+		chinese_credits += "%s\n%s\n" % [str(credit_page.get("title", "")), str(credit_page.get("body", ""))]
+	for required_credit in ["JOYER HUANG", "OPENAI CODEX", "GODOT ENGINE 4.2.2", "MANGA FORGE", "PYTHON 3", "FFMPEG 4.4.2", "COMFYUI", "STABLE DIFFUSION", "MINIMAX H3", "OPENAI 图像生成", "GPT-REALTIME-2.1", "INDEXTTS 2.5", "海绵音乐"]:
+		if chinese_credits.find(required_credit) < 0:
+			return _fail("Chinese credits omitted production credit: %s" % required_credit)
+	game.hud.show_victory({"won": true, "ending": "keep"})
+	game.hud.debug_finish_popup_transition(game.hud.victory_credits_panel)
+	if game.hud.victory_credits_prompt.text != "按任意键继续":
+		return _fail("Chinese non-final credits prompt is not the neutral continue wording")
+	game.hud.hide_victory_credits()
+	game.hud.debug_finish_popup_transition(game.hud.victory_credits_panel)
 	if not _validate_content_catalog():
 		return true
 	if Localization.gameplay_text("PAGE 5") != "第 5 页" or Localization.gameplay_text("MEMORY +7") != "记忆 +7" or Localization.gameplay_text("FINAL PERIOD!  6") != "终焉句点！  6":

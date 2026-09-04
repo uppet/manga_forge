@@ -70,8 +70,9 @@ func _validate_navigation_pause_and_persistence() -> bool:
 			return _fail("manual page %d overflows its text region" % (expected_page + 1))
 		if expected_page == 3 and game.hud.manual_body_label.text.find("Daily Chronicle") < 0:
 			return _fail("return page does not explain Daily Chronicle access")
-	if game.hud.manual_body_label.text.find("Godot Engine") < 0 or game.hud.manual_body_label.text.find("THIRD_PARTY_NOTICES.txt") < 0:
-		return _fail("credits and legal notice are not visible in game")
+	for required_credit in ["JOYER HUANG", "OPENAI CODEX", "GODOT 4.2.2", "COMFYUI", "STABLE DIFFUSION", "MINIMAX H3", "OPENAI IMAGE GENERATION", "GPT-REALTIME-2.1", "INDEXTTS 2.5", "HAI MIAN MUSIC", "THIRD_PARTY_NOTICES.TXT"]:
+		if game.hud.manual_body_label.text.find(required_credit) < 0:
+			return _fail("credits page omits %s" % required_credit)
 	if not _content_fits(game.hud.manual_body_label):
 		return _fail("credits page overflows its text region")
 	_send_action("manual")
