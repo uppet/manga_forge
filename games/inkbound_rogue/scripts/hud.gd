@@ -748,7 +748,7 @@ func _build_title() -> void:
 	title_shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	title_panel.add_child(title_shade)
 
-	var logo := _make_child_label(title_panel, "INKBOUND", Vector2(18, 17), Vector2(220, 42), 32, WHITE)
+	var logo := _make_child_label(title_panel, "LAST INKWARDEN", Vector2(18, 17), Vector2(300, 42), 27, WHITE)
 	var subtitle := _make_child_label(title_panel, "BLADE OF THE BLANK PAGE", Vector2(21, 54), Vector2(220, 20), 11, CRIMSON)
 	title_stats_label = _make_child_label(title_panel, "RANK 01  ·  MEM 000  ·  BEST 000000", Vector2(22, 81), Vector2(220, 18), 8, PAPER)
 
@@ -1469,7 +1469,7 @@ func _show_intro() -> void:
 	intro.size = Vector2(372, 102)
 	intro.color = Color(0.025, 0.02, 0.03, 0.78)
 	add_child(intro)
-	var title := _make_child_label(intro, "INKBOUND", Vector2(8, 10), Vector2(356, 36), 26, WHITE)
+	var title := _make_child_label(intro, "LAST INKWARDEN", Vector2(8, 10), Vector2(356, 36), 26, WHITE)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var subtitle := _make_child_label(intro, "BLADE OF THE BLANK PAGE", Vector2(8, 48), Vector2(356, 22), 12, CRIMSON)
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

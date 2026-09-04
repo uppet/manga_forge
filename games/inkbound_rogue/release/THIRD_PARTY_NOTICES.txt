@@ -1,4 +1,4 @@
-INKBOUND: BLADE OF THE BLANK PAGE — THIRD-PARTY NOTICES
+LAST INKWARDEN / 墨卫残章 — THIRD-PARTY NOTICES
 
 Godot Engine
 Copyright (c) 2014-present Godot Engine contributors.

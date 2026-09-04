@@ -2,5 +2,5 @@
 
 [ext_resource path="res://scripts/game.gd" type="Script" id="1_game"]
 
-[node name="InkboundRogue" type="Node2D"]
+[node name="LastInkwarden" type="Node2D"]
 script = ExtResource("1_game")

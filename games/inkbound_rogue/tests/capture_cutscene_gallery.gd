@@ -37,7 +37,7 @@ func _process(_delta: float) -> bool:
 			return _fail("viewport texture unavailable")
 		var output_dir := ProjectSettings.globalize_path("res://build/captures")
 		DirAccess.make_dir_recursive_absolute(output_dir)
-		var output_path := output_dir.path_join("inkbound-cutscene-%s.png" % STORY_ORDER[story_index])
+		var output_path := output_dir.path_join("last-inkwarden-cutscene-%s.png" % STORY_ORDER[story_index])
 		var result := image.save_png(output_path)
 		if result != OK:
 			return _fail("save_png error %d for %s" % [result, STORY_ORDER[story_index]])

@@ -26,12 +26,12 @@ func _process(_delta: float) -> bool:
 		game.debug_set_language(Localization.LANGUAGE_CHINESE)
 		game.hud.show_title(game._meta_snapshot())
 	elif frames == 5:
-		if not _capture("inkbound-zh-title.png"):
+		if not _capture("last-inkwarden-zh-title.png"):
 			return true
 		game.hud.show_settings()
 		game.hud.debug_finish_popup_transition()
 	elif frames == 8:
-		if not _capture("inkbound-zh-settings.png"):
+		if not _capture("last-inkwarden-zh-settings.png"):
 			return true
 		game.hud.hide_settings()
 		game.hud.debug_finish_popup_transition()
@@ -40,14 +40,14 @@ func _process(_delta: float) -> bool:
 		game.hud.show_upgrade(upgrade_choices)
 		game.hud.debug_finish_upgrade_transition()
 	elif frames == 11:
-		if not _capture("inkbound-zh-upgrades.png"):
+		if not _capture("last-inkwarden-zh-upgrades.png"):
 			return true
 		game.hud.upgrade_visible = false
 		game.hud.upgrade_panel.visible = false
 		game.debug_play_story("prologue")
 		game.cutscene.advance()
 	elif frames == 100:
-		if not _capture("inkbound-zh-story.png"):
+		if not _capture("last-inkwarden-zh-story.png"):
 			return true
 		game.cutscene._hide()
 		paused = false
@@ -59,7 +59,7 @@ func _process(_delta: float) -> bool:
 		game.spawn_word(Vector2(0, -32), "RECOVERY DROP!", Color("fff8e0"))
 		paused = true
 	elif frames == 104:
-		if not _capture("inkbound-zh-combat-hud.png"):
+		if not _capture("last-inkwarden-zh-combat-hud.png"):
 			return true
 		print("INKBOUND_LOCALIZATION_UI_OK locale=zh_CN captures=5 title=settings=upgrades=story=combat_hud font=system-fallback")
 		_cleanup(0)

@@ -2,7 +2,7 @@
 
 ## Musical identity
 
-Inkbound's experimental score uses five 海绵音乐 (Hai Mian Music) AIGC tracks
+Last Inkwarden's experimental score uses five 海绵音乐 (Hai Mian Music) AIGC tracks
 as its player-facing baseline. All runtime cues are 44.1 kHz stereo Ogg Vorbis
 at roughly -16 to -17 LUFS. Music must still support combat readability rather
 than fill every frequency.

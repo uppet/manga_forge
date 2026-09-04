@@ -4,15 +4,16 @@ config_version=5
 
 [application]
 
-config/name="Inkbound: Blade of the Blank Page"
+config/name="Last Inkwarden"
 config/description="A manga-pixel action roguelike about restoring the stories erased from the Grand Archive."
-config/version="0.23.3-alpha"
+config/version="0.23.4-alpha"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.2", "GL Compatibility")
 config/icon="res://assets/generated/icon.png"
 
 [autoload]
 
+BrandMigration="*res://scripts/brand_migration.gd"
 PlaytestSession="*res://scripts/playtest_session.gd"
 GameAnalyticsClient="*res://scripts/gameanalytics_client.gd"
 

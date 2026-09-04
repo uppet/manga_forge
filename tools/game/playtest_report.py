@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aggregate privacy-preserving Inkbound playtest sessions into JSON and Markdown."""
+"""Aggregate privacy-preserving Last Inkwarden sessions into JSON and Markdown."""
 
 from __future__ import annotations
 
@@ -163,7 +163,7 @@ def aggregate_sessions(root: Path) -> dict[str, Any]:
 
 def render_markdown(report: dict[str, Any]) -> str:
     lines = [
-        "# Inkbound playtest report",
+        "# Last Inkwarden playtest report",
         "",
         f"- Sessions: {report['sessions']} ({report['complete_sessions']} complete, {report['incomplete_sessions']} incomplete)",
         f"- Survey coverage: {report['surveyed_sessions']}/{report['sessions']}",

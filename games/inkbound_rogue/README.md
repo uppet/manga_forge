@@ -1,9 +1,12 @@
-# Inkbound: Blade of the Blank Page
+# Last Inkwarden / 墨卫残章
 
 A top-down manga-pixel action roguelike and Manga Forge's end-to-end release
 validation game. A complete three-act run follows Nara through the Grand Archive,
 the Forbidden Bindery, and the First Press, with seven animated story sequences
 and two persistent endings. Completed runs continue as harder drafts.
+
+The public naming, localized-title usage, and legacy save/interface policy are
+defined in `design/branding.md`.
 
 ## Playable content
 
@@ -312,13 +315,13 @@ python3 tools/windows/host_game.py playtest --participant P-001
 ```
 
 For a distributed Windows build, double-click
-`Start-Recorded-Playtest.cmd` beside `InkboundRogue.exe`. It explains the local
+`Start-Recorded-Playtest.cmd` beside `LastInkwarden.exe`. It explains the local
 data boundary, asks for consent and an anonymous code, creates a unique session,
 and opens the output folder after the game closes. Logs default to
 `playtest-logs/` beside the executable. Facilitators may instead run:
 
 ```cmd
-Start-Recorded-Playtest.cmd P-001 "D:\\InkboundPlaytestLogs"
+Start-Recorded-Playtest.cmd P-001 "D:\\LastInkwardenPlaytestLogs"
 ```
 
 The launcher scopes all environment variables to itself and the child game; it

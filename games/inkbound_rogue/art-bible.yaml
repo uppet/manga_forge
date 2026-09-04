@@ -1,6 +1,7 @@
 schema_version: 2
-project_id: inkbound-rogue
-title: "Inkbound: Blade of the Blank Page"
+project_id: last-inkwarden
+title: "Last Inkwarden"
+localized_title_zh_cn: "墨卫残章"
 internal_resolution: [480, 270]
 pixel_grid: 16
 texture_filter: nearest

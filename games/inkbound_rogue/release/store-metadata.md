@@ -1,4 +1,10 @@
-# Steam store metadata draft
+# Last Inkwarden / 墨卫残章 — Steam store metadata draft
+
+Public product name: **Last Inkwarden**
+
+Simplified Chinese product name: **墨卫残章**
+
+Promotional line: **Blade of the Blank Page / 空白页之刃**
 
 ## Short description
 

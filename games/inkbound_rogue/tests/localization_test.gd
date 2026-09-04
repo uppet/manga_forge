@@ -65,6 +65,8 @@ func _validate_chinese_runtime() -> bool:
 		return _fail("explicit Simplified Chinese locale was not applied")
 	if str(game.settings.get("language", "")) != Localization.LANGUAGE_CHINESE:
 		return _fail("language setting did not retain its persisted identifier")
+	if Localization.text("LAST INKWARDEN") != "墨卫残章" or Localization.text("BLADE OF THE BLANK PAGE") != "空白页之刃":
+		return _fail("public title localization is incomplete")
 	if Localization.text("NEW GAME") != "新游戏" or Localization.text("RAZOR INK") != "锋刃墨":
 		return _fail("shell or content translation catalogue is incomplete")
 	if not _validate_content_catalog():

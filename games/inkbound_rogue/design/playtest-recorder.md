@@ -38,7 +38,7 @@ python3 tools/windows/host_game.py process-status
 python3 tools/windows/host_game.py playtest --participant P-001
 ```
 
-`playtest` refuses to proceed while `InkboundRogue.exe` is already running,
+`playtest` refuses to proceed while `LastInkwarden.exe` or a legacy executable is already running,
 syncs and exports the current source, then launches exactly that executable with
 an anonymous build/session identity. For repeated sessions on the identical
 export, use `--reuse-build`; do not use it after source, assets, or version data

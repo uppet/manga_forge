@@ -38,33 +38,33 @@ func _process(_delta: float) -> bool:
 	elif frames == 6:
 		game.hud._cycle_contract(1)
 	elif frames == 12:
-		_capture("inkbound-title-render.png")
+		_capture("last-inkwarden-title-render.png")
 		if capture_failed:
 			return true
 		game.hud._toggle_history()
 		game.hud.debug_finish_popup_transition()
 	elif frames == 16:
-		_capture("inkbound-history-render.png")
+		_capture("last-inkwarden-history-render.png")
 		if capture_failed:
 			return true
 		game.hud._toggle_history()
 		game.hud._toggle_achievements()
 		game.hud.debug_finish_popup_transition()
 	elif frames == 20:
-		_capture("inkbound-achievements-render.png")
+		_capture("last-inkwarden-achievements-render.png")
 		if capture_failed:
 			return true
 		game.hud._toggle_achievements()
 		game.hud.show_settings()
 		game.hud.debug_finish_popup_transition()
 	elif frames == 24:
-		_capture("inkbound-options-render.png")
+		_capture("last-inkwarden-options-render.png")
 		if capture_failed:
 			return true
 		game.hud.show_bindings()
 		game.hud.debug_finish_popup_transition()
 	elif frames == 32:
-		_capture("inkbound-bindings-render.png")
+		_capture("last-inkwarden-bindings-render.png")
 		if capture_failed:
 			return true
 		game.hud.hide_bindings()
@@ -74,7 +74,7 @@ func _process(_delta: float) -> bool:
 		game.hud.hide_title()
 		game.debug_play_story("prologue")
 	elif frames == 40:
-		_capture("inkbound-cutscene-render.png")
+		_capture("last-inkwarden-cutscene-render.png")
 		if capture_failed:
 			return true
 		game.cutscene.debug_complete()
@@ -84,7 +84,7 @@ func _process(_delta: float) -> bool:
 		game.debug_offer_event("forgotten-shrine")
 		game.hud.debug_finish_popup_transition()
 	elif frames == 158:
-		_capture("inkbound-event-render.png")
+		_capture("last-inkwarden-event-render.png")
 		if capture_failed:
 			return true
 		game.hud._choose_event(1)
@@ -96,7 +96,7 @@ func _process(_delta: float) -> bool:
 		game._offer_route(2)
 		game.hud.debug_finish_popup_transition()
 	elif frames == 174:
-		_capture("inkbound-route-render.png")
+		_capture("last-inkwarden-route-render.png")
 		if capture_failed:
 			return true
 		game.hud._choose_event(0)
@@ -107,12 +107,12 @@ func _process(_delta: float) -> bool:
 		game.hud.achievement_toast.visible = false
 		game.hud.achievement_queue.clear()
 	elif frames == 210:
-		_capture("inkbound-gameplay-render.png")
+		_capture("last-inkwarden-gameplay-render.png")
 		if capture_failed:
 			return true
 		_prepare_combat_gallery()
 	elif frames == 218:
-		_capture("inkbound-enemy-powerup-render.png")
+		_capture("last-inkwarden-enemy-powerup-render.png")
 		if capture_failed:
 			return true
 		game.hud.show_game_over({
@@ -125,7 +125,7 @@ func _process(_delta: float) -> bool:
 		})
 		game.hud.debug_finish_game_over_transition(true)
 	elif frames == 226:
-		_capture("inkbound-run-summary-render.png")
+		_capture("last-inkwarden-run-summary-render.png")
 		if capture_failed:
 			return true
 		print("INKBOUND_CAPTURE_OK gallery=11 size=960x540")

@@ -23,12 +23,12 @@ func _process(_delta: float) -> bool:
 		game.hud.show_manual(0)
 		game.hud.debug_finish_popup_transition()
 	elif frames == 12:
-		if not _capture("inkbound-field-manual.png"):
+		if not _capture("last-inkwarden-field-manual.png"):
 			return true
 		game.hud.manual_page = 4
 		game.hud._refresh_manual()
 	elif frames == 21:
-		if not _capture("inkbound-credits-legal.png"):
+		if not _capture("last-inkwarden-credits-legal.png"):
 			return true
 		print("INKBOUND_MANUAL_CAPTURE_OK pages=2 size=%dx%d" % [root.get_texture().get_width(), root.get_texture().get_height()])
 		game.debug_clear_save_files()

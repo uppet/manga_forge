@@ -234,7 +234,7 @@ def probe(config: dict[str, Any]) -> None:
 
 def process_status(config: dict[str, Any]) -> None:
     command = r"""
-powershell.exe -NoProfile -Command '$now = Get-Date; $items = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "InkboundRogue.exe" -or $_.Name -like "Godot*.exe" } | ForEach-Object { [pscustomobject]@{ ProcessId = $_.ProcessId; Name = $_.Name; ElapsedSeconds = [math]::Round(($now - $_.CreationDate).TotalSeconds, 1); CpuSeconds = [math]::Round(($_.KernelModeTime + $_.UserModeTime) / 10000000, 1); WorkingSetMB = [math]::Round($_.WorkingSetSize / 1MB, 1); CommandLine = $_.CommandLine } }); [pscustomobject]@{ count = $items.Count; processes = $items } | ConvertTo-Json -Depth 4 -Compress'
+powershell.exe -NoProfile -Command '$now = Get-Date; $items = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -in @("LastInkwarden.exe", "InkboundRogue.exe") -or $_.Name -like "Godot*.exe" } | ForEach-Object { [pscustomobject]@{ ProcessId = $_.ProcessId; Name = $_.Name; ElapsedSeconds = [math]::Round(($now - $_.CreationDate).TotalSeconds, 1); CpuSeconds = [math]::Round(($_.KernelModeTime + $_.UserModeTime) / 10000000, 1); WorkingSetMB = [math]::Round($_.WorkingSetSize / 1MB, 1); CommandLine = $_.CommandLine } }); [pscustomobject]@{ count = $items.Count; processes = $items } | ConvertTo-Json -Depth 4 -Compress'
 """.strip()
     drive = config["windows_runtime_root"].split("\\", 1)[0] + "\\"
     remote(config, command, 120, cwd=drive)
@@ -251,7 +251,7 @@ powershell.exe -NoProfile -Command '$items = @(Get-CimInstance Win32_Process | W
 
 def ensure_game_not_running(config: dict[str, Any]) -> None:
     command = r"""
-powershell.exe -NoProfile -Command '$count = @(Get-Process -Name "InkboundRogue" -ErrorAction SilentlyContinue).Count; if ($count -gt 0) { Write-Error "InkboundRogue is already running; close it before preparing a playtest build"; exit 19 }'
+powershell.exe -NoProfile -Command '$count = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -in @("LastInkwarden.exe", "InkboundRogue.exe") }).Count; if ($count -gt 0) { Write-Error "Last Inkwarden is already running; close it before preparing a playtest build"; exit 19 }'
 """.strip()
     drive = config["windows_runtime_root"].split("\\", 1)[0] + "\\"
     remote(config, command, 120, cwd=drive)
@@ -723,24 +723,25 @@ def export(config: dict[str, Any], game: str) -> None:
 set -e
 GAME='{game_root}'
 mkdir -p \"$GAME/build/windows\"
-rm -f \"$GAME/build/windows/InkboundRogue.exe\" \"$GAME/build/windows/InkboundRogue.tmp\" \"$GAME/build/windows/Start-GameAnalytics.local.cmd.example\"
-\"$GODOT\" --headless --path \"$GAME\" --export-release 'Windows Desktop' \"$GAME/build/windows/InkboundRogue.exe\"
-test -s \"$GAME/build/windows/InkboundRogue.exe\"
+rm -f \"$GAME/build/windows/LastInkwarden.exe\" \"$GAME/build/windows/LastInkwarden.tmp\" \"$GAME/build/windows/InkboundRogue.exe\" \"$GAME/build/windows/InkboundRogue.tmp\" \"$GAME/build/windows/Start-GameAnalytics.local.cmd.example\"
+\"$GODOT\" --headless --path \"$GAME\" --export-release 'Windows Desktop' \"$GAME/build/windows/LastInkwarden.exe\"
+test -s \"$GAME/build/windows/LastInkwarden.exe\"
 cp \"$GAME/release/THIRD_PARTY_NOTICES.txt\" \"$GAME/build/windows/THIRD_PARTY_NOTICES.txt\"
 cp \"$GAME/release/version.json\" \"$GAME/build/windows/version.json\"
 cp \"$GAME/release/Start-Recorded-Playtest.cmd\" \"$GAME/build/windows/Start-Recorded-Playtest.cmd\"
 test \"$(tr -cd '\\r' < \"$GAME/build/windows/Start-Recorded-Playtest.cmd\" | wc -c)\" -gt 20
 ITCH=\"$GAME/build/itch-windows\"
 mkdir -p \"$ITCH\"
-cp \"$GAME/build/windows/InkboundRogue.exe\" \"$ITCH/InkboundRogue.exe\"
+rm -f \"$ITCH/InkboundRogue.exe\" \"$ITCH/LastInkwarden.exe\"
+cp \"$GAME/build/windows/LastInkwarden.exe\" \"$ITCH/LastInkwarden.exe\"
 cp \"$GAME/build/windows/THIRD_PARTY_NOTICES.txt\" \"$ITCH/THIRD_PARTY_NOTICES.txt\"
 cp \"$GAME/build/windows/version.json\" \"$ITCH/version.json\"
 cp \"$GAME/build/windows/Start-Recorded-Playtest.cmd\" \"$ITCH/Start-Recorded-Playtest.cmd\"
 test \"$(find \"$ITCH\" -mindepth 1 -maxdepth 1 | wc -l)\" -eq 4
 DEPOT=\"$GAME/build/steam-depot\"
 mkdir -p \"$DEPOT\"
-rm -f \"$DEPOT/InkboundRogue.exe\" \"$DEPOT/THIRD_PARTY_NOTICES.txt\" \"$DEPOT/version.json\"
-cp \"$GAME/build/windows/InkboundRogue.exe\" \"$DEPOT/InkboundRogue.exe\"
+rm -f \"$DEPOT/InkboundRogue.exe\" \"$DEPOT/LastInkwarden.exe\" \"$DEPOT/THIRD_PARTY_NOTICES.txt\" \"$DEPOT/version.json\"
+cp \"$GAME/build/windows/LastInkwarden.exe\" \"$DEPOT/LastInkwarden.exe\"
 cp \"$GAME/build/windows/THIRD_PARTY_NOTICES.txt\" \"$DEPOT/THIRD_PARTY_NOTICES.txt\"
 cp \"$GAME/build/windows/version.json\" \"$DEPOT/version.json\"
 test \"$(find \"$DEPOT\" -mindepth 1 -maxdepth 1 | wc -l)\" -eq 3
@@ -748,7 +749,7 @@ BOOT_STATUS=0
 export INKBOUND_BOOT_SMOKE=1
 export INKBOUND_GA_ENABLED=0
 BOOT_LOG=\"$GAME/build/windows/export-boot.log\"
-timeout 30s \"$GAME/build/windows/InkboundRogue.exe\" > \"$BOOT_LOG\" 2>&1 || BOOT_STATUS=$?
+timeout 30s \"$GAME/build/windows/LastInkwarden.exe\" > \"$BOOT_LOG\" 2>&1 || BOOT_STATUS=$?
 cat \"$BOOT_LOG\"
 echo "export_boot_status=$BOOT_STATUS"
 test "$BOOT_STATUS" -eq 0
@@ -802,7 +803,7 @@ def export_smoke(config: dict[str, Any], game: str) -> None:
     command = godot_resolver(config) + f"""
 set -e
 GAME='{game_root}'
-TARGET="$GAME/build/windows/InkboundRogue.exe"
+TARGET="$GAME/build/windows/LastInkwarden.exe"
 test -s "$TARGET"
 BOOT_STATUS=0
 export INKBOUND_BOOT_SMOKE=1
@@ -817,11 +818,11 @@ def run(config: dict[str, Any], game: str) -> None:
     game_root = posix_game_root(config, game)
     command = godot_resolver(config) + f"""
 GAME='{game_root}'
-if [ -f \"$GAME/build/windows/InkboundRogue.exe\" ]; then
-  TARGET=\"$GAME/build/windows/InkboundRogue.exe\"
-  EXISTING=$(powershell.exe -NoProfile -Command '(Get-Process -Name "InkboundRogue" -ErrorAction SilentlyContinue | Measure-Object).Count' | tr -d '\r[:space:]')
+if [ -f \"$GAME/build/windows/LastInkwarden.exe\" ]; then
+  TARGET=\"$GAME/build/windows/LastInkwarden.exe\"
+  EXISTING=$(powershell.exe -NoProfile -Command '@(Get-CimInstance Win32_Process | Where-Object {{ $_.Name -in @("LastInkwarden.exe", "InkboundRogue.exe") }}).Count' | tr -d '\r[:space:]')
   if [ \"${{EXISTING:-0}}\" -gt 0 ]; then
-    echo \"already running: InkboundRogue.exe instances=$EXISTING\"
+    echo \"already running: Last Inkwarden instances=$EXISTING\"
     exit 0
   fi
   TARGET_WIN=$(cygpath -w \"$TARGET\")
@@ -868,7 +869,7 @@ def playtest(config: dict[str, Any], game: str, participant: str, reuse_build: b
     command = godot_resolver(config) + f"""
 set -e
 GAME='{game_root}'
-TARGET="$GAME/build/windows/InkboundRogue.exe"
+TARGET="$GAME/build/windows/LastInkwarden.exe"
 test -s "$TARGET"
 SESSION_ROOT="$GAME/build/playtest/sessions"
 mkdir -p "$SESSION_ROOT"
@@ -895,7 +896,7 @@ def recorded_launcher_test(config: dict[str, Any], game: str) -> None:
 set -e
 GAME='{game_root}'
 LAUNCHER="$GAME/build/itch-windows/Start-Recorded-Playtest.cmd"
-TARGET="$GAME/build/itch-windows/InkboundRogue.exe"
+TARGET="$GAME/build/itch-windows/LastInkwarden.exe"
 RUN_ID=$(date -u +'%Y%m%dT%H%M%SZ')
 OUTPUT="$GAME/build/playtest/launcher-audit/$RUN_ID"
 test -s "$TARGET"
@@ -942,9 +943,9 @@ def restart(config: dict[str, Any], game: str) -> None:
     command = godot_resolver(config) + f"""
 set -e
 GAME='{game_root}'
-TARGET="$GAME/build/windows/InkboundRogue.exe"
+TARGET="$GAME/build/windows/LastInkwarden.exe"
 test -s "$TARGET"
-powershell.exe -NoProfile -Command '$items = @(Get-Process -Name "InkboundRogue" -ErrorAction SilentlyContinue); foreach ($item in $items) {{ $null = $item.CloseMainWindow() }}; $deadline = (Get-Date).AddSeconds(8); do {{ Start-Sleep -Milliseconds 200; $remaining = @(Get-Process -Name "InkboundRogue" -ErrorAction SilentlyContinue) }} while ($remaining.Count -gt 0 -and (Get-Date) -lt $deadline); if ($remaining.Count -gt 0) {{ Write-Error "InkboundRogue did not close gracefully; refusing to force-stop it"; exit 17 }}'
+powershell.exe -NoProfile -Command '$items = @(Get-CimInstance Win32_Process | Where-Object {{ $_.Name -in @("LastInkwarden.exe", "InkboundRogue.exe") }} | ForEach-Object {{ Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue }}); foreach ($item in $items) {{ $null = $item.CloseMainWindow() }}; $deadline = (Get-Date).AddSeconds(8); do {{ Start-Sleep -Milliseconds 200; $remaining = @(Get-CimInstance Win32_Process | Where-Object {{ $_.Name -in @("LastInkwarden.exe", "InkboundRogue.exe") }}) }} while ($remaining.Count -gt 0 -and (Get-Date) -lt $deadline); if ($remaining.Count -gt 0) {{ Write-Error "Last Inkwarden did not close gracefully; refusing to force-stop it"; exit 17 }}'
 TARGET_WIN=$(cygpath -w "$TARGET")
 powershell.exe -NoProfile -Command "Start-Process -FilePath '$TARGET_WIN' -ErrorAction Stop"
 echo "gracefully restarted $TARGET"

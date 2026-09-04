@@ -16,7 +16,7 @@ references:
 
 ```text
 Use case: stylized-concept
-Asset type: 16:9 full-screen ultimate-skill character cut-in for the 2D manga action game Inkbound: Blade of the Blank Page
+Asset type: 16:9 full-screen ultimate-skill character cut-in for the 2D manga action game Last Inkwarden / 墨卫残章
 Input images: Image 1 and Image 2 are identity and rendering-style references. Use only Nara, the top-left swordsman in Image 1 and the same swordsman shown in Image 2. Do not include any other character.
 Primary request: create one spectacular full-screen manga cut-in of Nara the instant he activates an ink technique. Preserve his exact identity: lean young swordsman, long black hair in a high ponytail, red headband and long red scarf/sash, white wrap shirt with rolled short sleeves, loose charcoal-black hakama trousers, sandals, black ink-like katana with a small gold guard. He draws the sword upward across the foreground, three-quarter close-up from waist/chest upward, eyes sharp and calm, face clearly recognizable, scarf and hair exploding in the motion.
 Scene/backdrop: abstract torn-paper panel, deep black sumi-ink eruption and diagonal speed lines, ivory paper slash, restrained crimson energy accents. No literal battlefield.

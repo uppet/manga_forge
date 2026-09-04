@@ -47,7 +47,7 @@ func _process(_delta: float) -> bool:
 		push_error("INKBOUND_RESTORATION_UI_FAIL: viewport texture unavailable")
 		_cleanup(1)
 		return true
-	var output_path := output_dir.path_join("inkbound-restoration-board.png")
+	var output_path := output_dir.path_join("last-inkwarden-restoration-board.png")
 	var result := image.save_png(output_path)
 	if result != OK:
 		push_error("INKBOUND_RESTORATION_UI_FAIL: save_png error %d" % result)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit Inkbound source provenance and an optional isolated Windows depot."""
+"""Audit Last Inkwarden source provenance and optional Windows bundles."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_GAME_ROOT = REPO_ROOT / "games" / "inkbound_rogue"
 RUNTIME_SUFFIXES = {".png", ".wav", ".ogg"}
-DEPOT_ALLOWLIST = {"InkboundRogue.exe", "THIRD_PARTY_NOTICES.txt", "version.json"}
+DEPOT_ALLOWLIST = {"LastInkwarden.exe", "THIRD_PARTY_NOTICES.txt", "version.json"}
 ITCH_ALLOWLIST = DEPOT_ALLOWLIST | {"Start-Recorded-Playtest.cmd"}
 REQUIRED_ASSET_FIELDS = {
     "id",
@@ -195,7 +195,7 @@ def audit_depot(depot_root: Path, expected_version: str) -> tuple[list[str], dic
         path = depot_root / name
         if not path.is_file() or path.stat().st_size <= 0:
             errors.append(f"depot payload is missing or empty: {name}")
-    executable = depot_root / "InkboundRogue.exe"
+    executable = depot_root / "LastInkwarden.exe"
     if executable.is_file():
         with executable.open("rb") as handle:
             if handle.read(2) != b"MZ":
@@ -226,7 +226,7 @@ def audit_itch_bundle(itch_root: Path, expected_version: str) -> tuple[list[str]
         path = itch_root / name
         if not path.is_file() or path.stat().st_size <= 0:
             errors.append(f"itch payload is missing or empty: {name}")
-    executable = itch_root / "InkboundRogue.exe"
+    executable = itch_root / "LastInkwarden.exe"
     if executable.is_file():
         with executable.open("rb") as handle:
             if handle.read(2) != b"MZ":

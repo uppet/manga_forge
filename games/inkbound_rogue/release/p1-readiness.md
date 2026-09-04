@@ -1,4 +1,4 @@
-# P1 candidate readiness — 0.23.3-alpha
+# P1 candidate readiness — 0.23.4-alpha
 
 Snapshot date: 2026-09-04. This is the automated development baseline for a
 small, private Windows playtest. It is not evidence of Steam release quality or
@@ -11,13 +11,14 @@ of player enjoyment, accessibility, minimum hardware, or controller coverage.
 | Serial regression | Pass: 29/29 gameplay, save, pause, quit, defeat, UI, localization, balance, persona, recorder, analytics, and stress gates |
 | Modal transitions | Pass: upgrade drafts retain their 0.24-second/0.18-second elastic transitions and 1.016× opening/closing overshoot; relic, event, pause, manual, settings, binding, title-overlay, and credits panels use 0.16-second fade-ins and 0.12-second fade-outs. Defeat uses a 1.25-second battlefield darkening before the result panel, then a 1.50-second input guard plus release-before-repress protection |
 | Modal input handoff | Pass: held movement resumes immediately after a choice; only overlapping attack/dash/special actions are gated until release, with a 0.75-second lost-release fail-safe and focus/controller reset |
-| Evidence directory | `build/p1-suite/20260904T102610Z/` in the Windows runtime; compact summary plus one log per gate |
-| Recorded stress run | Pass: 1,200 frames, 139.2 processing FPS average, 78 peak enemies, 52 peak pickups, 747 peak nodes, 120.8 MiB static memory, Page 13, 252 kills |
-| Unrecorded suite stress run | Pass: 1,200 frames, 142.8 processing FPS average, 76 peak enemies, 41 peak pickups, 745 peak nodes, 143.3 MiB static memory, Page 13, 238 kills |
+| Brand and localization | Pass: public identity is `Last Inkwarden / 墨卫残章`; English and Chinese title captures are contained, and the former profile directory is copied forward without overwriting new data or deleting old data |
+| Evidence directory | `build/p1-suite/20260904T132703Z/` in the Windows runtime; compact summary plus one log per gate |
+| Recorded stress run | Pass: 1,200 frames, 140.4 processing FPS average, 77 peak enemies, 38 peak pickups, 737 peak nodes, 143.2 MiB static memory, Page 13, 217 kills |
+| Unrecorded suite stress run | Pass: 1,200 frames, 140.9 processing FPS average, 77 peak enemies, 39 peak pickups, 740 peak nodes, 143.3 MiB static memory, Page 13, 223 kills |
 | Windows export boot | Pass: embedded-PCK executable ran 120 frames with GL Compatibility on Radeon RX 9070 XT and exited normally |
 | Recorded CMD launcher | Pass: consent-capable launcher started the real EXE, wrote a complete pseudonymous session, removed `incomplete.flag`, and left zero processes |
-| Release/depot audit | Pass: 108 assets; 64 procedural, 44 pre-generated AI, zero live AI; exactly 3 Steam depot files (117,758,121 bytes) and 4 itch.io recorded-playtest files (117,761,486 bytes) |
-| Candidate executable | `build/itch-windows/InkboundRogue.exe`; audited SHA-256 `61e91aaff7c5bb58e7f3b6c42c47261b31e5f2e7fb184770cb19a77bd840c445` |
+| Release/depot audit | Pass: 108 assets; 64 procedural, 44 pre-generated AI, zero live AI; exactly 3 Steam depot files (117,761,673 bytes) and 4 itch.io recorded-playtest files (117,765,036 bytes) |
+| Candidate executable | `build/itch-windows/LastInkwarden.exe`; audited SHA-256 `c79b67b71474da2f3be09f80f1bfaabc950c99830f37edc4de6deec7d20e78ca` |
 | Process hygiene | Pass: zero Godot or exported-game processes after the serial suite |
 
 The recorded and unrecorded stress figures are development-machine processing

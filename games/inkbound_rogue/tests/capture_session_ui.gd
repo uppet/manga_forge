@@ -42,16 +42,16 @@ func _process(_delta: float) -> bool:
 			game.hud.show_title(game._meta_snapshot())
 			paused = true
 		8:
-			_capture("inkbound-session-title.png")
+			_capture("last-inkwarden-session-title.png")
 			game.hud._show_loadout()
 			game.hud.debug_finish_popup_transition()
 		10:
-			_capture("inkbound-starting-armory.png")
+			_capture("last-inkwarden-starting-armory.png")
 			game.hud._cancel_loadout()
 			game.hud._toggle_story()
 			game.hud.debug_finish_popup_transition()
 		12:
-			_capture("inkbound-story-archive.png")
+			_capture("last-inkwarden-story-archive.png")
 			game.hud._toggle_story()
 			game.hud.debug_finish_popup_transition()
 			game.hud.hide_title()
@@ -60,13 +60,13 @@ func _process(_delta: float) -> bool:
 			game._sync_pause_state()
 			game.hud.debug_finish_popup_transition()
 		16:
-			_capture("inkbound-save-return.png")
+			_capture("last-inkwarden-save-return.png")
 			game.manually_paused = false
 			game._sync_pause_state()
 			game.hud.debug_finish_popup_transition()
 			_prepare_supplies()
 		22:
-			_capture("inkbound-recovery-aoe.png")
+			_capture("last-inkwarden-recovery-aoe.png")
 			paused = false
 			var worst_case_choices: Array[Dictionary] = [
 				Content.upgrade("greatbrush"),
@@ -77,7 +77,7 @@ func _process(_delta: float) -> bool:
 			game.hud.show_upgrade(worst_case_choices)
 			game.hud.debug_finish_upgrade_transition()
 		26:
-			_capture("inkbound-upgrade-cards.png")
+			_capture("last-inkwarden-upgrade-cards.png")
 			game.hud.upgrade_visible = false
 			game.hud.upgrade_panel.visible = false
 			game.hud.current_choices.clear()
@@ -85,7 +85,7 @@ func _process(_delta: float) -> bool:
 			game.offer_relic_draft("FIELD RELIC · CHOOSE ONE MEMORY")
 			game.hud.debug_finish_popup_transition()
 		28:
-			_capture("inkbound-relic-draft.png")
+			_capture("last-inkwarden-relic-draft.png")
 			game.hud._choose_relic(0)
 			game.hud.debug_finish_popup_transition()
 			paused = false
@@ -94,22 +94,22 @@ func _process(_delta: float) -> bool:
 			game.player.debug_ink_art(Vector2.RIGHT)
 			paused = true
 		33:
-			_capture("inkbound-ink-art.png")
+			_capture("last-inkwarden-ink-art.png")
 			paused = false
 			_prepare_page_directive()
 		35:
 			game.directive_zone._physics_process(3.4)
 			paused = true
 		37:
-			_capture("inkbound-page-directive.png")
+			_capture("last-inkwarden-page-directive.png")
 			paused = false
 			_prepare_route_hazard()
 		41:
-			_capture("inkbound-route-hazard.png")
+			_capture("last-inkwarden-route-hazard.png")
 			paused = false
 			_prepare_boss_hud()
 		43:
-			_capture("inkbound-boss-hud.png")
+			_capture("last-inkwarden-boss-hud.png")
 			game.hud.set_boss("", 0.0, 0.0)
 			game.hud.show_victory({
 				"won": true,
@@ -132,10 +132,10 @@ func _process(_delta: float) -> bool:
 			})
 			game.hud.debug_finish_popup_transition()
 		45:
-			_capture("inkbound-victory-results.png")
+			_capture("last-inkwarden-victory-results.png")
 			game.hud._skip_victory_credits_to_thanks()
 		47:
-			_capture("inkbound-thank-you.png")
+			_capture("last-inkwarden-thank-you.png")
 			print("INKBOUND_SESSION_CAPTURE_OK gallery=13 size=%dx%d" % [root.get_texture().get_width(), root.get_texture().get_height()])
 			paused = false
 			game.debug_clear_save_files()

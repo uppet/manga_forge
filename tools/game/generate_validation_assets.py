@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate deterministic, dependency-free pixel art and audio for Inkbound Rogue."""
+"""Generate deterministic, dependency-free assets for Last Inkwarden."""
 
 from __future__ import annotations
 

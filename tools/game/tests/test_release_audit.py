@@ -19,7 +19,7 @@ class ReleaseAuditTests(unittest.TestCase):
     def test_isolated_itch_bundle_accepts_only_the_four_release_files(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             itch_root = Path(temporary_directory)
-            (itch_root / "InkboundRogue.exe").write_bytes(b"MZtest")
+            (itch_root / "LastInkwarden.exe").write_bytes(b"MZtest")
             (itch_root / "THIRD_PARTY_NOTICES.txt").write_text("notice", encoding="utf-8")
             (itch_root / "version.json").write_text(
                 json.dumps({"version": "0.23.0-alpha"}), encoding="utf-8"
@@ -34,7 +34,7 @@ class ReleaseAuditTests(unittest.TestCase):
     def test_isolated_itch_bundle_rejects_internal_files(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             itch_root = Path(temporary_directory)
-            (itch_root / "InkboundRogue.exe").write_bytes(b"MZtest")
+            (itch_root / "LastInkwarden.exe").write_bytes(b"MZtest")
             (itch_root / "THIRD_PARTY_NOTICES.txt").write_text("notice", encoding="utf-8")
             (itch_root / "version.json").write_text(
                 json.dumps({"version": "0.23.0-alpha"}), encoding="utf-8"

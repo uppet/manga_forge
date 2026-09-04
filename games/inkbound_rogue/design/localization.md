@@ -1,7 +1,8 @@
 # Localization contract
 
-Inkbound ships English (`en`) and Simplified Chinese (`zh_CN`). English source
-text is canonical for content IDs, simulation state, checkpoints, and profile
+Last Inkwarden ships English (`en`) and Simplified Chinese (`zh_CN`) under the
+localized title **墨卫残章**. English source text is canonical for content IDs,
+simulation state, checkpoints, and profile
 history. `scripts/localization.gd` registers the Chinese catalogue as a Godot
 `Translation` before the HUD is built; dynamic strings explicitly translate
 their content fragments before formatting.
@@ -15,7 +16,7 @@ their content fragments before formatting.
 - English and Simplified Chinese are explicit runtime overrides.
 - The choice is saved in profile schema 12. Profiles created before the field
   existed safely inherit `auto`; invalid values are sanitized to `auto`.
-- Switching language refreshes the title shell, settings, manual, active
+- Switching language refreshes the localized public title, settings, manual, active
   technique/relic/event draft, HUD build/objective/directive state, result copy,
   and an active cutscene without restarting the run.
 

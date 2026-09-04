@@ -605,8 +605,8 @@ const ZH_CN := {
 
 	# Remaining shell, HUD and system notices.
 	"BUILD": "版本",
-	"INKBOUND": "墨缚",
-	"BLADE OF THE BLANK PAGE": "空白之页的刀刃",
+	"LAST INKWARDEN": "墨卫残章",
+	"BLADE OF THE BLANK PAGE": "空白页之刃",
 	"SURVIVE. CUT. REWRITE.": "生存。斩断。重写。",
 	"FIND IORI BEYOND THE REDACTIONS": "穿过删改，寻找伊织",
 	"NEW GAME": "新游戏",

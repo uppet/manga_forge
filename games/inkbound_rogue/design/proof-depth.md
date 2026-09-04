@@ -1,6 +1,6 @@
 # Proof Depth
 
-Proof Depth is Inkbound Rogue's post-ending mastery ladder. It layers on top of
+Proof Depth is Last Inkwarden's post-ending mastery ladder. It layers on top of
 difficulty, contract, route, starting weapon, and build choices instead of
 replacing them. Proof 0 remains the authored baseline, and clearing the highest
 available depth unlocks exactly one next depth. A failed run never skips a rung.

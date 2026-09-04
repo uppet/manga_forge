@@ -4,18 +4,18 @@ setlocal EnableExtensions DisableDelayedExpansion
 cd /d "%~dp0"
 
 set "GAME_EXIT=0"
-set "GAME_EXE=%~dp0InkboundRogue.exe"
+set "GAME_EXE=%~dp0LastInkwarden.exe"
 if exist "%GAME_EXE%" goto game_found
-echo [ERROR] InkboundRogue.exe must be beside this launcher.
-echo [错误] 请将本脚本与 InkboundRogue.exe 放在同一目录。
+echo [ERROR] LastInkwarden.exe must be beside this launcher.
+echo [错误] 请将本脚本与 LastInkwarden.exe 放在同一目录。
 set "GAME_EXIT=2"
 goto finish
 
 :game_found
 echo.
 echo ============================================================
-echo   INKBOUND ROGUE - RECORDED PLAYTEST
-echo   《Inkbound Rogue》本地记录试玩模式
+echo   LAST INKWARDEN - RECORDED PLAYTEST
+echo   《墨卫残章》本地记录试玩模式
 echo ============================================================
 echo.
 echo This mode records semantic gameplay events, coarse performance,
@@ -23,9 +23,9 @@ echo F6-F9 moment markers, optional game screenshots, and the exit survey.
 echo It does NOT record raw input, microphone, camera, account data, or
 echo send anything over the network. Files stay in the selected folder.
 echo.
-echo 此模式记录游戏事件、粗粒度性能、F6-F9 时刻标记、可选游戏截图
-echo 与退出问卷；不记录原始输入、麦克风、摄像头或账户信息，亦不会
-echo 自动联网传输。所有文件只保存在所选目录。
+echo(此模式记录游戏事件、粗粒度性能、F6-F9 时刻标记、可选游戏截图
+echo(与退出问卷；不记录原始输入、麦克风、摄像头或账户信息，亦不会
+echo(自动联网传输。所有文件只保存在所选目录。
 echo.
 if /I "%INKBOUND_LAUNCHER_ACCEPT%"=="1" goto consent_granted
 choice /C YN /N /M "Enable local recording? / 是否启用本地记录？ [Y/N]: "

@@ -1,6 +1,6 @@
 # Accessibility and controller intent contract
 
-Inkbound keeps accessibility options inside the same controller-navigable panel
+Last Inkwarden keeps accessibility options inside the same controller-navigable panel
 as audio, display, language, and bindings. Every setting is local, contains no
 account data, and persists in the atomic profile save. Profiles created before a
 setting existed inherit the documented default without a schema break.

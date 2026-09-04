@@ -3,7 +3,7 @@
 `host_game.py export` creates the runnable build in `build/windows/` and copies
 the exact Steam payload into the isolated `build/steam-depot/` directory:
 
-- `InkboundRogue.exe` — embedded-PCK Windows x86_64 game
+- `LastInkwarden.exe` — embedded-PCK Windows x86_64 game
 - `THIRD_PARTY_NOTICES.txt` — redistributable engine notice
 - `version.json` — product, build channel, and save-schema identity
 
@@ -63,7 +63,7 @@ Before uploading a playtest depot:
    the session; `host_game.py run` refuses to open a second exported instance.
    Test commands hard-kill ten seconds after a normal timeout signal;
    `host_game.py cleanup-tests` is the scoped recovery command for a failed
-   Inkbound test and does not target editors or the exported game.
+   Last Inkwarden test and does not target editors or the exported game.
 6. Run a pseudonymous recorded session with `host_game.py playtest --participant
    P-001`. Exercise at least one moment marker, finish the run survey, close the
    game normally, and confirm that `host_game.py playtest-report` sees one
