@@ -62,6 +62,30 @@ const MUSIC := {
 }
 const LOOPING_MUSIC_IDS := ["menu", "battle"]
 
+const PLAYER_HIT_LIGHT_VOICES := [
+	preload("res://assets/audio/voice/combat/nara_hit_light_01.wav"),
+	preload("res://assets/audio/voice/combat/nara_hit_light_02.wav"),
+	preload("res://assets/audio/voice/combat/nara_hit_light_03.wav"),
+]
+const PLAYER_HIT_HEAVY_VOICES := [
+	preload("res://assets/audio/voice/combat/nara_hit_heavy_01.wav"),
+	preload("res://assets/audio/voice/combat/nara_hit_heavy_02.wav"),
+]
+const PLAYER_DEATH_VOICE := preload("res://assets/audio/voice/combat/nara_death_b_jp.wav")
+const ENEMY_MASK_HIT_VOICES := [
+	preload("res://assets/audio/voice/combat/enemy_mask_hit_01.wav"),
+	preload("res://assets/audio/voice/combat/enemy_mask_hit_02.wav"),
+	preload("res://assets/audio/voice/combat/enemy_mask_hit_03.wav"),
+]
+const ENEMY_MASK_DEATH_VOICE := preload("res://assets/audio/voice/combat/enemy_mask_death_b.wav")
+const ENEMY_INK_HIT_VOICES := [
+	preload("res://assets/audio/voice/combat/enemy_ink_hit_01.wav"),
+	preload("res://assets/audio/voice/combat/enemy_ink_hit_02.wav"),
+	preload("res://assets/audio/voice/combat/enemy_ink_hit_03.wav"),
+]
+const ENEMY_INK_DEATH_VOICE := preload("res://assets/audio/voice/combat/enemy_ink_death_b.wav")
+const INK_ENEMY_KINDS := ["splitter", "leech", "errata", "blot"]
+
 const SOUND_COOLDOWNS_MSEC := {
 	"hit": 22,
 	"enemy_cast": 90,
@@ -73,10 +97,20 @@ const SOUND_COOLDOWNS_MSEC := {
 	"ui_move": 45,
 }
 
+const VOICE_COOLDOWNS_MSEC := {
+	"player_hit": 260,
+	"player_death": 1000,
+	"enemy_mask_hit": 180,
+	"enemy_mask_death": 320,
+	"enemy_ink_hit": 190,
+	"enemy_ink_death": 340,
+}
+
 const BOSS_KINDS := ["editor", "binder", "author"]
 const REBIND_ACTION_IDS := ["move_up", "move_down", "move_left", "move_right", "attack", "dash", "special", "pause", "options"]
 const SAVE_SCHEMA := 12
 const CHECKPOINT_SCHEMA := 1
+const QUIT_FLUSH_TIMEOUT_SECONDS := 2.0
 
 var arena: InkboundArena
 var player: InkboundPlayer
@@ -130,6 +164,9 @@ var test_force_english := true
 var using_gamepad := false
 var application_focused := true
 var focus_pause_engaged := false
+var quit_confirmation_active := false
+var quit_in_progress := false
+var debug_quit_completed := false
 var active_locale := Localization.LANGUAGE_ENGLISH
 var story_seen: Dictionary = {}
 var replaying_story := false
@@ -219,6 +256,8 @@ var music_crossfade: Tween
 var current_music := ""
 var last_sound_id := ""
 var sound_last_played_msec: Dictionary = {}
+var last_voice_id := ""
+var voice_last_played_msec: Dictionary = {}
 var settings: Dictionary = {
 	"master": 0.8,
 	"music": 0.65,
@@ -283,6 +322,7 @@ func _ready() -> void:
 	# playback remain responsive while the simulation is frozen.
 	process_mode = Node.PROCESS_MODE_PAUSABLE
 	get_tree().paused = false
+	get_tree().auto_accept_quit = false
 	Engine.time_scale = 1.0
 	_prepare_default_input_actions()
 	_capture_default_binding_events()
@@ -344,6 +384,8 @@ func _ready() -> void:
 	hud.binding_changed.connect(_on_binding_changed)
 	hud.bindings_reset_requested.connect(_on_bindings_reset_requested)
 	hud.manual_visibility_changed.connect(_on_manual_visibility_changed)
+	hud.quit_confirmation_changed.connect(_on_quit_confirmation_changed)
+	hud.quit_confirmed.connect(_on_quit_confirmed)
 	hud.ui_sound_requested.connect(play_sound)
 	hud.set_health(player.health, player.max_health)
 	hud.set_xp(player.xp, player.xp_needed, player.level)
@@ -356,6 +398,9 @@ func _ready() -> void:
 	_evaluate_achievements(false)
 	_apply_settings()
 	_configure_gameanalytics()
+	var analytics := _gameanalytics_client()
+	if analytics != null and not analytics.shutdown_finished.is_connected(_on_analytics_shutdown_finished):
+		analytics.shutdown_finished.connect(_on_analytics_shutdown_finished)
 	_set_input_mode(not Input.get_connected_joypads().is_empty())
 
 	cutscene = CutsceneScript.new()
@@ -460,7 +505,9 @@ func request_playtest_survey(reason: String) -> void:
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		request_quit_confirmation()
+	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		_set_application_focus(false)
 	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
 		_set_application_focus(true)
@@ -493,6 +540,54 @@ func _set_application_focus(focused: bool) -> void:
 
 func debug_set_application_focus(focused: bool) -> void:
 	_set_application_focus(focused)
+
+
+func request_quit_confirmation() -> void:
+	if quit_in_progress or not is_instance_valid(hud):
+		return
+	hud.show_quit_confirmation(run_started and not game_over and not run_won)
+
+
+func _on_quit_confirmation_changed(visible: bool) -> void:
+	quit_confirmation_active = visible
+	_sync_pause_state()
+
+
+func _on_quit_confirmed() -> void:
+	if quit_in_progress:
+		return
+	quit_in_progress = true
+	quit_confirmation_active = true
+	debug_quit_completed = false
+	if is_instance_valid(hud):
+		hud.set_quit_waiting()
+	if not test_mode:
+		# Only replace the resumable draft at a state the checkpoint schema can
+		# represent. Mid-choice and cutscene exits retain the previous safe draft.
+		_save_checkpoint("quit")
+		_save_run()
+	get_tree().create_timer(QUIT_FLUSH_TIMEOUT_SECONDS, true, false, true).timeout.connect(_finish_quit)
+	var analytics := _gameanalytics_client()
+	if analytics != null:
+		analytics.request_shutdown()
+	else:
+		call_deferred("_finish_quit")
+
+
+func _on_analytics_shutdown_finished(_queue_flushed: bool) -> void:
+	_finish_quit()
+
+
+func _finish_quit() -> void:
+	if not quit_in_progress:
+		return
+	quit_in_progress = false
+	if test_mode:
+		debug_quit_completed = true
+		return
+	Engine.time_scale = 1.0
+	get_tree().paused = false
+	get_tree().quit()
 
 
 func _process(delta: float) -> void:
@@ -1487,6 +1582,70 @@ func play_spatial_sound(sound_id: String, at: Vector2, pitch: float = 1.0) -> vo
 	add_child(audio)
 	audio.finished.connect(audio.queue_free)
 	audio.play()
+
+
+func play_player_hurt_voice(heavy: bool) -> void:
+	var bank: Array = PLAYER_HIT_HEAVY_VOICES if heavy else PLAYER_HIT_LIGHT_VOICES
+	var voice_id := "player_hit_heavy" if heavy else "player_hit_light"
+	_play_voice(bank[rng.randi_range(0, bank.size() - 1)], voice_id, -0.5, "player_hit")
+
+
+func play_player_death_voice() -> void:
+	_play_voice(PLAYER_DEATH_VOICE, "player_death_b", 0.0)
+
+
+func play_enemy_hurt_voice(at: Vector2, kind: String) -> void:
+	var ink_family := kind in INK_ENEMY_KINDS
+	var bank: Array = ENEMY_INK_HIT_VOICES if ink_family else ENEMY_MASK_HIT_VOICES
+	var voice_id := "enemy_ink_hit" if ink_family else "enemy_mask_hit"
+	_play_spatial_voice(bank[rng.randi_range(0, bank.size() - 1)], voice_id, at, -1.5)
+
+
+func play_enemy_death_voice(at: Vector2, kind: String) -> void:
+	var ink_family := kind in INK_ENEMY_KINDS
+	var stream: AudioStream = ENEMY_INK_DEATH_VOICE if ink_family else ENEMY_MASK_DEATH_VOICE
+	var voice_id := "enemy_ink_death_b" if ink_family else "enemy_mask_death_b"
+	_play_spatial_voice(stream, voice_id, at, -1.0)
+
+
+func _play_voice(stream: AudioStream, voice_id: String, base_volume_db: float, cooldown_id: String = "") -> void:
+	if not _claim_voice_request(voice_id, cooldown_id):
+		return
+	var audio := AudioStreamPlayer.new()
+	audio.process_mode = Node.PROCESS_MODE_ALWAYS
+	audio.stream = stream
+	audio.volume_db = base_volume_db + linear_to_db(maxf(0.001, float(settings.get("sfx", 0.85))))
+	add_child(audio)
+	audio.finished.connect(audio.queue_free)
+	audio.play()
+
+
+func _play_spatial_voice(stream: AudioStream, voice_id: String, at: Vector2, base_volume_db: float) -> void:
+	if not _claim_voice_request(voice_id):
+		return
+	var audio := AudioStreamPlayer2D.new()
+	audio.process_mode = Node.PROCESS_MODE_ALWAYS
+	audio.stream = stream
+	audio.global_position = at
+	audio.max_distance = 440.0
+	audio.attenuation = 1.65
+	audio.volume_db = base_volume_db + linear_to_db(maxf(0.001, float(settings.get("sfx", 0.85))))
+	add_child(audio)
+	audio.finished.connect(audio.queue_free)
+	audio.play()
+
+
+func _claim_voice_request(voice_id: String, requested_cooldown_id: String = "") -> bool:
+	last_voice_id = voice_id
+	if test_mode:
+		return false
+	var cooldown_id := requested_cooldown_id if not requested_cooldown_id.is_empty() else voice_id.trim_suffix("_b")
+	var now := Time.get_ticks_msec()
+	var cooldown := int(VOICE_COOLDOWNS_MSEC.get(cooldown_id, 0))
+	if cooldown > 0 and now - int(voice_last_played_msec.get(cooldown_id, -cooldown)) < cooldown:
+		return false
+	voice_last_played_msec[cooldown_id] = now
+	return true
 
 
 func _claim_sound_request(sound_id: String) -> bool:
@@ -2906,7 +3065,7 @@ func _on_save_return_requested() -> void:
 
 func _simulation_should_pause() -> bool:
 	var story_active := is_instance_valid(cutscene) and cutscene.active
-	return not application_focused or not run_started or manually_paused or manual_open or choosing_upgrade or choosing_relic or choosing_event or ink_art_cinematic_active or game_over or run_won or story_active
+	return not application_focused or not run_started or manually_paused or manual_open or choosing_upgrade or choosing_relic or choosing_event or ink_art_cinematic_active or quit_confirmation_active or quit_in_progress or game_over or run_won or story_active
 
 
 func _sync_pause_state() -> void:
@@ -2926,6 +3085,7 @@ func _on_player_died() -> void:
 	best_kills = maxi(best_kills, kills)
 	_finalize_run()
 	_save_run()
+	play_player_death_voice()
 	spawn_word(player.global_position + Vector2(0, -32), "THE END?", CRIMSON)
 	hud.show_game_over(last_run_summary)
 	_sync_pause_state()

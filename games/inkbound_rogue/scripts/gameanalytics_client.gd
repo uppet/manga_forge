@@ -1,5 +1,7 @@
 extends Node
 
+signal shutdown_finished(queue_flushed: bool)
+
 # Godot 4.2-compatible GameAnalytics Collection API v2 client. The current
 # official GDExtension requires a newer Godot runtime, so this deliberately
 # small adapter keeps analytics optional and isolated from gameplay.
@@ -41,6 +43,7 @@ var debug_logging := false
 var max_queue_events := MAX_QUEUED_EVENTS
 var credential_source := "none"
 var config_fingerprint := "none"
+var shutdown_requested := false
 
 
 func _ready() -> void:
@@ -171,6 +174,27 @@ func flush_now() -> void:
 		_submit_events()
 
 
+func request_shutdown() -> void:
+	if shutdown_requested:
+		return
+	shutdown_requested = true
+	if not active:
+		_finish_shutdown(queue.is_empty())
+		return
+	# The SceneTree still owns the HTTPRequest here. End and persist the session,
+	# then give the final batch a chance to complete before the game closes.
+	_end_session(false)
+	if dry_run:
+		_finish_shutdown(false)
+	elif initialized and not in_flight:
+		if queue.is_empty():
+			_finish_shutdown(true)
+		else:
+			_submit_events()
+	elif not initialized and not in_flight:
+		_request_init()
+
+
 func debug_snapshot() -> Dictionary:
 	return {
 		"active": active,
@@ -182,6 +206,7 @@ func debug_snapshot() -> Dictionary:
 		"session_num": session_num,
 		"credential_source": credential_source,
 		"config_fingerprint": config_fingerprint,
+		"shutdown_requested": shutdown_requested,
 		"queue": queue.duplicate(true),
 	}
 
@@ -253,7 +278,7 @@ func _begin_session(maximum_events: int = MAX_QUEUED_EVENTS) -> void:
 		_request_init()
 
 
-func _end_session() -> void:
+func _end_session(submit_immediately: bool = true) -> void:
 	if not active or session_ended:
 		return
 	session_ended = true
@@ -263,7 +288,8 @@ func _end_session() -> void:
 	state["open_session"] = {}
 	state["timestamp_offset"] = timestamp_offset
 	_write_dictionary(_state_path(), state)
-	flush_now()
+	if submit_immediately:
+		flush_now()
 
 
 func _notification(what: int) -> void:
@@ -272,7 +298,9 @@ func _notification(what: int) -> void:
 
 
 func _exit_tree() -> void:
-	_end_session()
+	# Children leave the tree before their parent, so HTTPRequest can no longer
+	# start work here. Persist an unsent session end for the next launch instead.
+	_end_session(false)
 	_save_queue()
 
 
@@ -297,6 +325,7 @@ func _disable_runtime() -> void:
 	sent_count = 0
 	session_ended = false
 	dry_run = false
+	shutdown_requested = false
 	set_process(false)
 
 
@@ -372,8 +401,23 @@ func _on_request_completed(result: int, response_code: int, _headers: PackedStri
 		_reset_retry()
 		if not queue.is_empty():
 			flush_elapsed = FLUSH_INTERVAL_SECONDS
+		elif shutdown_requested:
+			_finish_shutdown(true)
 		return
 	_schedule_retry("http_%d" % response_code)
+
+
+func _finish_shutdown(queue_flushed: bool) -> void:
+	if not shutdown_requested:
+		return
+	active = false
+	in_flight = false
+	request_kind = ""
+	sent_count = 0
+	set_process(false)
+	_save_queue()
+	status = "shutdown_flushed" if queue_flushed else "shutdown_queued"
+	shutdown_finished.emit(queue_flushed)
 
 
 func _schedule_retry(reason: String) -> void:

@@ -8,6 +8,8 @@ signal sequence_finished(form: String)
 
 const FRAME_SIZE := Vector2(216.0, 360.0)
 const VOICE_BASE_VOLUME_DB := 2.0
+const SPECIALIZED_VOICE_PROBABILITY := 0.1
+const COMMON_VOICE := preload("res://assets/audio/voice/nara_ink_art_kiai_jp.wav")
 const VOICES := {
 	"MARGINALIA": preload("res://assets/audio/voice/nara_ink_art_marginalia_jp.wav"),
 	"GREATBRUSH": preload("res://assets/audio/voice/nara_ink_art_greatbrush_jp.wav"),
@@ -72,12 +74,14 @@ var current_frame := -1
 var frame_elapsed := 0.0
 var released := false
 var reduced_flashes := false
-var current_show_cutin := true
 var frame_history: Array[int] = []
 var last_completed_form := ""
 var last_sequence_frame_count := 0
 var last_voice_form := ""
+var last_voice_variant := ""
+var debug_voice_roll_override := -1.0
 var player: Node
+var voice_rng := RandomNumberGenerator.new()
 
 var cutin_root: ColorRect
 var cutin_art: TextureRect
@@ -94,6 +98,7 @@ func _ready() -> void:
 	voice_player = AudioStreamPlayer.new()
 	voice_player.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(voice_player)
+	voice_rng.randomize()
 
 
 func _build_overlay() -> void:
@@ -158,7 +163,6 @@ func play(form: String, player_node: Node, direction: Vector2, show_cutin: bool,
 	active = true
 	released = false
 	reduced_flashes = reduce_flashes
-	current_show_cutin = show_cutin
 	current_frame = -1
 	frame_elapsed = 0.0
 	frame_history.clear()
@@ -276,10 +280,9 @@ func _finish_sequence() -> void:
 	active = false
 	phase = ""
 	cutin_root.visible = false
-	# The authored cut-in timings end with the voice. When cut-ins are disabled,
-	# retain the fast startup and let the line finish over resumed combat.
-	if current_show_cutin and is_instance_valid(voice_player):
-		voice_player.stop()
+	# The common kiai resolves inside the cut-in. Rare specialized lines are
+	# intentionally allowed to finish over resumed combat instead of extending
+	# the time stop or being cut off at the end of the five-frame startup.
 	player = null
 	sequence_finished.emit(current_form)
 
@@ -287,11 +290,18 @@ func _finish_sequence() -> void:
 func _play_voice(form: String, volume_linear: float) -> void:
 	if not is_instance_valid(voice_player) or not VOICES.has(form):
 		return
+	var roll := debug_voice_roll_override if debug_voice_roll_override >= 0.0 else voice_rng.randf()
+	var specialized := roll < SPECIALIZED_VOICE_PROBABILITY
 	voice_player.stop()
-	voice_player.stream = VOICES[form]
+	voice_player.stream = VOICES[form] if specialized else COMMON_VOICE
 	voice_player.volume_db = VOICE_BASE_VOLUME_DB + linear_to_db(maxf(0.001, volume_linear))
 	last_voice_form = form
+	last_voice_variant = "specialized" if specialized else "common"
 	voice_player.play()
+
+
+func debug_set_voice_roll(roll: float) -> void:
+	debug_voice_roll_override = roll
 
 
 func _flash(strength: float) -> void:

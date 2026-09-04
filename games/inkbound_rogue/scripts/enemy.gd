@@ -605,6 +605,8 @@ func take_damage(amount: float, impulse: Vector2, critical: bool = false) -> voi
 	tween.tween_property(sprite, "modulate", _elite_color() if is_elite else Color.WHITE, 0.11 if reduced_flashes_enabled() else 0.08)
 	if health <= 0.0:
 		die()
+	elif game.has_method("play_enemy_hurt_voice"):
+		game.play_enemy_hurt_voice(global_position, enemy_kind)
 
 
 func _try_defend(amount: float, impulse: Vector2) -> bool:
@@ -659,6 +661,8 @@ func die() -> void:
 		target.take_damage(1.5, (target.global_position - global_position).normalized(), "elite:volatile")
 		if game.has_method("spawn_word"):
 			game.spawn_word(global_position + Vector2(0, -18), "BOOM!", GOLD)
+	if game.has_method("play_enemy_death_voice"):
+		game.play_enemy_death_voice(global_position, enemy_kind)
 	died.emit(self, xp_value, global_position, enemy_kind)
 	queue_free()
 

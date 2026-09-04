@@ -162,10 +162,14 @@ The relic-agency gate must print `INKBOUND_RELIC_DRAFT_OK` for field, event,
 Directive, queue, controller, checkpoint, run-summary, and exhausted-pool paths.
 The combat-cast gate must print `INKBOUND_CAST_OK` for all sixteen clipped atlas
 regions, transparent alpha, unique actor mapping, ground shadows, and dynamic poses.
-The audio gate must print `INKBOUND_AUDIO_OK` for 30 cues, five Japanese Ink Art
-voices, five production-length music tracks, adaptive music transitions,
+The audio gate must print `INKBOUND_AUDIO_OK` for 30 cues, six Japanese Ink Art
+voices with a 90% common / 10% weapon-specialized distribution, 14 Japanese
+combat-feedback performances, five production-length music tracks, adaptive music transitions,
 production crossfade, spatial warnings, weapon timbres, supply feedback, UI
 feedback, and anti-spam cooldowns.
+The defeat-flow gate must print `INKBOUND_DEFEAT_FLOW_OK` after proving fatal
+voice exclusivity, screen-darkening before results, a minimum restart delay, and
+release-before-repress protection for keyboard and controller actions.
 The persistent-upgrade gate must print `INKBOUND_RESTORATION_OK` for six branches,
 thirty ranks, mastery effects, rank locks, two-axis controller navigation,
 schema-12 persistence, and schema-9 migration. Its Windows renderer companion

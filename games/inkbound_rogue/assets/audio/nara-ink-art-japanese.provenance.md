@@ -1,56 +1,45 @@
 # Nara Japanese Ink Art voice provenance
 
-Status date: 2026-09-03. The project owner auditioned these five Japanese
-performances and approved them for integration into the current game demo. All
-five are conservatively classified as pre-generated AI audio.
+Status date: 2026-09-04. The project owner supplied and approved this six-file
+Japanese delivery for integration into the current demo. All files are
+conservatively classified as pre-generated AI audio.
 
 ## Generation record
 
-- Service/model: OpenAI Realtime API, `gpt-realtime-2.1`
-- Built-in voice: `marin`
-- Character direction: Nara is a young trained woman warrior with low chest
-  resonance, slight rasp, controlled danger, and no cute or announcer-like
-  delivery.
-- Performance direction: `墨術` is pronounced `ぼくじゅつ`; `術` is the first
-  seal-breaking impact, and each final imperative syllable is an all-out strike
-  with controlled vocal tearing while remaining intelligible.
+- Service/model: locally operated IndexTTS 2.5
+- Reference voice: one consistent, capable young-woman timbre across the
+  Japanese and separately retained Chinese delivery
+- Runtime scope in this revision: Japanese only
+- Source/runtime format: 22.05 kHz mono 16-bit PCM WAV
+- Mastering: de-clipped and denoised by the delivery pipeline, with peaks
+  normalized to 0.89 (approximately -1 dBFS)
+- Performance direction: a cool, grounded woman warrior; technique names are
+  concise, their final syllables carry emphasis, and tails fade naturally
 - Generation happened during development. The shipped game performs no model
   or API calls.
 
-| Weapon | Japanese line | Runtime asset |
-| --- | --- | --- |
-| Marginalia | `墨術――古き痕よ、巡れ！` | `voice/nara_ink_art_marginalia_jp.wav` |
-| Greatbrush | `墨術――終の一筆、落ちろ！` | `voice/nara_ink_art_greatbrush_jp.wav` |
-| Needlepoint | `墨術――赤き線よ、貫け！` | `voice/nara_ink_art_needlepoint_jp.wav` |
-| Seal-Caster | `墨術――千の印よ、鎮め！` | `voice/nara_ink_art_seal_caster_jp.wav` |
-| Twin-Stroke | `墨術――双刃、運命を斬り変えろ！` | `voice/nara_ink_art_twin_stroke_jp.wav` |
+## Runtime selection
 
-The Realtime transcript gate accepted every line. Four transcripts represented
-`墨術` phonetically as `ぼくじゅつ`; this is an orthographic difference and the
-required pronunciation was preserved.
+Every Ink Art rolls once when cast. A roll below `0.10` selects the current
+weapon's specialized line; all other rolls select voice zero, the common
+`は！` kiai. Thus the exact authored distribution is 10% specialized and 90%
+common. The short common cry resolves during the time-stop cut-in. Specialized
+lines are deliberately allowed to finish after combat resumes, so their
+2.17–2.65 second deliveries neither lengthen the time stop nor get truncated.
 
-## Runtime derivation
-
-The accepted 24 kHz mono PCM sources remain in the ignored development output.
-The reviewed preview masters were high-pass filtered at 65 Hz, low-pass
-filtered at 18 kHz, conservatively peak-matched near -3 dBFS, and resampled to
-44.1 kHz mono PCM. For runtime pacing, FFmpeg `silenceremove` capped long
-dramatic pauses at 160 ms. FFmpeg `atempo=2.0` then doubled the delivery speed
-without changing pitch. A final per-take gain match restores peaks to roughly
--3 dBFS. No dynamic compression, reordering, or removal of spoken words was
-applied.
-
-| Runtime asset | Length | SHA-256 |
-| --- | ---: | --- |
-| `nara_ink_art_marginalia_jp.wav` | 1.277 s | `a4f38e5bf64e1d58d722d07fcd98870c66b4bd6cfe86af070cacecd59bb10fe4` |
-| `nara_ink_art_greatbrush_jp.wav` | 1.467 s | `dc6b1a7522ce355b08951c6a7e1b78136280aa8feb5c019e5564a79dfdef5c77` |
-| `nara_ink_art_needlepoint_jp.wav` | 1.289 s | `f046dbdb69cefca9a27e7508207cd660c57572460b9bf87183ea6a212265ef24` |
-| `nara_ink_art_seal_caster_jp.wav` | 1.379 s | `8fee53abb5e60c62a8c4deb315eec0c4e84d45669d15f6aebc90476e803ce075` |
-| `nara_ink_art_twin_stroke_jp.wav` | 1.440 s | `afbec3df8fb96da85dbb9479201a8a36fa642cc7f48c99e5a0fc15a9689d0354` |
+| ID | Weapon/use | Japanese line | Runtime asset | Length | SHA-256 |
+| ---: | --- | --- | --- | ---: | --- |
+| 0 | Common | `は！` | `voice/nara_ink_art_kiai_jp.wav` | 0.885 s | `829b313ceea687c92e55f43c5b7e61e1438ca04cb9dc0ea3045fbd378c72bc00` |
+| 1 | Marginalia | `もくじゅつ――きゅうこん、かいかん！` | `voice/nara_ink_art_marginalia_jp.wav` | 2.174 s | `6287decc0435eba9496f47e871eb3b0ee06d39118f1cd4fd45abf3ea98611777` |
+| 2 | Greatbrush | `もくじゅつ――しゅうひつ、おとせ！` | `voice/nara_ink_art_greatbrush_jp.wav` | 2.423 s | `d13d9cc366b8c1c36268bfc975100493b66b54c28b29bd7651b89d718a772351` |
+| 3 | Needlepoint | `もくじゅつ――せきせん、つらぬけ！` | `voice/nara_ink_art_needlepoint_jp.wav` | 2.654 s | `b5a4b9c53454ddb019442fe6e7bd6b6ab6ca0913f4776ce9e5efd1c963a31805` |
+| 4 | Seal-Caster | `もくじゅつ――せんいん、しずまれ！` | `voice/nara_ink_art_seal_caster_jp.wav` | 2.283 s | `ca2ad4458a4667f43a3217adc49bc868cd289a08b47a7013a4c47bc00d3c9f41` |
+| 5 | Twin-Stroke | `もくじゅつ――そうほう、かいめい！` | `voice/nara_ink_art_twin_stroke_jp.wav` | 2.431 s | `21fde3dd7f0b8088a0635373bc8cbdaba0cee04f96f146e240ed85c33280ef13` |
 
 ## Distribution gate
 
-The owner authorized the performances for the current demo. Before commercial
-distribution, preserve the originating OpenAI account/billing record and
-confirm that the applicable OpenAI terms cover distribution of generated voice
-assets. This file is an engineering inventory, not legal advice.
+The owner authorized this delivery for the current demo. Before commercial
+distribution, preserve the local generation/reference-voice records and verify
+the IndexTTS model, dependencies, reference recording, and generated-output
+rights applicable to the release. This file is an engineering inventory, not
+legal advice.

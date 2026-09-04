@@ -85,20 +85,49 @@ AI_ASSISTED_ASSETS = {
     **{
         GAME_ROOT / "assets" / "audio" / "voice" / filename: {
             "id": "voice-" + Path(filename).stem.replace("_", "-"),
-            "origin": "openai-realtime-audio-generation",
+            "origin": "local-indextts-2.5-audio-generation",
             "provenance_record": "games/inkbound_rogue/assets/audio/nara-ink-art-japanese.provenance.md",
-            "prompt_record_status": "production-brief-retained-in-project-conversation",
-            "derivation": "owner-approved OpenAI Realtime Japanese performance; runtime EQ/peak match, long dramatic silences capped at 160 ms, and pitch-preserving 2.0x tempo",
-            "human_review_status": "runtime-and-regression-reviewed-demo-owner-approval-recorded",
-            "rights_review_status": "publisher-confirmation-required-before-commercial-release",
-            "source_commit": "not-applicable-generated-in-project-conversation",
+            "prompt_record_status": "delivery-manifest-and-lines-retained",
+            "derivation": "owner-supplied local IndexTTS 2.5 Japanese delivery; direct 22.05 kHz mono runtime master; voice zero selected 90 percent and weapon-specific line selected 10 percent",
+            "human_review_status": "owner-approved-integration-and-runtime-regression-reviewed",
+            "rights_review_status": "indextts-dependencies-reference-and-output-rights-review-required-before-commercial-release",
+            "source_commit": "not-applicable-owner-supplied-local-generation",
         }
         for filename in (
+            "nara_ink_art_kiai_jp.wav",
             "nara_ink_art_marginalia_jp.wav",
             "nara_ink_art_greatbrush_jp.wav",
             "nara_ink_art_needlepoint_jp.wav",
             "nara_ink_art_seal_caster_jp.wav",
             "nara_ink_art_twin_stroke_jp.wav",
+        )
+    },
+    **{
+        GAME_ROOT / "assets" / "audio" / "voice" / "combat" / filename: {
+            "id": "voice-combat-" + Path(filename).stem.replace("_", "-"),
+            "origin": "openai-realtime-audio-generation",
+            "provenance_record": "games/inkbound_rogue/assets/audio/combat-feedback-japanese.provenance.md",
+            "prompt_record_status": "production-brief-and-dialogue-retained",
+            "derivation": "owner-auditioned OpenAI Realtime Japanese combat feedback; hit variants retained and B fatal take selected; role EQ, trim, peak match, and 44.1 kHz mono resample",
+            "human_review_status": "owner-b-selection-and-runtime-regression-reviewed",
+            "rights_review_status": "publisher-confirmation-required-before-commercial-release",
+            "source_commit": "not-applicable-generated-in-project-conversation",
+        }
+        for filename in (
+            "nara_hit_light_01.wav",
+            "nara_hit_light_02.wav",
+            "nara_hit_light_03.wav",
+            "nara_hit_heavy_01.wav",
+            "nara_hit_heavy_02.wav",
+            "nara_death_b_jp.wav",
+            "enemy_mask_hit_01.wav",
+            "enemy_mask_hit_02.wav",
+            "enemy_mask_hit_03.wav",
+            "enemy_mask_death_b.wav",
+            "enemy_ink_hit_01.wav",
+            "enemy_ink_hit_02.wav",
+            "enemy_ink_hit_03.wav",
+            "enemy_ink_death_b.wav",
         )
     },
     **{

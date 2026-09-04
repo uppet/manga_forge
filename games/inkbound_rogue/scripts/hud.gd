@@ -20,6 +20,8 @@ signal setting_adjusted(setting_id: String, direction: int)
 signal binding_changed(action_id: String, device_type: String, binding: Dictionary)
 signal bindings_reset_requested
 signal manual_visibility_changed(visible: bool)
+signal quit_confirmation_changed(visible: bool)
+signal quit_confirmed
 signal ui_sound_requested(sound_id: String)
 
 const DEEP_INK := Color("08070b")
@@ -34,6 +36,9 @@ const UPGRADE_CLOSE_DURATION := 0.18
 const POPUP_FADE_IN_DURATION := 0.16
 const POPUP_FADE_OUT_DURATION := 0.12
 const POPUP_START_SCALE := Vector2(0.97, 0.97)
+const DEFEAT_FADE_DURATION := 1.25
+const DEFEAT_INPUT_DELAY_SECONDS := 1.5
+const DEFEAT_RELEASE_ACTIONS := ["restart", "attack", "dash", "special", "pause"]
 
 var hp_bar: ColorRect
 var hp_bar_fill: ColorRect
@@ -88,6 +93,22 @@ var victory_credit_pages: Array[Dictionary] = []
 var victory_credit_tween: Tween
 var pause_panel: ColorRect
 var pause_label: Label
+var pause_resume_button: Button
+var pause_save_return_button: Button
+var pause_quit_button: Button
+var pause_help_label: Label
+var pause_navigation_buttons: Array[Button] = []
+var pause_navigation_index := 0
+var quit_panel: ColorRect
+var quit_title_label: Label
+var quit_body_label: Label
+var quit_status_label: Label
+var quit_cancel_button: Button
+var quit_confirm_button: Button
+var quit_visible := false
+var quit_waiting := false
+var quit_from_active_run := false
+var quit_navigation_index := 0
 var controls_label: Label
 var restart_button: Button
 var device_notice: Label
@@ -103,6 +124,10 @@ var popup_modal_stack: Array[Control] = []
 var modal_button_states: Dictionary = {}
 var relic_draft_visible := false
 var game_over_visible := false
+var game_over_panel_revealed := false
+var game_over_input_ready := false
+var game_over_input_deadline_msec := 0
+var game_over_sequence := 0
 var using_gamepad := false
 var input_enabled := true
 var ui_gamepad_latches: Dictionary = {}
@@ -154,6 +179,7 @@ var start_button: Button
 var continue_button: Button
 var story_button: Button
 var settings_button: Button
+var title_quit_button: Button
 var history_button: Button
 var achievements_button: Button
 var codex_button: Button
@@ -312,6 +338,10 @@ func _ready() -> void:
 	_wire_button_audio()
 
 
+func _process(_delta: float) -> void:
+	_update_game_over_input_gate()
+
+
 func _apply_ui_theme() -> void:
 	var shared_theme := Localization.ui_theme()
 	for child in get_children():
@@ -334,6 +364,16 @@ func _on_ui_button_down(button: Button) -> void:
 func _on_ui_button_hovered(button: Button) -> void:
 	if button.visible and not button.disabled and _button_is_in_active_modal(button):
 		ui_sound_requested.emit("ui_move")
+		var quit_index := [quit_cancel_button, quit_confirm_button].find(button)
+		if quit_visible and quit_index >= 0:
+			quit_navigation_index = quit_index
+			_refresh_quit_confirmation()
+			return
+		var pause_index := pause_navigation_buttons.find(button)
+		if pause_panel.visible and not quit_visible and pause_index >= 0:
+			pause_navigation_index = pause_index
+			_refresh_pause_navigation()
+			return
 		var title_index := title_navigation_buttons.find(button)
 		if title_visible and not _title_overlay_visible() and title_index >= 0:
 			title_navigation_index = title_index
@@ -341,7 +381,7 @@ func _on_ui_button_hovered(button: Button) -> void:
 
 
 func _emit_input_ui_sound(event: InputEvent) -> void:
-	var in_ui := title_visible or pause_panel.visible or settings_visible or bindings_visible or manual_visible or event_visible or relic_draft_visible or upgrade_visible or game_over_visible or victory_credits_visible
+	var in_ui := title_visible or pause_panel.visible or quit_visible or settings_visible or bindings_visible or manual_visible or event_visible or relic_draft_visible or upgrade_visible or game_over_visible or victory_credits_visible
 	var gamepad_cancel: bool = event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B
 	if not in_ui:
 		if event.is_action_pressed("manual") or event.is_action_pressed("pause") or event.is_action_pressed("options") or event.is_action_pressed("restoration") or event.is_action_pressed("proof_ledger") or event.is_action_pressed("daily_chronicle"):
@@ -349,7 +389,7 @@ func _emit_input_ui_sound(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("move_up") or event.is_action_pressed("move_down") or event.is_action_pressed("move_left") or event.is_action_pressed("move_right") or event.is_action_pressed("contract_prev") or event.is_action_pressed("contract_next"):
 		ui_sound_requested.emit("ui_move")
-	elif (gamepad_cancel and (title_visible or settings_visible or manual_visible)) or event.is_action_pressed("pause") or event.is_action_pressed("options") or (event.is_action_pressed("upgrade_3") and (settings_visible or manual_visible or restoration_visible or proof_visible)):
+	elif (gamepad_cancel and (title_visible or pause_panel.visible or quit_visible or settings_visible or manual_visible)) or event.is_action_pressed("pause") or event.is_action_pressed("options") or (event.is_action_pressed("upgrade_3") and (settings_visible or manual_visible or restoration_visible or proof_visible)):
 		ui_sound_requested.emit("ui_cancel")
 	elif event.is_action_pressed("restoration") or event.is_action_pressed("proof_ledger") or event.is_action_pressed("daily_chronicle") or event.is_action_pressed("attack") or event.is_action_pressed("dash") or event.is_action_pressed("restart") or event.is_action_pressed("upgrade_1") or event.is_action_pressed("upgrade_2") or event.is_action_pressed("upgrade_3") or event.is_action_pressed("upgrade_4"):
 		ui_sound_requested.emit("ui_confirm")
@@ -628,39 +668,59 @@ func _build_hud() -> void:
 	victory_credits_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	pause_panel = ColorRect.new()
-	pause_panel.position = Vector2(144, 50)
-	pause_panel.size = Vector2(192, 170)
+	pause_panel.position = Vector2(132, 22)
+	pause_panel.size = Vector2(216, 226)
 	pause_panel.color = Color(0.025, 0.02, 0.03, 0.88)
 	pause_panel.visible = false
 	add_child(pause_panel)
-	pause_label = _make_child_label(pause_panel, "PANEL PAUSED\nESC TO CONTINUE", Vector2(6, 9), Vector2(180, 44), 14, PAPER)
+	pause_label = _make_child_label(pause_panel, "PANEL PAUSED", Vector2(8, 7), Vector2(200, 34), 16, PAPER)
 	pause_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pause_resume_button = Button.new()
+	pause_resume_button.position = Vector2(18, 45)
+	pause_resume_button.size = Vector2(180, 27)
+	pause_resume_button.text = "CONTINUE"
+	pause_resume_button.add_theme_font_size_override("font_size", 9)
+	pause_resume_button.focus_mode = Control.FOCUS_NONE
+	pause_resume_button.pressed.connect(func() -> void: pause_requested.emit())
+	pause_panel.add_child(pause_resume_button)
 	pause_options_button = Button.new()
-	pause_options_button.position = Vector2(18, 58)
-	pause_options_button.size = Vector2(156, 27)
+	pause_options_button.position = Vector2(18, 77)
+	pause_options_button.size = Vector2(180, 27)
 	pause_options_button.text = "O / VIEW  OPTIONS"
 	pause_options_button.add_theme_font_size_override("font_size", 9)
 	pause_options_button.focus_mode = Control.FOCUS_NONE
 	pause_options_button.pressed.connect(show_settings)
 	pause_panel.add_child(pause_options_button)
 	pause_manual_button = Button.new()
-	pause_manual_button.position = Vector2(18, 94)
-	pause_manual_button.size = Vector2(156, 27)
+	pause_manual_button.position = Vector2(18, 109)
+	pause_manual_button.size = Vector2(180, 27)
 	pause_manual_button.text = "F1 / LT  FIELD MANUAL"
 	pause_manual_button.add_theme_font_size_override("font_size", 9)
 	pause_manual_button.focus_mode = Control.FOCUS_NONE
 	pause_manual_button.pressed.connect(show_manual)
 	pause_panel.add_child(pause_manual_button)
-	var save_return_button := Button.new()
-	save_return_button.position = Vector2(18, 130)
-	save_return_button.size = Vector2(156, 28)
-	save_return_button.text = "1 / X  SAVE & RETURN"
-	save_return_button.add_theme_font_size_override("font_size", 9)
-	save_return_button.focus_mode = Control.FOCUS_NONE
-	save_return_button.pressed.connect(func() -> void: save_return_requested.emit())
-	pause_panel.add_child(save_return_button)
+	pause_save_return_button = Button.new()
+	pause_save_return_button.position = Vector2(18, 141)
+	pause_save_return_button.size = Vector2(180, 27)
+	pause_save_return_button.text = "1 / X  SAVE & RETURN"
+	pause_save_return_button.add_theme_font_size_override("font_size", 9)
+	pause_save_return_button.focus_mode = Control.FOCUS_NONE
+	pause_save_return_button.pressed.connect(func() -> void: save_return_requested.emit())
+	pause_panel.add_child(pause_save_return_button)
+	pause_quit_button = Button.new()
+	pause_quit_button.position = Vector2(18, 173)
+	pause_quit_button.size = Vector2(180, 27)
+	pause_quit_button.text = "QUIT TO DESKTOP"
+	pause_quit_button.add_theme_font_size_override("font_size", 9)
+	pause_quit_button.focus_mode = Control.FOCUS_NONE
+	pause_quit_button.pressed.connect(show_quit_confirmation.bind(true))
+	pause_panel.add_child(pause_quit_button)
+	pause_navigation_buttons = [pause_resume_button, pause_options_button, pause_manual_button, pause_save_return_button, pause_quit_button]
+	pause_help_label = _make_child_label(pause_panel, "↑↓ SELECT  ·  A/ENTER CONFIRM  ·  B/ESC BACK", Vector2(10, 204), Vector2(196, 14), 7, GOLD)
+	pause_help_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_build_title()
 	_build_achievement_toast()
+	_build_quit_confirmation()
 
 
 func _build_title() -> void:
@@ -759,22 +819,31 @@ func _build_title() -> void:
 	title_panel.add_child(restoration_open_button)
 
 	codex_button = Button.new()
-	codex_button.position = Vector2(356, 68)
-	codex_button.size = Vector2(100, 28)
+	codex_button.position = Vector2(350, 68)
+	codex_button.size = Vector2(65, 28)
 	codex_button.text = "CODEX"
-	codex_button.add_theme_font_size_override("font_size", 9)
+	codex_button.add_theme_font_size_override("font_size", 8)
 	codex_button.focus_mode = Control.FOCUS_NONE
 	codex_button.pressed.connect(_toggle_codex)
 	title_panel.add_child(codex_button)
 
 	achievements_button = Button.new()
 	achievements_button.position = Vector2(246, 68)
-	achievements_button.size = Vector2(104, 28)
+	achievements_button.size = Vector2(100, 28)
 	achievements_button.text = "ACHIEVEMENTS"
 	achievements_button.add_theme_font_size_override("font_size", 7)
 	achievements_button.focus_mode = Control.FOCUS_NONE
 	achievements_button.pressed.connect(_toggle_achievements)
 	title_panel.add_child(achievements_button)
+
+	title_quit_button = Button.new()
+	title_quit_button.position = Vector2(419, 68)
+	title_quit_button.size = Vector2(37, 28)
+	title_quit_button.text = "QUIT"
+	title_quit_button.add_theme_font_size_override("font_size", 7)
+	title_quit_button.focus_mode = Control.FOCUS_NONE
+	title_quit_button.pressed.connect(show_quit_confirmation.bind(false))
+	title_panel.add_child(title_quit_button)
 
 	story_button = Button.new()
 	story_button.position = Vector2(246, 8)
@@ -832,6 +901,7 @@ func _build_title() -> void:
 		manual_button,
 		achievements_button,
 		codex_button,
+		title_quit_button,
 	]
 	title_navigation_actions = [
 		"new_game",
@@ -847,6 +917,7 @@ func _build_title() -> void:
 		"manual",
 		"achievements",
 		"codex",
+		"quit",
 	]
 
 	codex_panel = ColorRect.new()
@@ -1027,6 +1098,125 @@ func _build_daily_chronicle() -> void:
 	daily_panel.add_child(daily_start_button)
 	var footer := _make_child_label(daily_panel, "T / DOWN  OPEN OR CLOSE  ·  B / ESC  BACK", Vector2(12, 202), Vector2(408, 14), 7, PAPER)
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+
+func _build_quit_confirmation() -> void:
+	quit_panel = ColorRect.new()
+	quit_panel.position = Vector2.ZERO
+	quit_panel.size = Vector2(480, 270)
+	quit_panel.color = Color(0.008, 0.006, 0.012, 0.88)
+	quit_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	quit_panel.visible = false
+	add_child(quit_panel)
+	var card := ColorRect.new()
+	card.position = Vector2(82, 61)
+	card.size = Vector2(316, 148)
+	card.color = Color(0.035, 0.027, 0.042, 0.985)
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	quit_panel.add_child(card)
+	quit_title_label = _make_child_label(card, "LEAVE THE ARCHIVE?", Vector2(14, 8), Vector2(288, 27), 17, WHITE)
+	quit_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	quit_body_label = _make_child_label(card, "Your progress and latest safe draft will be preserved.", Vector2(20, 38), Vector2(276, 39), 9, PAPER)
+	quit_body_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	quit_status_label = _make_child_label(card, "Analytics will be given a moment to finish sending.", Vector2(20, 76), Vector2(276, 15), 7, GOLD)
+	quit_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	quit_cancel_button = Button.new()
+	quit_cancel_button.position = Vector2(20, 102)
+	quit_cancel_button.size = Vector2(132, 32)
+	quit_cancel_button.text = "CANCEL"
+	quit_cancel_button.add_theme_font_size_override("font_size", 10)
+	quit_cancel_button.focus_mode = Control.FOCUS_NONE
+	quit_cancel_button.pressed.connect(hide_quit_confirmation)
+	card.add_child(quit_cancel_button)
+	quit_confirm_button = Button.new()
+	quit_confirm_button.position = Vector2(164, 102)
+	quit_confirm_button.size = Vector2(132, 32)
+	quit_confirm_button.text = "SAVE & QUIT"
+	quit_confirm_button.add_theme_font_size_override("font_size", 10)
+	quit_confirm_button.focus_mode = Control.FOCUS_NONE
+	quit_confirm_button.pressed.connect(_confirm_quit)
+	card.add_child(quit_confirm_button)
+
+
+func show_quit_confirmation(from_active_run: bool = false) -> void:
+	if quit_waiting or _popup_transition_active(quit_panel):
+		return
+	if quit_visible:
+		quit_panel.move_to_front()
+		return
+	quit_from_active_run = from_active_run
+	quit_visible = true
+	quit_waiting = false
+	quit_navigation_index = 0
+	quit_panel.move_to_front()
+	_refresh_quit_confirmation()
+	_show_popup(quit_panel, false)
+	quit_confirmation_changed.emit(true)
+
+
+func hide_quit_confirmation() -> void:
+	if not quit_visible or quit_waiting or _popup_transition_active(quit_panel):
+		return
+	_hide_popup(quit_panel, _finish_hide_quit_confirmation, false)
+
+
+func _finish_hide_quit_confirmation() -> void:
+	quit_visible = false
+	quit_confirmation_changed.emit(false)
+	if title_visible:
+		_refresh_title_navigation()
+	elif pause_panel.visible:
+		_refresh_pause_navigation()
+
+
+func set_quit_waiting() -> void:
+	if not quit_visible:
+		return
+	quit_waiting = true
+	_refresh_quit_confirmation()
+
+
+func _move_quit_navigation(direction: int) -> void:
+	if not quit_visible or quit_waiting:
+		return
+	quit_navigation_index = posmod(quit_navigation_index + direction, 2)
+	_refresh_quit_confirmation()
+
+
+func _confirm_quit() -> void:
+	if not quit_visible or quit_waiting:
+		return
+	quit_waiting = true
+	_refresh_quit_confirmation()
+	quit_confirmed.emit()
+
+
+func _activate_quit_navigation() -> void:
+	if quit_navigation_index == 0:
+		hide_quit_confirmation()
+	else:
+		_confirm_quit()
+
+
+func _refresh_quit_confirmation() -> void:
+	if quit_panel == null:
+		return
+	var chinese := TranslationServer.get_locale().begins_with("zh")
+	quit_title_label.text = "退出游戏？" if chinese else "LEAVE THE ARCHIVE?"
+	quit_body_label.text = (
+		"当前进度与最近的安全草稿会先保存。" if quit_from_active_run
+		else "结束当前会话并返回桌面。"
+	) if chinese else (
+		"Your progress and latest safe draft will be preserved." if quit_from_active_run
+		else "End this session and return to the desktop."
+	)
+	quit_status_label.text = ("正在保存并发送匿名数据…" if chinese else "SAVING · FINISHING ANALYTICS…") if quit_waiting else ("退出前会短暂等待发送完成。" if chinese else "Analytics gets a brief moment to finish sending.")
+	quit_cancel_button.text = "取消" if chinese else "CANCEL"
+	quit_confirm_button.text = "保存并退出" if chinese and quit_from_active_run else ("退出" if chinese else ("SAVE & QUIT" if quit_from_active_run else "QUIT"))
+	quit_cancel_button.disabled = quit_waiting
+	quit_confirm_button.disabled = quit_waiting
+	quit_cancel_button.modulate = GOLD if not quit_waiting and quit_navigation_index == 0 else Color.WHITE
+	quit_confirm_button.modulate = CRIMSON.lightened(0.18) if not quit_waiting and quit_navigation_index == 1 else Color.WHITE
 
 
 func _build_achievement_toast() -> void:
@@ -1528,7 +1718,7 @@ func debug_finish_upgrade_transition() -> void:
 		_finish_upgrade_close()
 
 
-func _show_popup(panel: Control, scale_effect: bool = true) -> void:
+func _show_popup(panel: Control, scale_effect: bool = true, fade_duration: float = POPUP_FADE_IN_DURATION) -> void:
 	if not is_instance_valid(panel):
 		return
 	_cancel_popup_transition(panel)
@@ -1547,9 +1737,9 @@ func _show_popup(panel: Control, scale_effect: bool = true) -> void:
 	var tween := create_tween()
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	tween.set_parallel(true)
-	tween.tween_property(panel, "modulate", Color.WHITE, POPUP_FADE_IN_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(panel, "modulate", Color.WHITE, fade_duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	if scale_effect:
-		tween.tween_property(panel, "scale", Vector2.ONE, POPUP_FADE_IN_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(panel, "scale", Vector2.ONE, fade_duration).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	popup_transitions[panel_id] = {
 		"panel": panel,
 		"phase": "in",
@@ -1842,19 +2032,87 @@ func show_game_over(summary: Dictionary) -> void:
 	hide_victory_credits()
 	last_result_summary = summary.duplicate(true)
 	game_over_visible = true
+	game_over_panel_revealed = false
+	game_over_input_ready = false
+	game_over_input_deadline_msec = 0
+	game_over_sequence += 1
+	_hide_popup_immediate(game_over_backdrop)
+	_hide_popup_immediate(game_over_panel)
 	game_over_backdrop.move_to_front()
 	game_over_panel.move_to_front()
-	game_over_title.text = "THE PAGE GOES BLACK"
+	game_over_title.text = "此页归于黑暗" if TranslationServer.get_locale().begins_with("zh") else "THE PAGE GOES BLACK"
 	game_over_title.add_theme_color_override("font_color", CRIMSON)
 	game_over_label.text = _run_result_text(summary)
-	restart_button.text = "REWRITE THE PAGE"
-	_show_popup(game_over_backdrop, false)
+	_refresh_game_over_restart_button()
+	_show_popup(game_over_backdrop, false, DEFEAT_FADE_DURATION)
+	_continue_game_over_sequence(game_over_sequence)
+
+
+func _continue_game_over_sequence(sequence_id: int) -> void:
+	await get_tree().create_timer(DEFEAT_FADE_DURATION, true, false, true).timeout
+	_reveal_game_over_panel(sequence_id)
+
+
+func _reveal_game_over_panel(sequence_id: int) -> void:
+	if sequence_id != game_over_sequence or not game_over_visible or game_over_panel_revealed:
+		return
+	if _popup_transition_active(game_over_backdrop):
+		debug_finish_popup_transition(game_over_backdrop)
+	game_over_panel_revealed = true
 	_show_popup(game_over_panel)
+	game_over_input_deadline_msec = Time.get_ticks_msec() + int(ceil((POPUP_FADE_IN_DURATION + DEFEAT_INPUT_DELAY_SECONDS) * 1000.0))
+	_refresh_game_over_restart_button()
+
+
+func _update_game_over_input_gate() -> void:
+	if not game_over_visible or not game_over_panel_revealed or game_over_input_ready:
+		return
+	if Time.get_ticks_msec() < game_over_input_deadline_msec or _popup_transition_active(game_over_panel):
+		_refresh_game_over_restart_button()
+		return
+	for action in DEFEAT_RELEASE_ACTIONS:
+		if InputMap.has_action(action) and Input.is_action_pressed(action):
+			_refresh_game_over_restart_button()
+			return
+	game_over_input_ready = true
+	_refresh_game_over_restart_button()
+
+
+func _refresh_game_over_restart_button() -> void:
+	if not is_instance_valid(restart_button):
+		return
+	var chinese := TranslationServer.get_locale().begins_with("zh")
+	restart_button.disabled = not game_over_input_ready
+	if not game_over_input_ready:
+		restart_button.text = "墨迹尚未干透……" if chinese else "THE INK IS STILL SETTLING..."
+	elif using_gamepad:
+		restart_button.text = "A/× 或 START  重写" if chinese else "A/× OR START  REWRITE"
+	else:
+		restart_button.text = "R  重写此页" if chinese else "R  REWRITE THE PAGE"
+
+
+func debug_finish_game_over_transition(unlock_input: bool = false) -> void:
+	# Regression tests can settle the real paused transition without waiting on
+	# wall-clock animation, while production still requires the full delay and a
+	# release edge before restart.
+	if not game_over_visible:
+		return
+	game_over_sequence += 1
+	if _popup_transition_active(game_over_backdrop):
+		debug_finish_popup_transition(game_over_backdrop)
+	_reveal_game_over_panel(game_over_sequence)
+	if _popup_transition_active(game_over_panel):
+		debug_finish_popup_transition(game_over_panel)
+	if unlock_input:
+		game_over_input_deadline_msec = 0
+		_update_game_over_input_gate()
 
 
 func _request_game_over_restart() -> void:
-	if not game_over_visible or _popup_transition_active(game_over_panel):
+	if not game_over_visible or not game_over_input_ready or _popup_transition_active(game_over_panel):
 		return
+	game_over_input_ready = false
+	game_over_sequence += 1
 	_hide_popup(game_over_backdrop, Callable(), false)
 	_hide_popup(game_over_panel, func() -> void: restart_requested.emit())
 
@@ -1862,6 +2120,9 @@ func _request_game_over_restart() -> void:
 func show_victory(summary: Dictionary) -> void:
 	last_result_summary = summary.duplicate(true)
 	game_over_visible = false
+	game_over_panel_revealed = false
+	game_over_input_ready = false
+	game_over_sequence += 1
 	_hide_popup(game_over_backdrop, Callable(), false)
 	_hide_popup(game_over_panel)
 	victory_credit_pages = _victory_credit_page_data(summary)
@@ -2024,6 +2285,8 @@ func _run_result_text_zh(summary: Dictionary) -> String:
 func set_paused(paused: bool) -> void:
 	var should_show := paused and not manual_visible and not upgrade_visible and not relic_draft_visible and not event_visible and not game_over_visible
 	if should_show and (not pause_panel.visible or _popup_transition_phase(pause_panel) == "out"):
+		pause_navigation_index = 0
+		_refresh_pause_navigation()
 		_show_popup(pause_panel)
 	elif not should_show and pause_panel.visible and _popup_transition_phase(pause_panel) != "out":
 		_hide_popup(pause_panel)
@@ -2031,23 +2294,69 @@ func set_paused(paused: bool) -> void:
 		hide_settings()
 
 
+func _move_pause_navigation(direction: int) -> void:
+	if not pause_panel.visible or quit_visible:
+		return
+	pause_navigation_index = posmod(pause_navigation_index + direction, pause_navigation_buttons.size())
+	_refresh_pause_navigation()
+
+
+func _activate_pause_navigation() -> void:
+	match pause_navigation_index:
+		0:
+			pause_requested.emit()
+		1:
+			show_settings()
+		2:
+			show_manual()
+		3:
+			save_return_requested.emit()
+		4:
+			show_quit_confirmation(true)
+
+
+func _refresh_pause_navigation() -> void:
+	if pause_navigation_buttons.is_empty():
+		return
+	var chinese := TranslationServer.get_locale().begins_with("zh")
+	pause_navigation_index = clampi(pause_navigation_index, 0, pause_navigation_buttons.size() - 1)
+	pause_label.text = "战场已暂停" if chinese else "PANEL PAUSED"
+	if using_gamepad:
+		pause_resume_button.text = "A  继续" if chinese else "A  CONTINUE"
+		pause_options_button.text = "VIEW  选项" if chinese else "VIEW  OPTIONS"
+		pause_manual_button.text = "LT  战地手册" if chinese else "LT  FIELD MANUAL"
+		pause_save_return_button.text = "X  保存并返回" if chinese else "X  SAVE & RETURN"
+		pause_quit_button.text = "退出到桌面" if chinese else "QUIT TO DESKTOP"
+		pause_help_label.text = "↑↓ 选择  ·  A 确认  ·  B/START 返回" if chinese else "↑↓ SELECT  ·  A CONFIRM  ·  B/START BACK"
+	else:
+		pause_resume_button.text = "回车  继续" if chinese else "ENTER  CONTINUE"
+		pause_options_button.text = "O / F10  选项" if chinese else "O / F10  OPTIONS"
+		pause_manual_button.text = "F1 / H  战地手册" if chinese else "F1 / H  FIELD MANUAL"
+		pause_save_return_button.text = "1  保存并返回" if chinese else "1  SAVE & RETURN"
+		pause_quit_button.text = "退出到桌面" if chinese else "QUIT TO DESKTOP"
+		pause_help_label.text = "↑↓ 选择  ·  回车确认  ·  ESC 返回" if chinese else "↑↓ SELECT  ·  ENTER CONFIRM  ·  ESC BACK"
+	for index in range(pause_navigation_buttons.size()):
+		pause_navigation_buttons[index].modulate = GOLD if index == pause_navigation_index else Color.WHITE
+
+
 func set_input_mode(gamepad_active: bool) -> void:
 	using_gamepad = gamepad_active
 	var chinese := TranslationServer.get_locale().begins_with("zh")
 	if gamepad_active:
 		controls_label.text = "左摇杆移动  ·  右摇杆瞄准  ·  X/RT 斩击  ·  A/LB 冲刺  ·  B 墨术  ·  START 暂停" if chinese else "LS MOVE  ·  RS AIM  ·  X/RT SLASH  ·  A/LB DASH  ·  B ART  ·  START PAUSE"
-		restart_button.text = "A/× 或 START  重写" if chinese else "A/× OR START  REWRITE"
 		pause_label.text = "战场已暂停\n按 START 继续" if chinese else "PANEL PAUSED\nSTART TO CONTINUE"
 		pause_options_button.text = "VIEW  选项" if chinese else "VIEW  OPTIONS"
 		pause_manual_button.text = "LT  战地手册" if chinese else "LT  FIELD MANUAL"
 		manual_button.text = "战地手册" if chinese else "FIELD MANUAL"
 	else:
 		controls_label.text = "WASD 移动  ·  鼠标/J 斩击  ·  空格/K 冲刺  ·  E 墨术  ·  ESC 暂停" if chinese else "WASD MOVE  ·  MOUSE/J SLASH  ·  SPACE/K DASH  ·  E ART  ·  ESC PAUSE"
-		restart_button.text = "R  重写此页" if chinese else "R  REWRITE THE PAGE"
 		pause_label.text = "战场已暂停\n按 ESC 继续" if chinese else "PANEL PAUSED\nESC TO CONTINUE"
 		pause_options_button.text = "O / F10  选项" if chinese else "O / F10  OPTIONS"
 		pause_manual_button.text = "F1 / H  战地手册" if chinese else "F1 / H  FIELD MANUAL"
 		manual_button.text = "战地手册" if chinese else "FIELD MANUAL"
+	_refresh_game_over_restart_button()
+	_refresh_pause_navigation()
+	_refresh_quit_confirmation()
 	_refresh_manual()
 	set_ink_art(ink_art_source_name, ink_art_remaining, ink_art_maximum)
 	if upgrade_visible:
@@ -2199,6 +2508,7 @@ func refresh_title_meta(meta: Dictionary) -> void:
 
 func _refresh_title() -> void:
 	var chinese := TranslationServer.get_locale().begins_with("zh")
+	title_quit_button.text = "退出" if chinese else "QUIT"
 	var memories := int(title_data.get("meta_shards", 0))
 	var rank_data: Dictionary = title_data.get("archive_rank", {})
 	var archive_rank := int(rank_data.get("rank", 1))
@@ -2250,7 +2560,7 @@ func _refresh_title() -> void:
 
 
 func _title_overlay_visible() -> bool:
-	return daily_visible or proof_visible or restoration_visible or loadout_visible or codex_visible or achievements_visible or history_visible or story_visible or settings_visible or bindings_visible or manual_visible
+	return daily_visible or proof_visible or restoration_visible or loadout_visible or codex_visible or achievements_visible or history_visible or story_visible or settings_visible or bindings_visible or manual_visible or quit_visible
 
 
 func _refresh_title_navigation() -> void:
@@ -2332,6 +2642,8 @@ func _activate_title_navigation() -> void:
 			_toggle_achievements()
 		"codex":
 			_toggle_codex()
+		"quit":
+			show_quit_confirmation(false)
 	_refresh_title_navigation()
 
 
@@ -3238,7 +3550,24 @@ func _unhandled_input(event: InputEvent) -> void:
 	# into gameplay when the closing callback resumes the tree.
 	if (upgrade_visible and upgrade_transitioning) or not popup_transitions.is_empty():
 		return
+	if game_over_visible:
+		if game_over_input_ready and event.is_action_pressed("restart"):
+			_emit_input_ui_sound(event)
+			_request_game_over_restart()
+		return
 	_emit_input_ui_sound(event)
+	if quit_visible:
+		if quit_waiting:
+			return
+		if event.is_action_pressed("move_left") or event.is_action_pressed("move_up"):
+			_move_quit_navigation(-1)
+		elif event.is_action_pressed("move_right") or event.is_action_pressed("move_down"):
+			_move_quit_navigation(1)
+		elif _title_accept_pressed(event):
+			_activate_quit_navigation()
+		elif event.is_action_pressed("pause") or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B):
+			hide_quit_confirmation()
+		return
 	if victory_credits_visible:
 		if _any_button_pressed(event):
 			if victory_credits_final:
@@ -3355,6 +3684,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			if new_game_armed:
 				new_game_armed = false
 				_refresh_title()
+			else:
+				show_quit_confirmation(false)
 		elif event.is_action_pressed("daily_chronicle"):
 			_show_daily()
 		elif event.is_action_pressed("proof_ledger"):
@@ -3380,13 +3711,20 @@ func _unhandled_input(event: InputEvent) -> void:
 				_continue_from_title()
 		return
 	if pause_panel.visible:
-		if event.is_action_pressed("options"):
+		if event.is_action_pressed("move_up"):
+			_move_pause_navigation(-1)
+		elif event.is_action_pressed("move_down"):
+			_move_pause_navigation(1)
+		elif _title_accept_pressed(event):
+			_activate_pause_navigation()
+		elif event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B:
+			pause_requested.emit()
+		elif event.is_action_pressed("options"):
 			show_settings()
 		elif event.is_action_pressed("upgrade_1"):
 			save_return_requested.emit()
-		else:
-			if event.is_action_pressed("pause"):
-				pause_requested.emit()
+		elif event.is_action_pressed("pause"):
+			pause_requested.emit()
 		return
 	if event_visible:
 		if event.is_action_pressed("upgrade_1"):
@@ -3414,8 +3752,5 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.is_action_pressed("upgrade_4"):
 			_choose_upgrade(3)
 		return
-	if game_over_visible and event.is_action_pressed("restart"):
-		_request_game_over_restart()
-		return
-	if event.is_action_pressed("pause") and not game_over_visible:
+	if event.is_action_pressed("pause"):
 		pause_requested.emit()

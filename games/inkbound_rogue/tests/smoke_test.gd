@@ -560,7 +560,7 @@ func _run_smoke_test() -> void:
 		return
 	var manifest_file := FileAccess.open("res://asset-manifest.json", FileAccess.READ)
 	var manifest_data = JSON.parse_string(manifest_file.get_as_text()) if manifest_file != null else null
-	if not (manifest_data is Dictionary) or int(manifest_data.get("schema_version", 0)) != 3 or int(manifest_data.get("asset_count", 0)) != 93:
+	if not (manifest_data is Dictionary) or int(manifest_data.get("schema_version", 0)) != 3 or int(manifest_data.get("asset_count", 0)) != 108:
 		_fail("asset provenance manifest identity or coverage count drifted")
 		return
 	var ai_asset_count := 0
@@ -576,7 +576,7 @@ func _run_smoke_test() -> void:
 				return
 		ai_asset_count += 1 if asset_entry.get("generative_ai", false) == true else 0
 		live_ai_asset_count += 1 if asset_entry.get("live_generation", false) == true else 0
-	if ai_asset_count != 29 or live_ai_asset_count != 0:
+	if ai_asset_count != 44 or live_ai_asset_count != 0:
 		_fail("pre-generated/live AI asset inventory drifted")
 		return
 	for runtime_asset in [
@@ -590,6 +590,21 @@ func _run_smoke_test() -> void:
 		"res://assets/audio/voice/nara_ink_art_needlepoint_jp.wav",
 		"res://assets/audio/voice/nara_ink_art_seal_caster_jp.wav",
 		"res://assets/audio/voice/nara_ink_art_twin_stroke_jp.wav",
+		"res://assets/audio/voice/nara_ink_art_kiai_jp.wav",
+		"res://assets/audio/voice/combat/nara_hit_light_01.wav",
+		"res://assets/audio/voice/combat/nara_hit_light_02.wav",
+		"res://assets/audio/voice/combat/nara_hit_light_03.wav",
+		"res://assets/audio/voice/combat/nara_hit_heavy_01.wav",
+		"res://assets/audio/voice/combat/nara_hit_heavy_02.wav",
+		"res://assets/audio/voice/combat/nara_death_b_jp.wav",
+		"res://assets/audio/voice/combat/enemy_mask_hit_01.wav",
+		"res://assets/audio/voice/combat/enemy_mask_hit_02.wav",
+		"res://assets/audio/voice/combat/enemy_mask_hit_03.wav",
+		"res://assets/audio/voice/combat/enemy_mask_death_b.wav",
+		"res://assets/audio/voice/combat/enemy_ink_hit_01.wav",
+		"res://assets/audio/voice/combat/enemy_ink_hit_02.wav",
+		"res://assets/audio/voice/combat/enemy_ink_hit_03.wav",
+		"res://assets/audio/voice/combat/enemy_ink_death_b.wav",
 		"res://assets/audio/music_archive.wav",
 		"res://assets/audio/music_bindery.wav",
 		"res://assets/audio/music_finale.wav",

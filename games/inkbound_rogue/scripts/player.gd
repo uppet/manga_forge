@@ -619,6 +619,9 @@ func take_damage(amount: float, source_direction: Vector2 = Vector2.ZERO, source
 		})
 	if game.has_method("play_sound"):
 		game.play_sound("hurt", 0.9 + randf() * 0.12)
+	if health > 0.0 and game.has_method("play_player_hurt_voice"):
+		var heavy_hit := incoming >= max_health * 0.18 or health <= max_health * 0.3
+		game.play_player_hurt_voice(heavy_hit)
 	if game.has_method("impact"):
 		game.impact(global_position, false, "HIT!", 4.0)
 	if game.has_method("vibrate"):

@@ -119,6 +119,14 @@ and two persistent endings. Completed runs continue as harder drafts.
   warnings, teleport, parry, shield, restoration,
   combat supplies, boss entry/defeat, menu navigation, and Save & Return. Enemy
   warnings are spatial and rate-limited so large squads remain readable.
+  Nara adds three light and two heavy Japanese pain reactions plus the selected
+  B last-word performance; masked and ink enemies each add three subdued hit
+  variants and one selected B death reaction. Fatal damage never stacks the
+  normal hurt bark, and enemy voices use positional attenuation plus crowd
+  cooldowns so they remain below attacks and warnings.
+  Ink Arts use the locally generated Japanese voice-zero kiai on 90% of casts;
+  the current weapon's full Japanese technique line is a 10% rare variation
+  that finishes naturally over resumed combat without lengthening time stop.
   Blade cuts are led by shaped air, edge, paper, and handle transients rather
   than oscillator sweeps; the six extended scores use dry paper/wood/brush
   layers and 32-second act / 24-second boss arrangements to reduce loop fatigue.
@@ -137,6 +145,8 @@ it never attacks, locks a target, or changes keyboard/mouse aim:
 - `A` / Cross or left shoulder: dash
 - `B` / Circle: weapon-specific Ink Art
 - Start: pause / resume
+- D-pad / left stick up-down while paused: choose Continue, Options, Field
+  Manual, Save & Return, or Quit to Desktop; `A` confirms and `B` cancels
 - Left trigger: open / close the Field Manual; shoulder buttons turn its pages
 - Start on the title screen: continue a saved draft when present
 - D-pad / left stick up-down in the Armory: select a starting blade
@@ -148,10 +158,12 @@ it never attacks, locks a target, or changes keyboard/mouse aim:
 - D-pad down on the title screen: open/close Daily Chronicle
 - `X` / Square on the title screen: recent run history
 - Right trigger on the title screen: unlocked Story Archive
+- `Quit` on the title screen, or `B` / Escape at its root: open the bilingual
+  desktop-exit confirmation
 - `X` / Square in the pause menu: save the current draft and return to title
 - `X`, `Y`, `B`, RT / Square, Triangle, Circle, R2: choose techniques 1–4
 - `X`, `Y`, `B` / Square, Triangle, Circle: choose relics 1–3
-- `A` / Cross or Start: restart after defeat
+- `A` / Cross or Start: restart after the defeat fade and release prompt
 
 Keyboard and mouse remain fully supported:
 
@@ -161,7 +173,7 @@ Keyboard and mouse remain fully supported:
 - `Space` / right mouse / `K`: dash
 - `E` / middle mouse: weapon-specific Ink Art
 - `1`, `2`, `3`, `4`: choose a level-up technique
-- `R`: restart after defeat
+- `R`: restart after the defeat fade and release prompt
 - `Esc`: pause
 - `F1` / `H`: open / close the Field Manual; arrow keys turn its pages
 - `C` on the title screen: continue / load the current draft
@@ -211,6 +223,8 @@ godot --path .
 godot --headless --path . --editor --quit
 godot --headless --path . --script res://tests/smoke_test.gd
 godot --headless --path . --script res://tests/pause_state_test.gd
+godot --headless --path . --script res://tests/quit_flow_test.gd
+godot --headless --path . --script res://tests/defeat_flow_test.gd
 godot --headless --path . --script res://tests/save_recovery_test.gd
 godot --headless --path . --script res://tests/session_flow_test.gd
 godot --headless --path . --script res://tests/supply_drop_test.gd
@@ -239,7 +253,8 @@ godot --headless --path . --script res://tests/soak_test.gd
 ```
 
 The Windows host workflow exposes the same gates through `host_game.py test`,
-`host_game.py pause-test`, `host_game.py save-test`, `host_game.py progression`,
+`host_game.py pause-test`, `host_game.py quit-test`, `host_game.py defeat-test`,
+`host_game.py save-test`, `host_game.py progression`,
 `host_game.py session-test`, `host_game.py supply-test`, `host_game.py art-test`, `host_game.py encounter-test`,
 `host_game.py hazard-test`, `host_game.py loadout-test`, `host_game.py relic-test`,
 `host_game.py cutscene-test`, `host_game.py manual-test`, `host_game.py localization-test`, `host_game.py cast-test`,
@@ -254,7 +269,7 @@ seconds so a failed Godot test cannot linger indefinitely. `host_game.py
 process-status` reports every game/Godot process with elapsed time, CPU, memory,
 and command line; `host_game.py cleanup-tests` terminates only this project's
 `res://tests/` processes and never matches an editor or exported game.
-`host_game.py p1-suite` first mirrors/imports current source, then runs 27 core
+`host_game.py p1-suite` first mirrors/imports current source, then runs 29 core
 gates serially in one delegate session and finishes with a zero-process check.
 It keeps a compact summary and one diagnostic log per gate under
 `build/p1-suite/<UTC timestamp>/`; `build/p1-suite/latest.txt` identifies the
@@ -345,3 +360,7 @@ never sends raw input, world positions, participant codes, notes, screenshots,
 or high-frequency combat events. Turning the option off immediately stops the
 client and erases its local identity and queue. Configuration, event taxonomy,
 validation steps, and production caveats are in `design/gameanalytics.md`.
+Normal batches are sent during play; Quit to Desktop and intercepted window
+close requests save a safe draft and allow up to two seconds for the final
+session batch before closing. A forced process kill remains recoverable through
+the persisted offline queue.

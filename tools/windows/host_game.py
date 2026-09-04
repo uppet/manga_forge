@@ -304,6 +304,8 @@ def p1_suite(config: dict[str, Any], game: str) -> None:
     gates = [
         ("smoke", "smoke_test.gd", "headless", 120),
         ("pause", "pause_state_test.gd", "headless", 120),
+        ("quit", "quit_flow_test.gd", "headless", 120),
+        ("defeat", "defeat_flow_test.gd", "headless", 120),
         ("save", "save_recovery_test.gd", "headless", 120),
         ("session", "session_flow_test.gd", "headless", 180),
         ("supply", "supply_drop_test.gd", "headless", 120),
@@ -392,6 +394,24 @@ def pause_test(config: dict[str, Any], game: str) -> None:
     command = godot_resolver(config) + f"""
 GAME='{game_root}'
 timeout 90s "$GODOT" --headless --path "$GAME" --script res://tests/pause_state_test.gd
+"""
+    remote(config, command, 180)
+
+
+def quit_test(config: dict[str, Any], game: str) -> None:
+    game_root = posix_game_root(config, game)
+    command = godot_resolver(config) + f"""
+GAME='{game_root}'
+timeout 90s "$GODOT" --headless --path "$GAME" --script res://tests/quit_flow_test.gd
+"""
+    remote(config, command, 180)
+
+
+def defeat_test(config: dict[str, Any], game: str) -> None:
+    game_root = posix_game_root(config, game)
+    command = godot_resolver(config) + f"""
+GAME='{game_root}'
+timeout 90s "$GODOT" --headless --path "$GAME" --script res://tests/defeat_flow_test.gd
 """
     remote(config, command, 180)
 
@@ -934,7 +954,7 @@ echo "gracefully restarted $TARGET"
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "p1-suite", "test", "save-test", "pause-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "gameanalytics-test", "gameanalytics-build-test", "recorded-launcher-test", "capture-session", "capture-ink-art", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
+    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "p1-suite", "test", "save-test", "pause-test", "quit-test", "defeat-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "gameanalytics-test", "gameanalytics-build-test", "recorded-launcher-test", "capture-session", "capture-ink-art", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
     parser.add_argument("--game", default=DEFAULT_GAME)
     parser.add_argument("--participant", default="anonymous", help="anonymous facilitator-assigned playtest code")
     parser.add_argument("--reuse-build", action="store_true", help="launch the existing exported build without sync/export")
@@ -956,6 +976,10 @@ def main() -> int:
         save_test(config, args.game)
     elif args.command == "pause-test":
         pause_test(config, args.game)
+    elif args.command == "quit-test":
+        quit_test(config, args.game)
+    elif args.command == "defeat-test":
+        defeat_test(config, args.game)
     elif args.command == "session-test":
         session_test(config, args.game)
     elif args.command == "supply-test":

@@ -86,6 +86,14 @@ func _initialize() -> void:
 		return _fail("queue trimming removed the current session-start event")
 	if not FileAccess.file_exists(storage_root.path_join("state.json")) or not FileAccess.file_exists(storage_root.path_join("queue.json")):
 		return _fail("offline state and event queue were not persisted")
+	var shutdown_results: Array[bool] = []
+	analytics.shutdown_finished.connect(func(queue_flushed: bool) -> void: shutdown_results.append(queue_flushed))
+	analytics.request_shutdown()
+	var shutdown_snapshot: Dictionary = analytics.debug_snapshot()
+	if shutdown_results != [false] or bool(shutdown_snapshot.get("active", true)) or not bool(shutdown_snapshot.get("shutdown_requested", false)):
+		return _fail("graceful shutdown did not hand off its persisted queue")
+	if not _contains_category(shutdown_snapshot.get("queue", []), "session_end"):
+		return _fail("graceful shutdown did not persist a final session event")
 
 	analytics.configure_from_environment(false, true)
 	if not FileAccess.file_exists(storage_root.path_join("state.json")) or not FileAccess.file_exists(storage_root.path_join("queue.json")):

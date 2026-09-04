@@ -36,14 +36,21 @@ cue effectively inaudible beneath combat sounds.
   heavy brush-period impact, needle puncture and brake, seal stamp with twelve
   paper waves, or paired cross-cuts. Weapon identity comes from timing, impact,
   paper, bristle, and restrained metal resonance rather than electronic sweeps.
-- Every Ink Art also has one pre-generated Japanese Nara performance on a
-  persistent-pause voice player. With cut-ins enabled, excess dramatic silence
-  is capped and each five-pose sequence is timed to finish within 0.15 seconds
-  of its pitch-preserving 2.0x voice while the final imperative lands on the
-  authored release frame. The cut-in and all five startup frame durations are
-  shortened by the same factor so neither audio nor animation trails the other.
-  Disabling cut-ins retains the fast startup and allows the voice to finish over
-  resumed combat. The SFX slider controls all five performances.
+- Every Ink Art rolls one pre-generated Japanese IndexTTS 2.5 performance on a
+  persistent-pause voice player. Voice zero is a short common `は！` kiai used
+  for 90% of casts; the current weapon's named line is selected for the other
+  10%. The common cry resolves inside the existing cut-in. Rare 2.17–2.65
+  second lines continue over resumed combat instead of extending the time stop
+  or being truncated. Disabling cut-ins retains the same distribution and fast
+  startup. The SFX slider controls all six performances.
+- Nara has three light-hit and two heavy-hit Japanese pain variants, with a
+  dedicated owner-selected B death line. Fatal damage suppresses the normal hit
+  bark so the last words remain clean. Masked and ink-creature enemies each use
+  three quiet positional hit variants and one selected B death reaction.
+  Per-family crowd cooldowns and a shorter 440-pixel attenuation range prevent
+  enemy reactions from masking attacks or telegraphs. All combat performances
+  process through pause, allowing Nara's last words to complete beneath the
+  defeat fade.
 - Enemy projectile casts, dash charges, teleport windups, parries, shields, and
   Archivist restoration are positional warnings, not decorative noise. Their
   silhouettes use paper snaps, cloth movement, hollow knocks, and restrained
@@ -63,7 +70,9 @@ new cues.
 
 ## Validation
 
-`audio_system_test.gd` verifies all 30 sound cues, five 2.0x Japanese Ink Art voices,
+`audio_system_test.gd` verifies all 30 sound cues, six Japanese Ink Art voices
+with the exact 90% common / 10% specialized selection boundary, 14 Japanese
+combat-feedback voices,
 all five Hai Mian stereo music
 cues and their production-length floors, cyclic menu/battle versus linear
 story/endings, menu/run/boss/story/ending state mapping, weapon mappings, the

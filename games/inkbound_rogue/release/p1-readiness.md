@@ -1,6 +1,6 @@
 # P1 candidate readiness — 0.23.3-alpha
 
-Snapshot date: 2026-09-02. This is the automated development baseline for a
+Snapshot date: 2026-09-04. This is the automated development baseline for a
 small, private Windows playtest. It is not evidence of Steam release quality or
 of player enjoyment, accessibility, minimum hardware, or controller coverage.
 
@@ -8,16 +8,16 @@ of player enjoyment, accessibility, minimum hardware, or controller coverage.
 
 | Check | Result |
 | --- | --- |
-| Serial regression | Pass: 26/26 gameplay, save, pause, UI, localization, balance, persona, recorder, and stress gates |
-| Modal transitions | Pass: upgrade drafts retain their 0.24-second/0.18-second elastic transitions and 1.016× opening/closing overshoot; relic, event, pause, manual, settings, binding, title-overlay, game-over, and credits panels use 0.16-second fade-ins and 0.12-second fade-outs. Input stays locked and gameplay stays paused until closing callbacks complete |
+| Serial regression | Pass: 29/29 gameplay, save, pause, quit, defeat, UI, localization, balance, persona, recorder, analytics, and stress gates |
+| Modal transitions | Pass: upgrade drafts retain their 0.24-second/0.18-second elastic transitions and 1.016× opening/closing overshoot; relic, event, pause, manual, settings, binding, title-overlay, and credits panels use 0.16-second fade-ins and 0.12-second fade-outs. Defeat uses a 1.25-second battlefield darkening before the result panel, then a 1.50-second input guard plus release-before-repress protection |
 | Modal input handoff | Pass: held movement resumes immediately after a choice; only overlapping attack/dash/special actions are gated until release, with a 0.75-second lost-release fail-safe and focus/controller reset |
-| Evidence directory | `build/p1-suite/20260902T011355Z/` in the Windows runtime; compact summary plus one log per gate |
+| Evidence directory | `build/p1-suite/20260904T102610Z/` in the Windows runtime; compact summary plus one log per gate |
 | Recorded stress run | Pass: 1,200 frames, 139.2 processing FPS average, 78 peak enemies, 52 peak pickups, 747 peak nodes, 120.8 MiB static memory, Page 13, 252 kills |
-| Unrecorded suite stress run | Pass: 1,200 frames, 141.6 processing FPS average, 75 peak enemies, 47 peak pickups, 735 peak nodes, 120.8 MiB static memory, Page 13, 231 kills |
+| Unrecorded suite stress run | Pass: 1,200 frames, 142.8 processing FPS average, 76 peak enemies, 41 peak pickups, 745 peak nodes, 143.3 MiB static memory, Page 13, 238 kills |
 | Windows export boot | Pass: embedded-PCK executable ran 120 frames with GL Compatibility on Radeon RX 9070 XT and exited normally |
 | Recorded CMD launcher | Pass: consent-capable launcher started the real EXE, wrote a complete pseudonymous session, removed `incomplete.flag`, and left zero processes |
-| Release/depot audit | Pass: 73 assets; 59 procedural, 14 pre-generated AI, zero live AI; exactly 3 Steam depot files (111,347,049 bytes) and 4 itch.io recorded-playtest files (111,350,414 bytes) |
-| Candidate executable | `build/itch-windows/InkboundRogue.exe`; audited SHA-256 `48099a77ab3e6fa1e4754a3f06b2c0be52815e8cbfe69c4053361e454c7a6ac3` |
+| Release/depot audit | Pass: 108 assets; 64 procedural, 44 pre-generated AI, zero live AI; exactly 3 Steam depot files (117,758,121 bytes) and 4 itch.io recorded-playtest files (117,761,486 bytes) |
+| Candidate executable | `build/itch-windows/InkboundRogue.exe`; audited SHA-256 `61e91aaff7c5bb58e7f3b6c42c47261b31e5f2e7fb184770cb19a77bd840c445` |
 | Process hygiene | Pass: zero Godot or exported-game processes after the serial suite |
 
 The recorded and unrecorded stress figures are development-machine processing

@@ -30,6 +30,8 @@ Inkbound Rogue 的远程统计是可选能力，不替代现有的本地试玩�
 7. 进入“选项”，将“匿名使用数据”切为“开”。若未开启，即便 EXE 内已有 keys 也不会创建匿名 ID 或发起请求。
 8. 开一局并完成一次升级选择，然后在 GameAnalytics 的 Realtime / Live Events 中检查 `user`、`progression` 和 `design` 事件。
 
+Live Events 通常在发送后数秒至约 30 秒内出现，只保留最近 50 条；普通 Realtime 指标和其他报表还需几分钟处理。排查时确认打开的是同一个游戏项目，清空 Event Type / Build / User ID 过滤条件，并留意本构建的 Build 值为 `0.23.3-alpha`。还应在 Game Settings → General → Danger Zone 确认 Event Collection 没有被禁用或用过滤器排除此 Build/事件类别。
+
 不要把真实 keys 写进 Git、问题单、试玩日志或聊天记录。`*.local.json` 已加入 `.gitignore`，而 Git 中的 `gameanalytics_credentials.gd` 永远是空占位文件。这里的 Secret Key 会进入最终客户端，因此有能力逆向 EXE/PCK 的人仍可能提取它；这是客户端采集签名 key，不要把它与 GameAnalytics 账号密码、管理 API key 或其他服务密钥复用。
 
 ## 构建注入与开发覆盖
@@ -64,14 +66,16 @@ Inkbound Rogue 的远程统计是可选能力，不替代现有的本地试玩�
 
 - HTTP 使用 Godot `HTTPRequest` 异步提交，不阻塞主线程，也不改变暂停状态。
 - 初始化失败或断网时采用 5–120 秒指数退避；每约 20 秒批量提交，单批最多 32 条。
+- 事件并非只在退出时发送：初始化完成后会立即尝试首批发送，之后约每 20 秒提交。标题页、暂停菜单和窗口关闭请求共用退出确认流程；确认后保存安全草稿、结束统计会话，并最多等待 2 秒完成最后一批发送。
 - 队列上限 500 条，位于 `user://gameanalytics/queue.json`；匿名安装 ID、会话号和未正常结束会话位于 `user://gameanalytics/state.json`。
+- 操作系统强杀、断电或任务管理器结束进程无法等待网络；未发送事件仍保留在本地队列，并在下次启动时补交。
 - 关闭“匿名使用数据”会停止在途请求，并删除上述两个文件。
 - 自动化测试强制关闭网络；`gameanalytics_test.gd` 使用独立 dry-run 目录验证 HMAC、事件白名单、队列上限和 opt-out 删除。
 - `test_gameanalytics_build.py` 使用临时目录验证 Key 长度、注入位置、配置指纹及清单不泄露原始 Key。
 
 ## 发布前仍需完成
 
-- 用测试项目的真实 keys 做一次 Windows 客户端到 Live Events 的闭环；当前仓库不含账号 keys，因此 CI 只能验证本地协议契约。
+- 已用本机 Production keys 验证 Windows 客户端收到 HTTP 200 后清空本地队列；仍需由账号持有人在 Realtime → Live Events 确认仪表盘可见性。当前仓库不含账号 keys，CI 继续只验证本地协议契约。
 - 审核面向玩家的隐私说明、GameAnalytics 数据处理条款和各发行地区要求。
 - 为未来新增的平台分别准备本机 keys，并确认发行流水线选择了对应平台配置。
 - 在正式仪表盘确认事件 ID 的基数和漏斗价值，再决定是否增加事件。禁止为了“数据更多”加入高频战斗流。

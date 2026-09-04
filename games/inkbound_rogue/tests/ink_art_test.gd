@@ -130,7 +130,7 @@ func _run() -> void:
 	if not _validate_weapon_cinematics(game):
 		return
 
-	print("INKBOUND_ART_OK forms=5 upgrades=6 input=keyboard+gamepad cooldown=ok checkpoint=ok cinematics=5 cutins=optional startup_frames=5 release=authored freeze=ok scale=bounded sound=charge+5 voice=ja+5 tempo=2.0x synchronized=0.15s")
+	print("INKBOUND_ART_OK forms=5 upgrades=6 input=keyboard+gamepad cooldown=ok checkpoint=ok cinematics=5 cutins=optional startup_frames=5 release=authored freeze=ok scale=bounded sound=charge+5 voice=ja+6 distribution=common90+specialized10 rare_tail=resumed-combat")
 	_cleanup(game, 0)
 
 
@@ -161,6 +161,20 @@ func _validate_weapon_cinematics(game: Node) -> bool:
 	game.settings["ink_art_cutins"] = true
 	game.player.ink_art_echo = false
 	game.player.ink_art_heal = false
+	game.ink_art_cinematic.debug_set_voice_roll(0.5)
+	game.ink_art_cinematic._play_voice("MARGINALIA", 0.85)
+	if game.ink_art_cinematic.voice_player.stream != game.ink_art_cinematic.COMMON_VOICE or game.ink_art_cinematic.last_voice_variant != "common":
+		return _cinematic_fail(game, "the 90-percent path did not select voice zero")
+	game.ink_art_cinematic.debug_set_voice_roll(0.099999)
+	game.ink_art_cinematic._play_voice("MARGINALIA", 0.85)
+	if game.ink_art_cinematic.voice_player.stream != game.ink_art_cinematic.VOICES["MARGINALIA"] or game.ink_art_cinematic.last_voice_variant != "specialized":
+		return _cinematic_fail(game, "a roll below 0.10 did not select the specialized voice")
+	game.ink_art_cinematic.debug_set_voice_roll(0.1)
+	game.ink_art_cinematic._play_voice("MARGINALIA", 0.85)
+	if game.ink_art_cinematic.voice_player.stream != game.ink_art_cinematic.COMMON_VOICE:
+		return _cinematic_fail(game, "the exact 0.10 probability boundary selected a specialized voice")
+	game.ink_art_cinematic.voice_player.stop()
+	game.ink_art_cinematic.debug_set_voice_roll(0.0)
 	for form in forms:
 		_clear_enemies(game)
 		game.player.weapon_form = form
@@ -177,13 +191,8 @@ func _validate_weapon_cinematics(game: Node) -> bool:
 			return _cinematic_fail(game, "%s did not freeze the live battlefield" % form)
 		if not game.ink_art_cinematic.cutin_root.visible or game.ink_art_cinematic.phase != "cutin":
 			return _cinematic_fail(game, "%s did not open its full-screen cut-in" % form)
-		if game.ink_art_cinematic.last_voice_form != form or game.ink_art_cinematic.voice_player.stream != game.ink_art_cinematic.VOICES[form] or not game.ink_art_cinematic.voice_player.playing:
+		if game.ink_art_cinematic.last_voice_form != form or game.ink_art_cinematic.last_voice_variant != "specialized" or game.ink_art_cinematic.voice_player.stream != game.ink_art_cinematic.VOICES[form] or not game.ink_art_cinematic.voice_player.playing:
 			return _cinematic_fail(game, "%s did not start its mapped Japanese voice" % form)
-		var sequence_duration := float(game.ink_art_cinematic.FORM_DATA[form]["cutin_duration"])
-		for frame_duration in game.ink_art_cinematic.FORM_DATA[form]["frame_durations"]:
-			sequence_duration += float(frame_duration)
-		if absf(sequence_duration - float(game.ink_art_cinematic.VOICES[form].get_length())) > 0.15:
-			return _cinematic_fail(game, "%s voice and cut-in sequence length drifted apart" % form)
 		if target.health < health_before or game.last_sound_id != "ink_art":
 			return _cinematic_fail(game, "%s applied damage before its release frame or lost the shared charge cue" % form)
 		if game.hud.input_enabled or game.cutscene.input_enabled:
@@ -209,8 +218,9 @@ func _validate_weapon_cinematics(game: Node) -> bool:
 			return _cinematic_fail(game, "%s did not resume the battlefield after recovery" % form)
 		if game.ink_art_cinematic.last_sequence_frame_count != 5 or game.player.ink_art_cinematic_pose_active:
 			return _cinematic_fail(game, "%s did not present and restore all five startup frames" % form)
-		if game.ink_art_cinematic.voice_player.playing:
-			return _cinematic_fail(game, "%s left its voice playing beyond the synchronized cut-in" % form)
+		if not game.ink_art_cinematic.voice_player.playing:
+			return _cinematic_fail(game, "%s rare specialized line was cut off when combat resumed" % form)
+		game.ink_art_cinematic.voice_player.stop()
 		if not game.player.sprite.scale.is_equal_approx(game.player.visual_base_scale) or game.player.sprite.texture != game.player.idle_texture:
 			return _cinematic_fail(game, "%s did not restore the normal combat sprite scale" % form)
 		if not game.hud.input_enabled or not game.cutscene.input_enabled:
@@ -234,6 +244,7 @@ func _validate_weapon_cinematics(game: Node) -> bool:
 	if not game.ink_art_cinematic.voice_player.playing:
 		return _cinematic_fail(game, "cut-in-disabled path cut off the Japanese voice instead of resuming combat")
 	game.ink_art_cinematic.voice_player.stop()
+	game.ink_art_cinematic.debug_set_voice_roll(-1.0)
 	game.settings["ink_art_cutins"] = true
 	game.test_mode = true
 	return true

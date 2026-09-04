@@ -42,14 +42,67 @@ func _process(_delta: float) -> bool:
 	if frames < 3:
 		return false
 	if frames == 3:
-		if not _validate_catalog() or not _validate_adaptive_music() or not _validate_combat_cues() or not _validate_ui_cues() or not _validate_runtime_crossfade():
+		if not _validate_catalog() or not _validate_combat_voices() or not _validate_adaptive_music() or not _validate_combat_cues() or not _validate_ui_cues() or not _validate_runtime_crossfade():
 			return true
 		validated = true
 		return false
 	if not validated or frames < 6 or Time.get_ticks_msec() - audio_released_at_msec < 250:
 		return false
-	print("INKBOUND_AUDIO_OK sounds=30 voices=5 language=ja voice_tempo=2.0x music=5 hai_mian_stereo=menu+battle+story+keep+rewrite loop_crossfade=1.5s state_crossfade=0.55s linear_story_endings=3 weapons=5 physical_blade_layers=4 ink_art_layers=charge+5_release material_score=paper/wood/brush enemy_cues=6 pickups=2 ui=4 spatial=ok cooldowns=ok")
+	print("INKBOUND_AUDIO_OK sounds=30 voices=20 ink_art=6 combat_feedback=14 language=ja ink_art_distribution=common90+specialized10 music=5 hai_mian_stereo=menu+battle+story+keep+rewrite loop_crossfade=1.5s state_crossfade=0.55s linear_story_endings=3 weapons=5 physical_blade_layers=4 ink_art_layers=charge+5_release material_score=paper/wood/brush enemy_cues=6 pickups=2 ui=4 spatial=ok cooldowns=ok")
 	_cleanup(0)
+	return true
+
+
+func _validate_combat_voices() -> bool:
+	var pools := [
+		game.PLAYER_HIT_LIGHT_VOICES,
+		game.PLAYER_HIT_HEAVY_VOICES,
+		game.ENEMY_MASK_HIT_VOICES,
+		game.ENEMY_INK_HIT_VOICES,
+	]
+	var expected_sizes := [3, 2, 3, 3]
+	var total := 3
+	for index in range(pools.size()):
+		if pools[index].size() != expected_sizes[index]:
+			return _fail("combat voice pool count drifted")
+		for stream in pools[index]:
+			if stream.get_length() < 0.1:
+				return _fail("combat hit voice is empty")
+			total += 1
+	for stream in [game.PLAYER_DEATH_VOICE, game.ENEMY_MASK_DEATH_VOICE, game.ENEMY_INK_DEATH_VOICE]:
+		if stream.get_length() < 0.8:
+			return _fail("selected B fatal voice is empty or truncated")
+	if total != 14 or game.PLAYER_DEATH_VOICE.get_length() < 2.7:
+		return _fail("combat feedback catalog count or Nara last-word tail drifted")
+	game.play_player_hurt_voice(false)
+	if game.last_voice_id != "player_hit_light":
+		return _fail("player light-hit voice route is missing")
+	game.play_player_hurt_voice(true)
+	if game.last_voice_id != "player_hit_heavy":
+		return _fail("player heavy-hit voice route is missing")
+	game.play_player_death_voice()
+	if game.last_voice_id != "player_death_b":
+		return _fail("selected B player death route is missing")
+	game.play_enemy_hurt_voice(game.player.global_position, "mask")
+	if game.last_voice_id != "enemy_mask_hit":
+		return _fail("masked enemy hit voice route is missing")
+	game.play_enemy_death_voice(game.player.global_position, "blot")
+	if game.last_voice_id != "enemy_ink_death_b":
+		return _fail("selected B ink death route is missing")
+	game.test_mode = false
+	game.voice_last_played_msec.clear()
+	game.play_player_death_voice()
+	var runtime_player: AudioStreamPlayer = null
+	for child in game.get_children():
+		if child is AudioStreamPlayer and child.stream == game.PLAYER_DEATH_VOICE:
+			runtime_player = child
+			break
+	if runtime_player == null or runtime_player.process_mode != Node.PROCESS_MODE_ALWAYS or not runtime_player.playing:
+		game.test_mode = true
+		return _fail("fatal voice player does not survive paused defeat presentation")
+	runtime_player.stop()
+	runtime_player.free()
+	game.test_mode = true
 	return true
 
 
@@ -61,12 +114,26 @@ func _validate_catalog() -> bool:
 			return _fail("missing or empty sound cue %s" % sound_id)
 	if game.ink_art_cinematic.VOICES.size() != 5:
 		return _fail("Ink Art Japanese voice catalog count drifted")
+	if game.ink_art_cinematic.COMMON_VOICE.get_length() < 0.8 or game.ink_art_cinematic.COMMON_VOICE.get_length() > 1.0:
+		return _fail("Ink Art common Japanese kiai has an invalid runtime length")
+	if not is_equal_approx(game.ink_art_cinematic.SPECIALIZED_VOICE_PROBABILITY, 0.1):
+		return _fail("Ink Art specialized voice probability drifted from one in ten")
 	for form in ["MARGINALIA", "GREATBRUSH", "NEEDLEPOINT", "SEAL-CASTER", "TWIN-STROKE"]:
 		if not game.ink_art_cinematic.VOICES.has(form):
 			return _fail("missing Ink Art Japanese voice for %s" % form)
 		var voice_length: float = game.ink_art_cinematic.VOICES[form].get_length()
-		if voice_length < 1.2 or voice_length > 1.55:
+		if voice_length < 2.1 or voice_length > 2.7:
 			return _fail("Ink Art Japanese voice has an invalid runtime length for %s" % form)
+	game.ink_art_cinematic.debug_set_voice_roll(0.5)
+	game.ink_art_cinematic._play_voice("MARGINALIA", 0.85)
+	if game.ink_art_cinematic.voice_player.stream != game.ink_art_cinematic.COMMON_VOICE or game.ink_art_cinematic.last_voice_variant != "common":
+		return _fail("Ink Art common voice-zero route is missing")
+	game.ink_art_cinematic.debug_set_voice_roll(0.05)
+	game.ink_art_cinematic._play_voice("MARGINALIA", 0.85)
+	if game.ink_art_cinematic.voice_player.stream != game.ink_art_cinematic.VOICES["MARGINALIA"] or game.ink_art_cinematic.last_voice_variant != "specialized":
+		return _fail("Ink Art one-in-ten specialized route is missing")
+	game.ink_art_cinematic.voice_player.stop()
+	game.ink_art_cinematic.debug_set_voice_roll(-1.0)
 	if game.ink_art_cinematic.voice_player == null or game.ink_art_cinematic.voice_player.process_mode != Node.PROCESS_MODE_ALWAYS:
 		return _fail("Ink Art voice player does not survive the cinematic pause")
 	var physical_cut_lengths := {"slash": 0.23, "slash_heavy": 0.35, "slash_light": 0.14, "seal_cast": 0.27}

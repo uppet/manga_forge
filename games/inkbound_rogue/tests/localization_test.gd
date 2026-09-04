@@ -44,7 +44,7 @@ func _process(_delta: float) -> bool:
 	elif frames == 6:
 		if not _validate_persistence_and_fallback():
 			return true
-		print("INKBOUND_LOCALIZATION_OK locales=en,zh_CN setting=auto/en/zh_CN persistence=ok content=translated story=translated font=cjk layout=contained runtime_switch=ok")
+		print("INKBOUND_LOCALIZATION_OK locales=en,zh_CN setting=auto/en/zh_CN persistence=ok content=translated story=translated exit=localized font=cjk layout=contained runtime_switch=ok")
 		_cleanup(0)
 		return true
 	return false
@@ -76,8 +76,14 @@ func _validate_chinese_runtime() -> bool:
 		return _fail("configured Windows font fallback cannot render Simplified Chinese")
 
 	game.hud.show_title(game._meta_snapshot())
-	if game.hud.start_button.text.find("新游戏") < 0 or game.hud.difficulty_button.text.find("标准草稿") < 0:
+	if game.hud.start_button.text.find("新游戏") < 0 or game.hud.difficulty_button.text.find("标准草稿") < 0 or game.hud.title_quit_button.text != "退出":
 		return _fail("title shell did not refresh into Chinese")
+	game.hud.show_quit_confirmation(false)
+	game.hud.debug_finish_popup_transition(game.hud.quit_panel)
+	if game.hud.quit_title_label.text != "退出游戏？" or game.hud.quit_cancel_button.text != "取消" or game.hud.quit_confirm_button.text != "退出" or game.hud.quit_status_label.text.find("发送") < 0:
+		return _fail("quit confirmation was not localized into Chinese")
+	game.hud.hide_quit_confirmation()
+	game.hud.debug_finish_popup_transition(game.hud.quit_panel)
 	game.hud.set_input_mode(true)
 	var right_trigger := _joy_axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)
 	game.hud._unhandled_input(right_trigger)

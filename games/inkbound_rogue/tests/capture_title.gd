@@ -123,7 +123,7 @@ func _process(_delta: float) -> bool:
 			"route_ids": ["razor-gallery", "errata-canals", "red-press"],
 			"new_unlocks": ["GLASS SCRIPT", "TWIN-STROKE FORM"],
 		})
-		game.hud.debug_finish_popup_transition()
+		game.hud.debug_finish_game_over_transition(true)
 	elif frames == 226:
 		_capture("inkbound-run-summary-render.png")
 		if capture_failed:
