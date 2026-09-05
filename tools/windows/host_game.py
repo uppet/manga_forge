@@ -320,6 +320,7 @@ def p1_suite(config: dict[str, Any], game: str) -> None:
         ("cast", "combat_cast_test.gd", "headless", 120),
         ("audio", "audio_system_test.gd", "headless", 120),
         ("combat-feel", "combat_feel_test.gd", "headless", 120),
+        ("boss-intro", "boss_intro_test.gd", "headless", 120),
         ("accessibility", "accessibility_test.gd", "headless", 120),
         ("restoration", "restoration_board_test.gd", "headless", 120),
         ("proof", "proof_depth_test.gd", "headless", 120),
@@ -541,6 +542,15 @@ timeout 120s "$GODOT" --headless --path "$GAME" --script res://tests/combat_feel
     remote(config, command, 180)
 
 
+def boss_intro_test(config: dict[str, Any], game: str) -> None:
+    game_root = posix_game_root(config, game)
+    command = godot_resolver(config) + f"""
+GAME='{game_root}'
+timeout 120s "$GODOT" --headless --path "$GAME" --script res://tests/boss_intro_test.gd
+"""
+    remote(config, command, 180)
+
+
 def accessibility_test(config: dict[str, Any], game: str) -> None:
     game_root = posix_game_root(config, game)
     command = godot_resolver(config) + f"""
@@ -602,6 +612,24 @@ GAME='{game_root}'
 timeout 60s "$GODOT" --path "$GAME" --script res://tests/capture_upgrade_ui.gd
 """
     remote(config, command, 120)
+
+
+def capture_boss_intro(config: dict[str, Any], game: str) -> None:
+    game_root = posix_game_root(config, game)
+    command = godot_resolver(config) + f"""
+GAME='{game_root}'
+timeout 120s "$GODOT" --path "$GAME" --script res://tests/capture_boss_intro.gd
+"""
+    remote(config, command, 180)
+
+
+def capture_enemy_attacks(config: dict[str, Any], game: str) -> None:
+    game_root = posix_game_root(config, game)
+    command = godot_resolver(config) + f"""
+GAME='{game_root}'
+timeout 120s "$GODOT" --path "$GAME" --script res://tests/capture_enemy_attacks.gd
+"""
+    remote(config, command, 180)
 
 
 def capture_restoration(config: dict[str, Any], game: str) -> None:
@@ -964,7 +992,7 @@ echo "gracefully restarted $TARGET"
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "p1-suite", "test", "save-test", "pause-test", "quit-test", "defeat-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "gameanalytics-test", "gameanalytics-build-test", "recorded-launcher-test", "capture-session", "capture-ink-art", "capture-upgrades", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-credits", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
+    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "p1-suite", "test", "save-test", "pause-test", "quit-test", "defeat-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "boss-intro-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "gameanalytics-test", "gameanalytics-build-test", "recorded-launcher-test", "capture-session", "capture-ink-art", "capture-upgrades", "capture-boss-intro", "capture-enemy-attacks", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-credits", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
     parser.add_argument("--game", default=DEFAULT_GAME)
     parser.add_argument("--participant", default="anonymous", help="anonymous facilitator-assigned playtest code")
     parser.add_argument("--reuse-build", action="store_true", help="launch the existing exported build without sync/export")
@@ -1016,6 +1044,8 @@ def main() -> int:
         audio_test(config, args.game)
     elif args.command == "combat-feel-test":
         combat_feel_test(config, args.game)
+    elif args.command == "boss-intro-test":
+        boss_intro_test(config, args.game)
     elif args.command == "accessibility-test":
         accessibility_test(config, args.game)
     elif args.command == "restoration-test":
@@ -1045,6 +1075,10 @@ timeout 120s "$GODOT" --headless --path "$GAME" --script res://tests/playtest_re
         capture_ink_art(config, args.game)
     elif args.command == "capture-upgrades":
         capture_upgrades(config, args.game)
+    elif args.command == "capture-boss-intro":
+        capture_boss_intro(config, args.game)
+    elif args.command == "capture-enemy-attacks":
+        capture_enemy_attacks(config, args.game)
     elif args.command == "capture-restoration":
         capture_restoration(config, args.game)
     elif args.command == "capture-proof":

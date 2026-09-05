@@ -282,13 +282,17 @@ gates serially in one delegate session and finishes with a zero-process check.
 It keeps a compact summary and one diagnostic log per gate under
 `build/p1-suite/<UTC timestamp>/`; `build/p1-suite/latest.txt` identifies the
 newest run without deleting earlier evidence.
-`host_game.py capture-session` renders a ten-frame title, Armory, Story Archive,
+`host_game.py capture-session` renders a thirteen-frame title, Armory, Story Archive,
 Save & Return, recovery/AOE, technique, relic-draft, Ink Art, Directive, and
 route-hazard readability gallery.
 `host_game.py capture-cutscenes` renders all seven story sequences after their
 panel wipe, including the independent close-up layer.
 `host_game.py capture-upgrades` checks every technique card for safe title,
 prompt, description, and rarity spacing before capturing the longest copy;
+`host_game.py capture-boss-intro` renders the unique Editor, Binder, and Author
+half-screen introduction portraits after their entrance animation settles;
+`host_game.py capture-enemy-attacks` freezes melee and ranged strike frames with
+their authoritative hitbox/ejection particles visible;
 `host_game.py capture-restoration` renders the six-branch persistent upgrade board;
 `host_game.py capture-proof` renders all eleven Proof Depths and their cumulative clause;
 `host_game.py capture-daily` checks the date, seed, fixed rules, reward, and record panel;
@@ -306,8 +310,8 @@ of only checking menu visibility. Release metadata, legal notices, version ident
 and inert Steam depot templates live under `release/`; real App/Depot IDs are
 never stored in the repository.
 
-`asset-manifest.json` schema 3 integrity-hashes all 108 player-consumed PNG/WAV/OGG
-assets and distinguishes 64 deterministic procedural outputs from forty-four
+`asset-manifest.json` schema 3 integrity-hashes all 113 player-consumed PNG/WAV/OGG
+assets and distinguishes 64 deterministic procedural outputs from forty-nine
 pre-generated AI-assisted assets. `release/ai-content-disclosure.md` keeps the
 Steam survey draft and unresolved publisher sign-offs explicit; the shipped
 game performs no live AI generation.

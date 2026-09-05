@@ -1,5 +1,7 @@
 extends SceneTree
 
+const FxScript = preload("res://scripts/comic_fx.gd")
+
 var game
 var failed := false
 var frames := 0
@@ -34,13 +36,16 @@ func _process(_delta: float) -> bool:
 	_test_contact_telegraph()
 	if failed:
 		return true
+	_test_ranged_attack_keyframes()
+	if failed:
+		return true
 	_test_enemy_dash_commitment()
 	if failed:
 		return true
 	_test_projectile_budget_curve()
 	if failed:
 		return true
-	print("INKBOUND_COMBAT_FEEL_OK attack_buffer=130ms contact_telegraph=shape enemy_dash=committed projectile_caps=8/10/12/16/20..30 slash_sweep=animated")
+	print("INKBOUND_COMBAT_FEEL_OK attack_buffer=130ms enemy_keyframes=anticipate/coil/strike/recover melee_fx=hitbox_arc cast_fx=projectile_vectors enemy_dash=committed projectile_caps=8/10/12/16/20..30 slash_sweep=animated")
 	_cleanup(0)
 	return true
 
@@ -101,7 +106,56 @@ func _test_contact_telegraph() -> void:
 	enemy._physics_process(0.2)
 	if game.player.health >= starting_health or enemy.contact_windup >= 0.0:
 		_fail("telegraphed contact damage did not land after its warning")
+		return
+	if enemy.attack_frame_history != [0, 1, 2]:
+		_fail("contact attack did not traverse anticipation, coil, and strike keyframes: %s" % str(enemy.attack_frame_history))
+		return
+	var melee_fx = _latest_fx(FxScript.FxMode.ENEMY_MELEE)
+	if melee_fx == null or not is_equal_approx(float(melee_fx.radius), enemy._contact_range()) or not is_equal_approx(float(melee_fx.arc_radians), deg_to_rad(enemy._contact_arc_degrees())):
+		_fail("contact particles do not share the authoritative hitbox radius and arc")
+		return
+	enemy._physics_process(0.05)
+	enemy._physics_process(0.02)
+	if enemy.attack_frame_history != [0, 1, 2, 3]:
+		_fail("contact attack omitted its recovery keyframe: %s" % str(enemy.attack_frame_history))
+		return
 	enemy.free()
+
+
+func _test_ranged_attack_keyframes() -> void:
+	var enemy = game.debug_spawn_enemy("scribe", game.player.global_position + Vector2(100, 0))
+	enemy.speed = 0.0
+	enemy.shoot_timer = 0.0
+	var projectiles_before: int = game.active_hostile_projectile_count()
+	enemy._physics_process(0.01)
+	if enemy.ranged_windup <= 0.0 or enemy.attack_frame_history != [0]:
+		_fail("ranged enemy fired without an anticipation keyframe")
+		return
+	enemy._physics_process(enemy.ranged_windup_total * 0.55)
+	if enemy.attack_frame_history != [0, 1] or game.active_hostile_projectile_count() != projectiles_before:
+		_fail("ranged enemy coil did not remain projectile-free")
+		return
+	enemy._physics_process(enemy.ranged_windup_total)
+	if enemy.attack_frame_history != [0, 1, 2] or game.active_hostile_projectile_count() != projectiles_before + 1:
+		_fail("ranged strike keyframe did not release exactly one scribe projectile")
+		return
+	var cast_fx = _latest_fx(FxScript.FxMode.ENEMY_CAST)
+	if cast_fx == null or not is_equal_approx(float(cast_fx.radius), 7.0) or cast_fx.cast_directions.size() != enemy.last_cast_direction_count or enemy.last_cast_direction_count != 1:
+		_fail("ranged particles do not match the projectile radius and launch vectors")
+		return
+	enemy._physics_process(0.05)
+	enemy._physics_process(0.2)
+	if enemy.attack_frame_history != [0, 1, 2, 3]:
+		_fail("ranged attack omitted its recovery keyframe: %s" % str(enemy.attack_frame_history))
+	enemy.free()
+
+
+func _latest_fx(mode: int):
+	var candidate = null
+	for child in game.get_children():
+		if child is ComicFX and int(child.mode) == mode:
+			candidate = child
+	return candidate
 
 
 func _test_enemy_dash_commitment() -> void:

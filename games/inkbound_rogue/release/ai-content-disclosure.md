@@ -13,7 +13,8 @@ during play is **Live-Generated** and requires additional guardrail disclosure:
 **Pre-Generated AI: Yes.** OpenAI image generation was used under project
 direction to create one 16-character manga-pixel combat atlas, a derivative
 four-frame protagonist slash atlas, seven unlettered manga cutscene
-backgrounds, and ten weapon-specific Ink Art cut-in/startup images. OpenAI
+backgrounds, ten weapon-specific Ink Art cut-in/startup images, two choice-icon
+atlases, and three identity-referenced boss-introduction portraits. OpenAI
 Realtime was also used to pre-generate 14 Japanese player/enemy combat-feedback
 performances. A locally operated IndexTTS 2.5 pipeline generated six Japanese
 Nara Ink Art performances from one consistent reference voice.
@@ -43,6 +44,8 @@ not an AI service.
 | Nara slash atlas | 1 | `assets/characters/nara-slash-atlas-v1.prompt.md`; full generation/edit trail retained | Publisher rights/IP review |
 | Narrative backgrounds | 7 | `assets/cutscenes/README.md`; shared constraints retained, exact per-image prompts not retained | Publisher rights/IP review or replacement |
 | Ink Art cinematics | 10 | `assets/ink_art/README.md`; shared identity constraints, weapon briefs, source dimensions, and runtime derivation retained | Publisher rights/IP review |
+| Technique/relic choice icons | 2 | `assets/ui/choice_icons/provenance.md`; complete final production briefs retained | Publisher rights/IP review |
+| Boss introduction portraits | 3 | `assets/boss_intro/provenance.md`; shared constraints and all three character prompts retained | Publisher rights/IP review |
 | Japanese Ink Art voice | 6 | `assets/audio/nara-ink-art-japanese.provenance.md`; lines, model, reference-voice description, selection distribution, and hashes retained | Owner approved demo use; verify IndexTTS/dependency, reference recording, and generated-output rights before commercial distribution |
 | Japanese combat-feedback voice | 14 | `assets/audio/combat-feedback-japanese.provenance.md`; dialogue, model/voices, B selection, transformations, and hashes retained | Owner approved B selection for demo use; publisher/OpenAI terms review before commercial distribution |
 | Hai Mian Music soundtrack | 5 | `assets/audio/hai-mian-music.provenance.md`; source/runtime hashes, known AIGC ProduceIDs, roles, processing, and production briefs retained | Owner approved demo use; confirm generation-time plan and terms before commercial distribution |

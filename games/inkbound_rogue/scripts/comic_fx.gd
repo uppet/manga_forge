@@ -3,7 +3,7 @@ class_name ComicFX
 
 const Localization = preload("res://scripts/localization.gd")
 
-enum FxMode { SLASH, BURST, WORD, AFTERIMAGE, ART_RING, ART_LINE }
+enum FxMode { SLASH, BURST, WORD, AFTERIMAGE, ART_RING, ART_LINE, ENEMY_MELEE, ENEMY_CAST }
 
 const PAPER := Color("fff8e0")
 const CRIMSON := Color("d33037")
@@ -19,6 +19,7 @@ var tint := PAPER
 var drift := Vector2.ZERO
 var burst_angles: Array[float] = []
 var line_end := Vector2.ZERO
+var cast_directions: Array[Vector2] = []
 
 
 func setup_slash(at: Vector2, direction: Vector2, slash_radius: float, arc_degrees: float, critical: bool = false) -> ComicFX:
@@ -87,6 +88,33 @@ func setup_art_line(from: Vector2, to: Vector2, color: Color = CRIMSON) -> Comic
 	return self
 
 
+func setup_enemy_melee(at: Vector2, direction: Vector2, hit_radius: float, hit_arc_degrees: float) -> ComicFX:
+	mode = FxMode.ENEMY_MELEE
+	global_position = at
+	rotation = direction.angle()
+	radius = hit_radius
+	arc_radians = deg_to_rad(hit_arc_degrees)
+	tint = CRIMSON
+	lifetime = 0.28
+	z_index = 23
+	for index in range(9):
+		burst_angles.append(lerpf(-arc_radians * 0.5, arc_radians * 0.5, float(index) / 8.0))
+	return self
+
+
+func setup_enemy_cast(at: Vector2, directions: Array[Vector2], projectile_radius: float = 7.0) -> ComicFX:
+	mode = FxMode.ENEMY_CAST
+	global_position = at
+	radius = projectile_radius
+	tint = Color("5be1f5")
+	lifetime = 0.24
+	z_index = 22
+	for direction in directions:
+		if direction.length_squared() > 0.001:
+			cast_directions.append(direction.normalized())
+	return self
+
+
 func _ready() -> void:
 	queue_redraw()
 
@@ -96,7 +124,9 @@ func _process(delta: float) -> void:
 	position += drift * delta
 	var progress := clampf(age / lifetime, 0.0, 1.0)
 	modulate.a = 1.0 - progress
-	scale = Vector2.ONE * (1.0 + progress * 0.15)
+	# Enemy attack effects visualize authoritative hit geometry. They must not
+	# inherit the decorative overscale used by impact bursts.
+	scale = Vector2.ONE if mode in [FxMode.ENEMY_MELEE, FxMode.ENEMY_CAST] else Vector2.ONE * (1.0 + progress * 0.15)
 	queue_redraw()
 	if age >= lifetime:
 		queue_free()
@@ -148,3 +178,34 @@ func _draw() -> void:
 			draw_line(Vector2.ZERO, line_end, tint, 5.0, true)
 			draw_line(normal * 4.0, line_end + normal * 4.0, tint.lightened(0.32), 1.5, true)
 			draw_line(-normal * 5.0, line_end - normal * 5.0, tint.darkened(0.2), 2.0, true)
+		FxMode.ENEMY_MELEE:
+			var progress := clampf(age / lifetime, 0.0, 1.0)
+			var reveal := minf(1.0, progress * 3.4)
+			var start_angle := -arc_radians * 0.5
+			var end_angle := lerpf(start_angle, arc_radians * 0.5, reveal)
+			var wedge := PackedVector2Array([Vector2.ZERO])
+			for index in range(15):
+				var angle := lerpf(start_angle, end_angle, float(index) / 14.0)
+				wedge.append(Vector2.from_angle(angle) * radius)
+			draw_colored_polygon(wedge, Color(CRIMSON.r, CRIMSON.g, CRIMSON.b, 0.12))
+			draw_arc(Vector2.ZERO, radius, start_angle, end_angle, 24, INK, 6.0, true)
+			draw_arc(Vector2.ZERO, radius, start_angle, end_angle, 24, CRIMSON, 2.4, true)
+			draw_arc(Vector2.ZERO, radius * 0.62, start_angle, end_angle, 18, PAPER, 1.0, true)
+			for index in range(burst_angles.size()):
+				var angle := burst_angles[index]
+				if angle > end_angle:
+					continue
+				var particle_direction := Vector2.from_angle(angle)
+				var inner := radius * (0.28 + float(index % 3) * 0.09)
+				var outer := minf(radius, inner + radius * (0.2 + progress * 0.24))
+				draw_line(particle_direction * inner, particle_direction * outer, PAPER if index % 2 == 0 else CRIMSON, 1.5)
+		FxMode.ENEMY_CAST:
+			var progress := clampf(age / lifetime, 0.0, 1.0)
+			draw_circle(Vector2.ZERO, radius + 3.0, Color(INK.r, INK.g, INK.b, 0.82))
+			draw_arc(Vector2.ZERO, radius, 0.0, TAU, 20, tint, 2.0, true)
+			for direction in cast_directions:
+				var normal := direction.rotated(PI * 0.5)
+				var tip := direction * lerpf(9.0, 26.0, minf(1.0, progress * 2.2))
+				draw_line(direction * 3.0, tip, INK, 5.0, true)
+				draw_line(direction * 5.0, tip, tint, 1.8, true)
+				draw_line(normal * 2.0 + direction * 7.0, tip - direction * 5.0, tint.lightened(0.18), 1.0, true)

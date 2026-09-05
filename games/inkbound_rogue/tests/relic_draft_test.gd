@@ -1,6 +1,7 @@
 extends SceneTree
 
 const Content = preload("res://scripts/content_db.gd")
+const ChoiceIcons = preload("res://scripts/choice_icons.gd")
 const UNOWNED := ["broken-mask", "glass-nib", "paper-heart"]
 
 var game: Node
@@ -28,6 +29,18 @@ func _run() -> void:
 	game.debug_set_rng_seed(484848)
 	game.player.controls_enabled = false
 	game.run_started = true
+	var relic_regions: Array[String] = []
+	for relic_data in Content.RELICS:
+		var mapped_id := str(relic_data.get("id", ""))
+		if not ChoiceIcons.RELIC_CELLS.has(mapped_id):
+			_fail("relic icon map omits " + mapped_id)
+			return
+		var mapped_texture := ChoiceIcons.relic_icon(mapped_id)
+		var region_key := str(mapped_texture.region)
+		if mapped_texture.atlas == null or region_key in relic_regions:
+			_fail("relic icon map duplicates or omits a unique atlas cell for " + mapped_id)
+			return
+		relic_regions.append(region_key)
 	for relic_data in Content.RELICS:
 		var relic_id := str(relic_data.get("id", ""))
 		if relic_id not in UNOWNED:
@@ -94,7 +107,7 @@ func _run() -> void:
 	if int(game.last_run_summary.get("relic_count", 0)) != 12 or game.last_run_summary.get("relic_ids", []).size() != 12:
 		_fail("run summary did not preserve the completed relic build")
 		return
-	print("INKBOUND_RELIC_DRAFT_OK choices=3 field=ok event=queued directive=ok pause=modal gamepad=XY checkpoint=ok summary=12 archive=12")
+	print("INKBOUND_RELIC_DRAFT_OK choices=3 icons=12/12-unique field=ok event=queued directive=ok pause=modal gamepad=XY checkpoint=ok summary=12 archive=12")
 	_cleanup(0)
 
 
@@ -138,11 +151,19 @@ func _validate_open_draft(expected_choices: int, source_fragment: String) -> boo
 		var name_label: RichTextLabel = game.hud.relic_draft_name_labels[index]
 		var description_label: RichTextLabel = game.hud.relic_draft_description_labels[index]
 		var footer_label: RichTextLabel = game.hud.relic_draft_footer_labels[index]
+		var icon_frame: ColorRect = game.hud.relic_draft_icon_frames[index]
+		var icon: TextureRect = game.hud.relic_draft_icons[index]
 		if input_label.position.y + input_label.size.y > name_label.position.y:
 			_fail("relic input prompt overlaps its name")
 			return false
 		if name_label.position.y + name_label.size.y > description_label.position.y:
 			_fail("relic name overlaps its description")
+			return false
+		if name_label.position.y + name_label.size.y > icon_frame.position.y or icon_frame.position.y + icon_frame.size.y > description_label.position.y:
+			_fail("relic icon overlaps its name or description")
+			return false
+		if icon.texture == null or not (icon.texture is AtlasTexture) or icon.texture_filter != CanvasItem.TEXTURE_FILTER_NEAREST:
+			_fail("relic card is missing its clipped nearest-filter atlas icon")
 			return false
 		if description_label.position.y + description_label.size.y > footer_label.position.y:
 			_fail("relic description overlaps its footer")

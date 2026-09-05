@@ -23,9 +23,9 @@ echo F6-F9 moment markers, optional game screenshots, and the exit survey.
 echo It does NOT record raw input, microphone, camera, account data, or
 echo send anything over the network. Files stay in the selected folder.
 echo.
-echo(此模式记录游戏事件、粗粒度性能、F6-F9 时刻标记、可选游戏截图
-echo(与退出问卷；不记录原始输入、麦克风、摄像头或账户信息，亦不会
-echo(自动联网传输。所有文件只保存在所选目录。
+echo 此模式记录游戏事件、粗粒度性能、F6-F9 时刻标记、可选游戏截图
+echo 与退出问卷；不记录原始输入、麦克风、摄像头或账户信息，亦不会
+echo 自动联网传输。所有文件只保存在所选目录。
 echo.
 if /I "%INKBOUND_LAUNCHER_ACCEPT%"=="1" goto consent_granted
 choice /C YN /N /M "Enable local recording? / 是否启用本地记录？ [Y/N]: "

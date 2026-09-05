@@ -1,6 +1,6 @@
-# P1 candidate readiness — 0.23.4-alpha
+# P1 candidate readiness — 0.24.0-alpha
 
-Snapshot date: 2026-09-04. This is the automated development baseline for a
+Snapshot date: 2026-09-05. This is the automated development baseline for a
 small, private Windows playtest. It is not evidence of Steam release quality or
 of player enjoyment, accessibility, minimum hardware, or controller coverage.
 
@@ -8,17 +8,18 @@ of player enjoyment, accessibility, minimum hardware, or controller coverage.
 
 | Check | Result |
 | --- | --- |
-| Serial regression | Pass: 29/29 gameplay, save, pause, quit, defeat, UI, localization, balance, persona, recorder, analytics, and stress gates |
+| Serial regression | Pass: 30/30 gameplay, save, pause, quit, defeat, UI, localization, balance, persona, recorder, analytics, combat-presentation, and stress gates |
 | Modal transitions | Pass: upgrade drafts retain their 0.24-second/0.18-second elastic transitions and 1.016× opening/closing overshoot; relic, event, pause, manual, settings, binding, title-overlay, and credits panels use 0.16-second fade-ins and 0.12-second fade-outs. Defeat uses a 1.25-second battlefield darkening before the result panel, then a 1.50-second input guard plus release-before-repress protection |
 | Modal input handoff | Pass: held movement resumes immediately after a choice; only overlapping attack/dash/special actions are gated until release, with a 0.75-second lost-release fail-safe and focus/controller reset |
+| Choice and combat presentation | Pass: 36 upgrades and 12 unique relics have illustrated, gamepad-readable cards; enemy melee/ranged attacks traverse anticipate/coil/strike/recover keyframes with hitbox-matched FX; all three bosses use unique localized 480×170 modal cut-ins that pause play and isolate HUD/story input |
 | Brand and localization | Pass: public identity is `Last Inkwarden / 墨卫残章`; English and Chinese title captures are contained, and the former profile directory is copied forward without overwriting new data or deleting old data |
-| Evidence directory | `build/p1-suite/20260904T132703Z/` in the Windows runtime; compact summary plus one log per gate |
-| Recorded stress run | Pass: 1,200 frames, 140.4 processing FPS average, 77 peak enemies, 38 peak pickups, 737 peak nodes, 143.2 MiB static memory, Page 13, 217 kills |
-| Unrecorded suite stress run | Pass: 1,200 frames, 140.9 processing FPS average, 77 peak enemies, 39 peak pickups, 740 peak nodes, 143.3 MiB static memory, Page 13, 223 kills |
+| Evidence directory | `build/p1-suite/20260905T043921Z/` in the Windows runtime; compact summary plus one log per gate |
+| Recorded stress run | Pass: 1,200 frames, 143.5 processing FPS average, 77 peak enemies, 50 peak pickups, 795 peak nodes, 184.5 MiB static memory, Page 13, 246 kills |
+| Unrecorded suite stress run | Pass: 1,200 frames, 143.9 processing FPS average, 77 peak enemies, 35 peak pickups, 770 peak nodes, 184.3 MiB static memory, Page 13, 225 kills |
 | Windows export boot | Pass: embedded-PCK executable ran 120 frames with GL Compatibility on Radeon RX 9070 XT and exited normally |
 | Recorded CMD launcher | Pass: consent-capable launcher started the real EXE, wrote a complete pseudonymous session, removed `incomplete.flag`, and left zero processes |
-| Release/depot audit | Pass: 108 assets; 64 procedural, 44 pre-generated AI, zero live AI; exactly 3 Steam depot files (117,761,673 bytes) and 4 itch.io recorded-playtest files (117,765,036 bytes) |
-| Candidate executable | `build/itch-windows/LastInkwarden.exe`; audited SHA-256 `c79b67b71474da2f3be09f80f1bfaabc950c99830f37edc4de6deec7d20e78ca` |
+| Release/depot audit | Pass: 113 assets; 64 procedural, 49 pre-generated AI, zero live AI; exactly 3 Steam depot files (127,037,167 bytes) and 4 itch.io recorded-playtest files (127,040,530 bytes) |
+| Candidate executable | `build/itch-windows/LastInkwarden.exe`; audited SHA-256 `528c143c1aca3f7feed64b921e1857080594290ffccc6edb37d92218402acd81` |
 | Process hygiene | Pass: zero Godot or exported-game processes after the serial suite |
 
 The recorded and unrecorded stress figures are development-machine processing

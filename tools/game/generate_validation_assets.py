@@ -171,6 +171,39 @@ AI_ASSISTED_ASSETS = {
             "twin-stroke-startup.png",
         )
     },
+    **{
+        GAME_ROOT / "assets" / "ui" / "choice_icons" / filename: {
+            "id": "choice-icons-" + Path(filename).stem,
+            "origin": "openai-image-generation",
+            "provenance_record": "games/inkbound_rogue/assets/ui/choice_icons/provenance.md",
+            "prompt_record_status": "complete",
+            "derivation": "project-directed transparent UI icon atlas mapped by content ID at runtime",
+            "human_review_status": "windows-runtime-and-capture-reviewed",
+            "rights_review_status": "publisher-confirmation-required-before-commercial-release",
+            "source_commit": "not-applicable-generated-in-project-conversation",
+        }
+        for filename in (
+            "upgrade-icons-v1.png",
+            "relic-icons-v1.png",
+        )
+    },
+    **{
+        GAME_ROOT / "assets" / "boss_intro" / filename: {
+            "id": "boss-intro-" + Path(filename).stem,
+            "origin": "openai-image-generation",
+            "provenance_record": "games/inkbound_rogue/assets/boss_intro/provenance.md",
+            "prompt_record_status": "complete",
+            "derivation": "identity-reference boss portrait from combat-cast-atlas-v1",
+            "human_review_status": "windows-runtime-and-capture-reviewed",
+            "rights_review_status": "publisher-confirmation-required-before-commercial-release",
+            "source_commit": "not-applicable-generated-in-project-conversation",
+        }
+        for filename in (
+            "editor-cutin-v1.png",
+            "binder-cutin-v1.png",
+            "author-cutin-v1.png",
+        )
+    },
 }
 
 INK = (20, 18, 24, 255)

@@ -570,7 +570,7 @@ func _run_smoke_test() -> void:
 		return
 	var manifest_file := FileAccess.open("res://asset-manifest.json", FileAccess.READ)
 	var manifest_data = JSON.parse_string(manifest_file.get_as_text()) if manifest_file != null else null
-	if not (manifest_data is Dictionary) or int(manifest_data.get("schema_version", 0)) != 3 or int(manifest_data.get("asset_count", 0)) != 108:
+	if not (manifest_data is Dictionary) or int(manifest_data.get("schema_version", 0)) != 3 or int(manifest_data.get("asset_count", 0)) != 113:
 		_fail("asset provenance manifest identity or coverage count drifted")
 		return
 	var ai_asset_count := 0
@@ -586,7 +586,7 @@ func _run_smoke_test() -> void:
 				return
 		ai_asset_count += 1 if asset_entry.get("generative_ai", false) == true else 0
 		live_ai_asset_count += 1 if asset_entry.get("live_generation", false) == true else 0
-	if ai_asset_count != 44 or live_ai_asset_count != 0:
+	if ai_asset_count != 49 or live_ai_asset_count != 0:
 		_fail("pre-generated/live AI asset inventory drifted")
 		return
 	for runtime_asset in [

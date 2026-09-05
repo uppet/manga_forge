@@ -3,6 +3,7 @@ class_name InkboundHUD
 
 const Content = preload("res://scripts/content_db.gd")
 const Localization = preload("res://scripts/localization.gd")
+const ChoiceIcons = preload("res://scripts/choice_icons.gd")
 
 signal upgrade_selected(index: int)
 signal relic_selected(index: int)
@@ -65,6 +66,8 @@ var upgrade_input_labels: Array[RichTextLabel] = []
 var upgrade_name_labels: Array[RichTextLabel] = []
 var upgrade_description_labels: Array[RichTextLabel] = []
 var upgrade_rarity_labels: Array[RichTextLabel] = []
+var upgrade_icon_frames: Array[ColorRect] = []
+var upgrade_icons: Array[TextureRect] = []
 var relic_draft_panel: ColorRect
 var relic_draft_source_label: Label
 var relic_draft_buttons: Array[Button] = []
@@ -72,6 +75,8 @@ var relic_draft_input_labels: Array[RichTextLabel] = []
 var relic_draft_name_labels: Array[RichTextLabel] = []
 var relic_draft_description_labels: Array[RichTextLabel] = []
 var relic_draft_footer_labels: Array[RichTextLabel] = []
+var relic_draft_icon_frames: Array[ColorRect] = []
+var relic_draft_icons: Array[TextureRect] = []
 var event_panel: ColorRect
 var event_title: Label
 var event_body: Label
@@ -562,7 +567,23 @@ func _build_hud() -> void:
 		divider.color = Color(0.42, 0.36, 0.31, 0.55)
 		divider.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		button.add_child(divider)
-		var description_label := _make_card_text(button, "Choose a stroke to continue.", Vector2(12, 37), Vector2(202, 41), 8, PAPER, true, false)
+		var icon_frame := ColorRect.new()
+		icon_frame.position = Vector2(10, 37)
+		icon_frame.size = Vector2(38, 41)
+		icon_frame.color = Color(0.055, 0.045, 0.065, 0.96)
+		icon_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		button.add_child(icon_frame)
+		upgrade_icon_frames.append(icon_frame)
+		var icon := TextureRect.new()
+		icon.position = Vector2(3, 4)
+		icon.size = Vector2(32, 35)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon_frame.add_child(icon)
+		upgrade_icons.append(icon)
+		var description_label := _make_card_text(button, "Choose a stroke to continue.", Vector2(54, 37), Vector2(162, 41), 8, PAPER, true, false)
 		description_label.add_theme_constant_override("line_separation", 1)
 		upgrade_description_labels.append(description_label)
 		var rarity_label := _make_card_text(button, "COMMON", Vector2(10, 89), Vector2(206, 14), 7, Color(0.66, 0.62, 0.56, 1))
@@ -590,9 +611,25 @@ func _build_hud() -> void:
 		relic_draft_buttons.append(relic_button)
 		var relic_input := _make_card_text(relic_button, "%d" % (i + 1), Vector2(8, 5), Vector2(124, 16), 8, GOLD)
 		relic_draft_input_labels.append(relic_input)
-		var relic_name := _make_card_text(relic_button, "RELIC", Vector2(8, 24), Vector2(124, 31), 8, WHITE, true)
+		var relic_name := _make_card_text(relic_button, "RELIC", Vector2(8, 23), Vector2(124, 25), 8, WHITE, true)
 		relic_draft_name_labels.append(relic_name)
-		var relic_description := _make_card_text(relic_button, "Choose a memory to bind into this draft.", Vector2(8, 62), Vector2(124, 62), 7, PAPER, true)
+		var relic_icon_frame := ColorRect.new()
+		relic_icon_frame.position = Vector2(47, 51)
+		relic_icon_frame.size = Vector2(46, 46)
+		relic_icon_frame.color = Color(0.055, 0.043, 0.06, 0.98)
+		relic_icon_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		relic_button.add_child(relic_icon_frame)
+		relic_draft_icon_frames.append(relic_icon_frame)
+		var relic_icon := TextureRect.new()
+		relic_icon.position = Vector2(3, 3)
+		relic_icon.size = Vector2(40, 40)
+		relic_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		relic_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		relic_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		relic_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		relic_icon_frame.add_child(relic_icon)
+		relic_draft_icons.append(relic_icon)
+		var relic_description := _make_card_text(relic_button, "Choose a memory to bind into this draft.", Vector2(8, 101), Vector2(124, 31), 7, PAPER, true)
 		relic_draft_description_labels.append(relic_description)
 		var relic_footer := _make_card_text(relic_button, "RUN RELIC", Vector2(8, 136), Vector2(124, 16), 7, GOLD)
 		relic_draft_footer_labels.append(relic_footer)
@@ -1588,11 +1625,14 @@ func _refresh_upgrade_buttons() -> void:
 			continue
 		var choice: Dictionary = Localization.localized(current_choices[i])
 		var rarity := str(choice.get("rarity", "common"))
+		var rarity_color := _upgrade_rarity_color(rarity)
 		upgrade_input_labels[i].text = "[center]%s[/center]" % prefixes[i]
 		upgrade_name_labels[i].text = "[center]%s[/center]" % str(choice.get("name", "TECHNIQUE"))
 		upgrade_description_labels[i].text = "[left]%s[/left]" % str(choice.get("description", ""))
 		upgrade_rarity_labels[i].text = "[center]%s[/center]" % _upgrade_card_footer(current_choices[i], rarity)
-		upgrade_rarity_labels[i].add_theme_color_override("default_color", _upgrade_rarity_color(rarity))
+		upgrade_rarity_labels[i].add_theme_color_override("default_color", rarity_color)
+		upgrade_icon_frames[i].color = Color(rarity_color.r * 0.18, rarity_color.g * 0.16, rarity_color.b * 0.2, 0.98)
+		upgrade_icons[i].texture = ChoiceIcons.upgrade_icon(str(current_choices[i].get("id", "")))
 		_fit_upgrade_card_copy(i)
 
 
@@ -1978,6 +2018,15 @@ func _refresh_relic_draft_buttons() -> void:
 		relic_draft_name_labels[index].text = "[center]%s[/center]" % str(choice.get("name", "RELIC"))
 		relic_draft_description_labels[index].text = "[center]%s[/center]" % str(choice.get("description", ""))
 		relic_draft_footer_labels[index].text = "[center]%s  ·  %d/%d[/center]" % ["本局遗物" if TranslationServer.get_locale().begins_with("zh") else "RUN RELIC", index + 1, current_relic_choices.size()]
+		relic_draft_icons[index].texture = ChoiceIcons.relic_icon(str(current_relic_choices[index].get("id", "")))
+		_fit_relic_card_copy(index)
+
+
+func _fit_relic_card_copy(index: int) -> void:
+	_fit_rich_text(relic_draft_input_labels[index], 8, 7, true)
+	_fit_rich_text(relic_draft_name_labels[index], 8, 6, true)
+	_fit_rich_text(relic_draft_description_labels[index], 7, 5, false)
+	_fit_rich_text(relic_draft_footer_labels[index], 7, 6, true)
 
 
 func _choose_relic(index: int) -> void:

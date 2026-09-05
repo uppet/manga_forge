@@ -2,6 +2,7 @@ extends SceneTree
 
 const Content = preload("res://scripts/content_db.gd")
 const HUD = preload("res://scripts/hud.gd")
+const ChoiceIcons = preload("res://scripts/choice_icons.gd")
 
 var frames := 0
 var hud: InkboundHUD
@@ -21,6 +22,12 @@ func _initialize() -> void:
 	for action in ["pause", "options", "manual", "upgrade_1", "upgrade_2", "upgrade_3", "upgrade_4", "move_up", "move_down", "move_left", "move_right", "attack", "dash", "special"]:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action)
+	for upgrade in Content.UPGRADES:
+		var upgrade_id := str(upgrade.get("id", ""))
+		if not ChoiceIcons.UPGRADE_CELLS.has(upgrade_id):
+			push_error("INKBOUND_UPGRADE_UI_FAIL: icon map omits " + upgrade_id)
+			quit(1)
+			return
 	var background := ColorRect.new()
 	background.size = Vector2(480, 270)
 	background.color = Color("08070b")
@@ -115,6 +122,8 @@ func _validate_card_regions() -> bool:
 		var name_label := hud.upgrade_name_labels[index]
 		var description_label := hud.upgrade_description_labels[index]
 		var rarity_label := hud.upgrade_rarity_labels[index]
+		var icon_frame := hud.upgrade_icon_frames[index]
+		var icon := hud.upgrade_icons[index]
 		if input_label.position.x + input_label.size.x + EXPECTED_MIN_HORIZONTAL_GAP > name_label.position.x:
 			push_error("INKBOUND_UPGRADE_UI_FAIL: input prompt overlaps name on card %d" % index)
 			return false
@@ -123,6 +132,12 @@ func _validate_card_regions() -> bool:
 			return false
 		if description_label.position.y + description_label.size.y + EXPECTED_MIN_VERTICAL_GAP > rarity_label.position.y:
 			push_error("INKBOUND_UPGRADE_UI_FAIL: description overlaps rarity on card %d" % index)
+			return false
+		if icon_frame.position.x + icon_frame.size.x > description_label.position.x or icon_frame.position.y < description_label.position.y or icon_frame.position.y + icon_frame.size.y > description_label.position.y + description_label.size.y + 2.0:
+			push_error("INKBOUND_UPGRADE_UI_FAIL: technique icon overlaps copy bands on card %d" % index)
+			return false
+		if icon.texture == null or not (icon.texture is AtlasTexture) or icon.texture_filter != CanvasItem.TEXTURE_FILTER_NEAREST:
+			push_error("INKBOUND_UPGRADE_UI_FAIL: technique icon is missing its clipped nearest-filter atlas cell on card %d" % index)
 			return false
 		if rarity_label.position.y + rarity_label.size.y > button.size.y:
 			push_error("INKBOUND_UPGRADE_UI_FAIL: rarity leaves card bounds on card %d (y=%.1f h=%.1f card=%.1f)" % [index, rarity_label.position.y, rarity_label.size.y, button.size.y])

@@ -30,7 +30,7 @@ Last Inkwarden / 墨卫残章的远程统计是可选能力，不替代现有的
 7. 进入“选项”，将“匿名使用数据”切为“开”。若未开启，即便 EXE 内已有 keys 也不会创建匿名 ID 或发起请求。
 8. 开一局并完成一次升级选择，然后在 GameAnalytics 的 Realtime / Live Events 中检查 `user`、`progression` 和 `design` 事件。
 
-Live Events 通常在发送后数秒至约 30 秒内出现，只保留最近 50 条；普通 Realtime 指标和其他报表还需几分钟处理。排查时确认打开的是同一个游戏项目，清空 Event Type / Build / User ID 过滤条件，并留意本构建的 Build 值为 `0.23.4-alpha`。还应在 Game Settings → General → Danger Zone 确认 Event Collection 没有被禁用或用过滤器排除此 Build/事件类别。
+Live Events 通常在发送后数秒至约 30 秒内出现，只保留最近 50 条；普通 Realtime 指标和其他报表还需几分钟处理。排查时确认打开的是同一个游戏项目，清空 Event Type / Build / User ID 过滤条件，并留意本构建的 Build 值为 `0.24.0-alpha`。还应在 Game Settings → General → Danger Zone 确认 Event Collection 没有被禁用或用过滤器排除此 Build/事件类别。
 
 不要把真实 keys 写进 Git、问题单、试玩日志或聊天记录。`*.local.json` 已加入 `.gitignore`，而 Git 中的 `gameanalytics_credentials.gd` 永远是空占位文件。这里的 Secret Key 会进入最终客户端，因此有能力逆向 EXE/PCK 的人仍可能提取它；这是客户端采集签名 key，不要把它与 GameAnalytics 账号密码、管理 API key 或其他服务密钥复用。
 

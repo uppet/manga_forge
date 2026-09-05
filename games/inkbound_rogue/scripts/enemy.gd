@@ -22,8 +22,12 @@ var contact_damage := 1.0
 var xp_value := 1
 var contact_cooldown := 0.0
 var contact_windup := -1.0
+var contact_attack_direction := Vector2.RIGHT
 var external_velocity := Vector2.ZERO
 var shoot_timer := 2.2
+var ranged_windup := -1.0
+var ranged_windup_total := 0.0
+var ranged_attack_direction := Vector2.RIGHT
 var dash_timer := 0.0
 var dash_charge := 0.0
 var summon_timer := 5.0
@@ -58,6 +62,16 @@ var haste_time := 0.0
 var facing_direction := Vector2.RIGHT
 var source_wave := 1
 var simulation_order := 0
+var attack_animation_kind := ""
+var attack_keyframe := -1
+var attack_direction := Vector2.RIGHT
+var attack_strike_hold := 0.0
+var attack_recovery := 0.0
+var attack_frame_history: Array[int] = []
+var attack_release_count := 0
+var last_attack_fx_radius := 0.0
+var last_attack_fx_arc_degrees := 0.0
+var last_cast_direction_count := 0
 
 
 func configure(kind_value: String, player_target: Node2D, wave: int) -> InkboundEnemy:
@@ -268,6 +282,7 @@ func _physics_process(delta: float) -> void:
 	var distance := to_target.length()
 	var direction := to_target.normalized() if distance > 0.01 else Vector2.ZERO
 	facing_direction = direction if direction.length_squared() > 0.01 else facing_direction
+	_advance_attack_animation(delta)
 	var movement_speed := speed * (1.0 - slow_amount if slow_time > 0.0 else 1.0) * (1.28 if haste_time > 0.0 else 1.0)
 	var desired := direction * movement_speed
 
@@ -277,13 +292,11 @@ func _physics_process(delta: float) -> void:
 		"scribe":
 			desired = _ranged_movement(direction, distance, movement_speed, 128.0)
 			if shoot_timer <= 0.0:
-				shoot_timer = 1.85 if source_wave <= 3 else 1.55
-				shoot_projectiles(direction)
+				_begin_ranged_attack(direction, 1.85 if source_wave <= 3 else 1.55)
 		"warden":
 			desired = _ranged_movement(direction, distance, movement_speed, 102.0)
 			if shoot_timer <= 0.0:
-				shoot_timer = 2.35
-				shoot_projectiles(direction)
+				_begin_ranged_attack(direction, 2.35)
 		"censor":
 			if shield_hits <= 0:
 				desired *= 1.25
@@ -297,39 +310,39 @@ func _physics_process(delta: float) -> void:
 		"blot":
 			desired = Vector2.ZERO
 			if shoot_timer <= 0.0:
-				shoot_timer = 3.2 if source_wave <= 3 else 2.65
-				shoot_projectiles(direction)
+				_begin_ranged_attack(direction, 3.2 if source_wave <= 3 else 2.65)
 		"duelist":
 			desired = _duelist_movement(direction, distance, movement_speed)
 		"editor":
 			if shoot_timer <= 0.0:
-				shoot_timer = 1.55
-				shoot_projectiles(direction)
+				_begin_ranged_attack(direction, 1.55)
 		"binder":
 			desired = _ranged_movement(direction, distance, movement_speed, 118.0)
 			if shoot_timer <= 0.0:
-				shoot_timer = 1.8
-				shoot_projectiles(direction)
+				_begin_ranged_attack(direction, 1.8)
 			if summon_timer <= 0.0:
 				summon_timer = 5.8
 				_summon_masks()
 		"author":
 			if shoot_timer <= 0.0:
-				shoot_timer = maxf(0.48, 1.05 - (1.0 - health / max_health) * 0.4)
-				shoot_projectiles(direction)
+				_begin_ranged_attack(direction, maxf(0.48, 1.05 - (1.0 - health / max_health) * 0.4))
 			if dash_timer <= 0.0:
 				dash_timer = 3.1
 				dash_charge = 0.28
+				_begin_attack_keyframes("dash", facing_direction)
 				var author_game := get_parent()
 				if author_game.has_method("play_spatial_sound"):
 					author_game.play_spatial_sound("enemy_dash", global_position, 0.72)
 			if dash_charge > 0.0:
 				desired *= 0.08
+				_set_attack_keyframe(1 if dash_charge < 0.13 else 0)
 				sprite.modulate = charge_warning_color(CRIMSON, int(dash_charge * 24.0))
 			elif dash_timer > 2.58:
 				desired *= 4.6
 				sprite.modulate = _elite_color() if is_elite else Color.WHITE
 
+	if contact_windup >= 0.0 or ranged_windup >= 0.0:
+		desired *= 0.12
 	var separation := Vector2.ZERO
 	var nearby_enemies := get_tree().get_nodes_in_group("enemies")
 	var game := get_parent()
@@ -354,15 +367,14 @@ func _physics_process(delta: float) -> void:
 
 	var contact_range := _contact_range()
 	var contact_distance := global_position.distance_to(target.global_position)
-	if contact_distance < contact_range and contact_cooldown <= 0.0:
+	if contact_windup >= 0.0:
+		if contact_windup <= 0.0:
+			_land_contact_attack(contact_attack_direction)
+	elif contact_distance < contact_range and contact_cooldown <= 0.0 and ranged_windup < 0.0:
 		if _contact_attack_is_pretelegraphed():
 			_land_contact_attack(direction)
-		elif contact_windup < 0.0:
-			contact_windup = _contact_windup_duration()
-		elif contact_windup <= 0.0:
-			_land_contact_attack(direction)
-	else:
-		contact_windup = -1.0
+		else:
+			_begin_contact_attack(direction)
 	_update_visual(delta, direction)
 
 
@@ -373,6 +385,96 @@ func _contact_range() -> float:
 func _contact_windup_duration() -> float:
 	var duration := 0.22 if enemy_kind in BOSS_KINDS else (0.18 if enemy_kind in ["brute", "warden", "censor", "blot"] else 0.14)
 	return duration * (0.72 if is_elite and elite_affix == "swift" else 1.0)
+
+
+func _contact_arc_degrees() -> float:
+	if enemy_kind in BOSS_KINDS:
+		return 168.0
+	if enemy_kind in ["brute", "warden", "censor", "blot"]:
+		return 150.0
+	if enemy_kind == "leech":
+		return 120.0
+	return 132.0
+
+
+func _begin_contact_attack(direction: Vector2) -> void:
+	contact_attack_direction = direction.normalized() if direction.length_squared() > 0.001 else facing_direction
+	contact_windup = _contact_windup_duration()
+	_begin_attack_keyframes("melee", contact_attack_direction)
+
+
+func _ranged_windup_duration() -> float:
+	var duration: float = {
+		"scribe": 0.28,
+		"warden": 0.36,
+		"blot": 0.4,
+		"editor": 0.3,
+		"binder": 0.38,
+		"author": 0.26,
+	}.get(enemy_kind, 0.3)
+	return duration * (0.74 if is_elite and elite_affix == "swift" else 1.0)
+
+
+func _begin_ranged_attack(direction: Vector2, cooldown: float) -> bool:
+	if ranged_windup >= 0.0 or contact_windup >= 0.0 or attack_recovery > 0.0:
+		return false
+	shoot_timer = cooldown
+	ranged_attack_direction = direction.normalized() if direction.length_squared() > 0.001 else facing_direction
+	ranged_windup_total = _ranged_windup_duration()
+	ranged_windup = ranged_windup_total
+	_begin_attack_keyframes("cast", ranged_attack_direction)
+	return true
+
+
+func _begin_attack_keyframes(kind: String, direction: Vector2) -> void:
+	attack_animation_kind = kind
+	attack_direction = direction.normalized() if direction.length_squared() > 0.001 else facing_direction
+	attack_strike_hold = 0.0
+	attack_recovery = 0.0
+	attack_frame_history.clear()
+	attack_keyframe = -1
+	_set_attack_keyframe(0)
+
+
+func _set_attack_keyframe(frame_index: int) -> void:
+	var resolved := clampi(frame_index, 0, 3)
+	if attack_keyframe == resolved:
+		return
+	attack_keyframe = resolved
+	attack_frame_history.append(resolved)
+
+
+func _release_attack_keyframes() -> void:
+	_set_attack_keyframe(2)
+	attack_release_count += 1
+	attack_strike_hold = 0.045
+	attack_recovery = 0.2 if enemy_kind in BOSS_KINDS else 0.16
+
+
+func _advance_attack_animation(delta: float) -> void:
+	if ranged_windup >= 0.0:
+		ranged_windup = maxf(0.0, ranged_windup - delta)
+		var cast_progress := 1.0 - ranged_windup / maxf(0.001, ranged_windup_total)
+		_set_attack_keyframe(1 if cast_progress >= 0.48 else 0)
+		facing_direction = ranged_attack_direction
+		if ranged_windup <= 0.0:
+			ranged_windup = -1.0
+			shoot_projectiles(ranged_attack_direction)
+		return
+	if contact_windup >= 0.0:
+		var contact_progress := 1.0 - contact_windup / maxf(0.001, _contact_windup_duration())
+		_set_attack_keyframe(1 if contact_progress >= 0.48 else 0)
+		facing_direction = contact_attack_direction
+		return
+	if attack_strike_hold > 0.0:
+		attack_strike_hold = maxf(0.0, attack_strike_hold - delta)
+		return
+	if attack_recovery > 0.0:
+		_set_attack_keyframe(3)
+		attack_recovery = maxf(0.0, attack_recovery - delta)
+		if attack_recovery <= 0.0:
+			attack_keyframe = -1
+			attack_animation_kind = ""
 
 
 func _contact_attack_is_pretelegraphed() -> bool:
@@ -387,24 +489,47 @@ func _contact_attack_is_pretelegraphed() -> bool:
 func _land_contact_attack(direction: Vector2) -> void:
 	contact_windup = -1.0
 	contact_cooldown = 0.72 if enemy_kind == "leech" else 0.86
-	if not target.has_method("take_damage"):
+	attack_direction = direction.normalized() if direction.length_squared() > 0.001 else facing_direction
+	_release_attack_keyframes()
+	var hit_radius := _contact_range()
+	var hit_arc := _contact_arc_degrees()
+	last_attack_fx_radius = hit_radius
+	last_attack_fx_arc_degrees = hit_arc
+	var game := get_parent()
+	if game.has_method("spawn_enemy_melee_fx"):
+		game.spawn_enemy_melee_fx(global_position, attack_direction, hit_radius, hit_arc)
+	if not target.has_method("take_damage") or not _target_inside_contact_hitbox(attack_direction, hit_radius, hit_arc):
 		return
-	var landed: bool = target.take_damage(contact_damage, direction, "contact:" + enemy_kind)
+	var landed: bool = target.take_damage(contact_damage, attack_direction, "contact:" + enemy_kind)
 	if landed and enemy_kind == "leech":
 		health = minf(max_health, health + contact_damage * 1.8)
 	if landed and is_elite and elite_affix == "vampiric":
 		health = minf(max_health, health + contact_damage * 2.4)
 
 
+func _target_inside_contact_hitbox(direction: Vector2, hit_radius: float, hit_arc_degrees: float) -> bool:
+	if not is_instance_valid(target):
+		return false
+	var offset := target.global_position - global_position
+	if offset.length_squared() > hit_radius * hit_radius:
+		return false
+	if offset.length_squared() <= 0.001:
+		return true
+	var minimum_dot := cos(deg_to_rad(hit_arc_degrees) * 0.5)
+	return direction.normalized().dot(offset.normalized()) >= minimum_dot
+
+
 func _dasher_movement(desired: Vector2, distance: float) -> Vector2:
 	if dash_timer <= 0.0 and dash_charge <= 0.0 and distance < 190.0:
 		dash_charge = 0.38
 		dash_timer = 2.1
+		_begin_attack_keyframes("dash", facing_direction)
 		var game := get_parent()
 		if game.has_method("play_spatial_sound"):
 			game.play_spatial_sound("enemy_dash", global_position, 1.08)
 	if dash_charge > 0.0:
 		desired *= 0.12
+		_set_attack_keyframe(1 if dash_charge < 0.17 else 0)
 		sprite.modulate = charge_warning_color(CRIMSON, int(dash_charge * 18.0))
 	elif dash_timer > 1.5:
 		desired *= 4.2
@@ -418,12 +543,14 @@ func _errata_movement(direction: Vector2, movement_speed: float) -> Vector2:
 		teleport_timer = 4.6
 		teleport_charge = 0.48
 		teleport_pending = true
+		_begin_attack_keyframes("teleport", facing_direction)
 		if game.has_method("spawn_word"):
 			game.spawn_word(global_position + Vector2(0, -24), "ERRATA...", STEEL)
 		if game.has_method("play_spatial_sound"):
 			game.play_spatial_sound("teleport", global_position, 1.0)
 	if teleport_pending:
 		if teleport_charge > 0.0:
+			_set_attack_keyframe(1 if teleport_charge < 0.2 else 0)
 			sprite.modulate = charge_warning_color(Color(0.55, 0.42, 0.65, 1.0), int(teleport_charge * 28.0))
 			return Vector2.ZERO
 		teleport_pending = false
@@ -458,6 +585,8 @@ func _duelist_movement(direction: Vector2, distance: float, movement_speed: floa
 	if dash_timer <= 0.0 and distance < 125.0:
 		dash_timer = 2.5
 		counter_rush = 0.24
+		_begin_attack_keyframes("counter", direction)
+		_set_attack_keyframe(1)
 	return _ranged_movement(direction, distance, movement_speed, 64.0)
 
 
@@ -525,56 +654,92 @@ func apply_status(bleed: float, burn: float, slow: float) -> void:
 
 
 func _update_visual(delta: float, direction: Vector2) -> void:
-	if direction.x != 0.0:
-		sprite.flip_h = direction.x < 0.0
+	var pose_direction := attack_direction if attack_keyframe >= 0 else direction
+	if pose_direction.x != 0.0:
+		sprite.flip_h = pose_direction.x < 0.0
 	var motion_phase := Time.get_ticks_msec() * 0.012 + get_instance_id() * 0.1
 	var bob := sin(motion_phase)
 	var target_scale := visual_base_scale * Vector2(1.0 + absf(bob) * 0.022, 1.0 - absf(bob) * 0.022)
+	var pose_offset := Vector2.ZERO
+	var pose_rotation := pose_direction.x * 0.045
+	match attack_keyframe:
+		0:
+			target_scale *= Vector2(0.93, 1.08)
+			pose_offset = -pose_direction * 2.0
+			pose_rotation -= 0.07 * (-1.0 if pose_direction.x < 0.0 else 1.0)
+		1:
+			target_scale *= Vector2(1.13, 0.86)
+			pose_offset = -pose_direction * 5.0
+			pose_rotation -= 0.15 * (-1.0 if pose_direction.x < 0.0 else 1.0)
+		2:
+			target_scale *= Vector2(1.22, 0.8)
+			pose_offset = pose_direction * 6.0
+			pose_rotation += 0.16 * (-1.0 if pose_direction.x < 0.0 else 1.0)
+		3:
+			target_scale *= Vector2(1.03, 0.97)
+			pose_offset = pose_direction * 2.0
+			pose_rotation += 0.055 * (-1.0 if pose_direction.x < 0.0 else 1.0)
 	if dash_charge > 0.0 or counter_rush > 0.0 or teleport_rush > 0.0:
 		target_scale *= Vector2(1.18, 0.84)
 		ground_shadow_scale = ground_shadow_scale.lerp(Vector2(1.25, 0.72), minf(1.0, delta * 15.0))
 	else:
 		ground_shadow_scale = ground_shadow_scale.lerp(Vector2.ONE, minf(1.0, delta * 9.0))
-	sprite.scale = sprite.scale.lerp(target_scale, minf(1.0, delta * 12.0))
-	sprite.rotation = lerp_angle(sprite.rotation, direction.x * 0.045, delta * 9.0)
-	sprite.position.y = visual_y_offset + bob * (1.0 if enemy_kind in BOSS_KINDS else 0.7)
+	sprite.scale = sprite.scale.lerp(target_scale, minf(1.0, delta * 22.0))
+	sprite.rotation = lerp_angle(sprite.rotation, pose_rotation, delta * 20.0)
+	var base_position := Vector2(0.0, visual_y_offset + bob * (1.0 if enemy_kind in BOSS_KINDS else 0.7))
+	sprite.position = sprite.position.lerp(base_position + pose_offset, minf(1.0, delta * 24.0))
 	queue_redraw()
 
 
 func shoot_projectiles(direction: Vector2) -> void:
 	var game := get_parent()
 	if not game.has_method("spawn_projectile"):
+		_release_attack_keyframes()
 		return
 	if game.has_method("available_hostile_projectile_slots") and game.available_hostile_projectile_slots() <= 0:
+		_release_attack_keyframes()
 		return
+	if attack_keyframe < 0:
+		_begin_attack_keyframes("cast", direction)
 	if game.has_method("play_spatial_sound"):
 		var cast_pitch: float = float({"scribe": 1.18, "warden": 0.82, "blot": 0.68, "editor": 0.76, "binder": 0.64, "author": 0.56}.get(enemy_kind, 1.0))
 		game.play_spatial_sound("enemy_cast", global_position, cast_pitch)
+	var launched_directions: Array[Vector2] = []
 	match enemy_kind:
 		"scribe":
-			game.spawn_projectile(global_position, direction, 126.0, "projectile:" + enemy_kind)
+			_spawn_hostile_projectile(game, direction, 126.0, launched_directions)
 			game.spawn_word(global_position + Vector2(0, -22), "SCRIBE!", GOLD)
 		"warden":
 			for index in range(8):
-				game.spawn_projectile(global_position, Vector2.from_angle(TAU * float(index) / 8.0 + pattern_phase * 0.2), 82.0, "projectile:" + enemy_kind)
+				_spawn_hostile_projectile(game, Vector2.from_angle(TAU * float(index) / 8.0 + pattern_phase * 0.2), 82.0, launched_directions)
 			game.spawn_word(global_position + Vector2(0, -28), "SEAL!", STEEL)
 		"blot":
 			for index in range(6):
-				game.spawn_projectile(global_position, Vector2.from_angle(TAU * float(index) / 6.0 + pattern_phase * 0.16), 58.0, "projectile:" + enemy_kind)
+				_spawn_hostile_projectile(game, Vector2.from_angle(TAU * float(index) / 6.0 + pattern_phase * 0.16), 58.0, launched_directions)
 			game.spawn_word(global_position + Vector2(0, -26), "SPILL!", CRIMSON)
 		"binder":
 			for index in range(10):
-				game.spawn_projectile(global_position, Vector2.from_angle(TAU * float(index) / 10.0 + pattern_phase * 0.35), 92.0, "projectile:" + enemy_kind)
+				_spawn_hostile_projectile(game, Vector2.from_angle(TAU * float(index) / 10.0 + pattern_phase * 0.35), 92.0, launched_directions)
 			game.spawn_word(global_position + Vector2(0, -34), "BIND!", GOLD)
 		"author":
 			for index in range(5):
 				var angle := pattern_phase * 0.9 + TAU * float(index) / 5.0
-				game.spawn_projectile(global_position, Vector2.from_angle(angle), 112.0 + index * 5.0, "projectile:" + enemy_kind)
+				_spawn_hostile_projectile(game, Vector2.from_angle(angle), 112.0 + index * 5.0, launched_directions)
 			game.spawn_word(global_position + Vector2(0, -40), "REVISE!", CRIMSON)
 		_:
 			for offset_angle in [-0.36, 0.0, 0.36]:
-				game.spawn_projectile(global_position, direction.rotated(offset_angle), 104.0, "projectile:" + enemy_kind)
+				_spawn_hostile_projectile(game, direction.rotated(offset_angle), 104.0, launched_directions)
 			game.spawn_word(global_position + Vector2(0, -30), "EDIT!", CRIMSON)
+	last_cast_direction_count = launched_directions.size()
+	if not launched_directions.is_empty() and game.has_method("spawn_enemy_cast_fx"):
+		game.spawn_enemy_cast_fx(global_position, launched_directions, 7.0)
+	_release_attack_keyframes()
+
+
+func _spawn_hostile_projectile(game: Node, direction: Vector2, projectile_speed: float, launched_directions: Array[Vector2]) -> void:
+	var normalized := direction.normalized() if direction.length_squared() > 0.001 else facing_direction
+	if game.spawn_projectile(global_position, normalized, projectile_speed, "projectile:" + enemy_kind):
+		launched_directions.append(normalized)
 
 
 func _summon_masks() -> void:
@@ -683,13 +848,21 @@ func _draw() -> void:
 	if contact_windup >= 0.0 and not dead:
 		var windup_progress := 1.0 - contact_windup / maxf(0.001, _contact_windup_duration())
 		var warning_radius := _contact_range() + lerpf(4.0, 0.0, windup_progress)
-		var warning_angle := facing_direction.angle()
-		var warning_span := lerpf(0.42, 1.08, windup_progress)
+		var warning_angle := contact_attack_direction.angle()
+		var hitbox_half_arc := deg_to_rad(_contact_arc_degrees()) * 0.5
+		var warning_span := lerpf(0.34, hitbox_half_arc, windup_progress)
 		draw_arc(Vector2.ZERO, warning_radius, warning_angle - warning_span, warning_angle + warning_span, 18, DEEP_INK, 4.5)
 		draw_arc(Vector2.ZERO, warning_radius, warning_angle - warning_span, warning_angle + warning_span, 18, CRIMSON, 2.0)
 		for edge in [-1.0, 1.0]:
 			var tick_direction := Vector2.from_angle(warning_angle + warning_span * edge)
 			draw_line(tick_direction * (warning_radius - 3.0), tick_direction * (warning_radius + 3.0), PAPER, 1.5)
+	if ranged_windup >= 0.0 and not dead:
+		var cast_progress := 1.0 - ranged_windup / maxf(0.001, ranged_windup_total)
+		var cast_radius := lerpf(17.0, 9.0, cast_progress)
+		var cast_color := STEEL if enemy_kind in ["warden", "author"] else GOLD
+		draw_arc(Vector2.ZERO, cast_radius, 0.0, TAU, 22, DEEP_INK, 4.0)
+		draw_arc(Vector2.ZERO, cast_radius, 0.0, TAU, 22, cast_color, 1.8)
+		draw_line(ranged_attack_direction * 7.0, ranged_attack_direction * lerpf(18.0, 28.0, cast_progress), cast_color, 1.5)
 	if is_elite and not dead:
 		draw_arc(Vector2.ZERO, 14.0 if enemy_kind not in ["brute", "warden", "censor", "blot"] else 18.0, 0.0, TAU, 20, _elite_color(), 1.5)
 	if health >= max_health or dead:

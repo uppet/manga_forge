@@ -1,7 +1,7 @@
 {
   "product": "Last Inkwarden",
   "localized_product": "墨卫残章",
-  "version": "0.23.4-alpha",
+  "version": "0.24.0-alpha",
   "save_schema": 12,
   "checkpoint_schema": 1,
   "platform": "windows-x86_64",

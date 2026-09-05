@@ -10,6 +10,7 @@ const ArenaScript = preload("res://scripts/arena.gd")
 const HudScript = preload("res://scripts/hud.gd")
 const CutsceneScript = preload("res://scripts/cutscene.gd")
 const InkArtCinematicScript = preload("res://scripts/ink_art_cinematic.gd")
+const BossIntroCinematicScript = preload("res://scripts/boss_intro_cinematic.gd")
 const DirectiveZoneScript = preload("res://scripts/directive_zone.gd")
 const RouteHazardScript = preload("res://scripts/route_hazard.gd")
 const Content = preload("res://scripts/content_db.gd")
@@ -118,6 +119,7 @@ var camera: Camera2D
 var hud: InkboundHUD
 var cutscene: InkboundCutscene
 var ink_art_cinematic: InkboundInkArtCinematic
+var boss_intro_cinematic: InkboundBossIntroCinematic
 var route_hazard
 var rng := RandomNumberGenerator.new()
 
@@ -155,6 +157,7 @@ var route_shard_multiplier := 1.0
 var shake_strength := 0.0
 var hit_stop_active := false
 var ink_art_cinematic_active := false
+var boss_intro_cinematic_active := false
 var pending_ink_art: Dictionary = {}
 var test_mode := false
 var deterministic_simulation := false
@@ -411,6 +414,9 @@ func _ready() -> void:
 	add_child(ink_art_cinematic)
 	ink_art_cinematic.release_requested.connect(_on_ink_art_cinematic_release)
 	ink_art_cinematic.sequence_finished.connect(_on_ink_art_cinematic_finished)
+	boss_intro_cinematic = BossIntroCinematicScript.new()
+	add_child(boss_intro_cinematic)
+	boss_intro_cinematic.sequence_finished.connect(_on_boss_intro_cinematic_finished)
 	hud.set_input_enabled(application_focused)
 	cutscene.set_input_enabled(application_focused)
 
@@ -521,9 +527,9 @@ func _set_application_focus(focused: bool) -> void:
 		player.clear_suppressed_gameplay_input()
 	record_playtest_event("focus_changed", {"focused": focused, "run_started": run_started, "wave": wave})
 	if is_instance_valid(hud):
-		hud.set_input_enabled(focused and not ink_art_cinematic_active)
+		hud.set_input_enabled(focused and not ink_art_cinematic_active and not boss_intro_cinematic_active)
 	if is_instance_valid(cutscene):
-		cutscene.set_input_enabled(focused and not ink_art_cinematic_active)
+		cutscene.set_input_enabled(focused and not ink_art_cinematic_active and not boss_intro_cinematic_active)
 	if not focused:
 		for device in Input.get_connected_joypads():
 			Input.stop_joy_vibration(device)
@@ -924,8 +930,38 @@ func spawn_enemy(kind: String = "mask", at: Vector2 = Vector2.INF) -> InkboundEn
 		play_sound("boss_warning")
 		play_music("battle")
 		record_playtest_event("boss_started", {"boss": kind, "page": wave, "health": enemy.max_health})
+		if not restoring_checkpoint and run_started and not test_mode:
+			_start_boss_intro_cinematic(kind)
 	enemy.died.connect(_on_enemy_died)
 	return enemy
+
+
+func _start_boss_intro_cinematic(kind: String) -> void:
+	if not is_instance_valid(boss_intro_cinematic) or boss_intro_cinematic_active:
+		return
+	if not boss_intro_cinematic.play(kind, wave):
+		return
+	boss_intro_cinematic_active = true
+	if is_instance_valid(hud):
+		hud.set_input_enabled(false)
+	if is_instance_valid(cutscene):
+		cutscene.set_input_enabled(false)
+	record_playtest_event("boss_intro_started", {"boss": kind, "page": wave})
+	vibrate(0.28, 0.72, 0.16)
+	_sync_pause_state()
+
+
+func _on_boss_intro_cinematic_finished(kind: String) -> void:
+	if not boss_intro_cinematic_active:
+		return
+	boss_intro_cinematic_active = false
+	_suppress_modal_selection_input()
+	if is_instance_valid(hud):
+		hud.set_input_enabled(application_focused)
+	if is_instance_valid(cutscene):
+		cutscene.set_input_enabled(application_focused)
+	record_playtest_event("boss_intro_finished", {"boss": kind, "page": wave})
+	_sync_pause_state()
 
 
 func _on_enemy_died(_enemy: Node, xp_value: int, death_position: Vector2, enemy_kind: String) -> void:
@@ -1499,6 +1535,18 @@ func _apply_ink_art_status(enemy: Node) -> void:
 func spawn_slash(at: Vector2, direction: Vector2, reach: float, arc: float) -> void:
 	var fx: ComicFX = FxScript.new().setup_slash(at, direction, reach, arc)
 	add_child(fx)
+
+
+func spawn_enemy_melee_fx(at: Vector2, direction: Vector2, hit_radius: float, hit_arc_degrees: float) -> ComicFX:
+	var fx: ComicFX = FxScript.new().setup_enemy_melee(at, direction, hit_radius, hit_arc_degrees)
+	add_child(fx)
+	return fx
+
+
+func spawn_enemy_cast_fx(at: Vector2, directions: Array[Vector2], projectile_radius: float = 7.0) -> ComicFX:
+	var fx: ComicFX = FxScript.new().setup_enemy_cast(at, directions, projectile_radius)
+	add_child(fx)
+	return fx
 
 
 func spawn_afterimage(at: Vector2) -> void:
@@ -3017,7 +3065,7 @@ func _on_relic_selected(index: int) -> void:
 func _toggle_pause() -> void:
 	if not application_focused:
 		return
-	if ink_art_cinematic_active or choosing_upgrade or choosing_relic or choosing_event or game_over or run_won or (is_instance_valid(cutscene) and cutscene.active):
+	if ink_art_cinematic_active or boss_intro_cinematic_active or choosing_upgrade or choosing_relic or choosing_event or game_over or run_won or (is_instance_valid(cutscene) and cutscene.active):
 		return
 	manually_paused = not manually_paused
 	record_playtest_event("manual_pause", {"paused": manually_paused, "page": wave})
@@ -3065,7 +3113,7 @@ func _on_save_return_requested() -> void:
 
 func _simulation_should_pause() -> bool:
 	var story_active := is_instance_valid(cutscene) and cutscene.active
-	return not application_focused or not run_started or manually_paused or manual_open or choosing_upgrade or choosing_relic or choosing_event or ink_art_cinematic_active or quit_confirmation_active or quit_in_progress or game_over or run_won or story_active
+	return not application_focused or not run_started or manually_paused or manual_open or choosing_upgrade or choosing_relic or choosing_event or ink_art_cinematic_active or boss_intro_cinematic_active or quit_confirmation_active or quit_in_progress or game_over or run_won or story_active
 
 
 func _sync_pause_state() -> void:
@@ -4062,6 +4110,20 @@ func debug_set_language(language_setting: String) -> void:
 
 func debug_spawn_enemy(kind: String, at: Vector2) -> InkboundEnemy:
 	return spawn_enemy(kind, at)
+
+
+func debug_play_boss_intro(kind: String) -> bool:
+	if not is_instance_valid(boss_intro_cinematic) or not BOSS_KINDS.has(kind):
+		return false
+	if not boss_intro_cinematic.play(kind, wave):
+		return false
+	boss_intro_cinematic_active = true
+	if is_instance_valid(hud):
+		hud.set_input_enabled(false)
+	if is_instance_valid(cutscene):
+		cutscene.set_input_enabled(false)
+	_sync_pause_state()
+	return true
 
 
 func debug_apply_upgrade(upgrade_id: String) -> void:
