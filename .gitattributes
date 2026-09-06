@@ -1,1 +1,6 @@
+# The validation generator compares the committed manifest byte-for-byte.
+# Keep it LF-normalized even when Actions checks the repository out on Windows.
+/games/inkbound_rogue/asset-manifest.json text eol=lf
+
+# Windows command files must retain native line endings.
 *.cmd text eol=crlf
