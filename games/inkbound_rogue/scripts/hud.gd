@@ -250,6 +250,7 @@ var privacy_visible := false
 var privacy_selected := 0
 var analytics_privacy_id := ""
 var analytics_collection_status := "disabled"
+var analytics_available_in_build := true
 var bindings_panel: ColorRect
 var binding_buttons: Array[Button] = []
 var binding_status_label: Label
@@ -1485,6 +1486,8 @@ func _build_privacy_ui() -> void:
 
 
 func show_analytics_consent_required() -> void:
+	if not analytics_available_in_build:
+		return
 	if analytics_consent_visible or _popup_transition_active(analytics_consent_panel):
 		return
 	analytics_consent_required = true
@@ -1524,7 +1527,7 @@ func show_privacy_notice() -> void:
 	if privacy_visible or _popup_transition_active(privacy_panel):
 		return
 	privacy_visible = true
-	privacy_selected = 1 if bool(settings_values.get("analytics_consent", false)) else 0
+	privacy_selected = 1 if analytics_available_in_build and bool(settings_values.get("analytics_consent", false)) else 0
 	_refresh_privacy_notice()
 	_show_popup(privacy_panel, false)
 
@@ -1543,6 +1546,10 @@ func _finish_hide_privacy_notice() -> void:
 func _set_privacy_consent(allowed: bool) -> void:
 	if not privacy_visible or _popup_transition_active(privacy_panel):
 		return
+	if not analytics_available_in_build:
+		privacy_selected = 0
+		_refresh_privacy_notice()
+		return
 	privacy_selected = 1 if allowed else 0
 	if bool(settings_values.get("analytics_consent", false)) != allowed:
 		analytics_consent_decided.emit(allowed)
@@ -1553,6 +1560,20 @@ func _set_privacy_consent(allowed: bool) -> void:
 func _refresh_privacy_notice() -> void:
 	var chinese := TranslationServer.get_locale().begins_with("zh")
 	privacy_title.text = "数据与隐私" if chinese else "DATA & PRIVACY"
+	privacy_allow_button.disabled = not analytics_available_in_build
+	if not analytics_available_in_build:
+		privacy_selected = 0
+		privacy_body.text = (
+			"[left]此版本在构建时已禁用 GameAnalytics，不包含远程统计凭据，即使设置相关环境变量也不会发送远程统计。\n\nStart-Recorded-Playtest.cmd 仅在你主动使用时，把匿名试玩记录保存在游戏目录的 playtest-logs 文件夹；它不会自动上传。删除该文件夹即可删除本地记录。详见游戏目录 PRIVACY_NOTICE.txt。[/left]"
+			if chinese
+			else "[left]GameAnalytics is disabled at build time in this edition. It contains no remote-statistics credentials and does not send analytics even if related environment variables are set.\n\nStart-Recorded-Playtest.cmd records an anonymous playtest only when you deliberately use it. Its playtest-logs folder remains beside the game and is never uploaded automatically. Delete that folder to erase the local record. See PRIVACY_NOTICE.txt beside the game.[/left]"
+		)
+		privacy_status_label.text = "当前状态：未包含远程统计" if chinese else "STATUS: REMOTE STATISTICS NOT INCLUDED"
+		privacy_deny_button.text = "不发送" if chinese else "DON'T SEND"
+		privacy_allow_button.text = "此版本不可用" if chinese else "NOT IN THIS BUILD"
+		privacy_deny_button.modulate = GOLD
+		privacy_allow_button.modulate = Color(0.45, 0.45, 0.48, 1.0)
+		return
 	var public_id := analytics_privacy_id if not analytics_privacy_id.is_empty() else ("未创建 / 已清除" if chinese else "NOT CREATED / ERASED")
 	if chinese:
 		privacy_body.text = "[left]远程统计完全可选，仅用于发现难度、稳定性与操作体验问题。GameAnalytics 接收随机安装/会话标识、版本和有限的玩法事件；不会收到姓名、邮箱、试玩代号、存档、自由文本、截图、随机种子、精确位置或高频战斗输入。\n\n关闭统计会立即停止提交，并删除本机 user://gameanalytics 中的待发送队列与随机标识。独立的本地试玩记录不会自动上传。数据处理方、跨境处理和联系/撤回方式见游戏目录 PRIVACY_NOTICE.txt。\n统计请求 ID：%s[/left]" % public_id
@@ -1575,6 +1596,18 @@ func _refresh_privacy_notice() -> void:
 func set_analytics_privacy_identity(value: String, collection_status: String = "disabled") -> void:
 	analytics_privacy_id = value.strip_edges()
 	analytics_collection_status = collection_status
+	if privacy_visible:
+		_refresh_privacy_notice()
+
+
+func set_analytics_available_in_build(available: bool) -> void:
+	analytics_available_in_build = available
+	if not available:
+		analytics_consent_required = false
+		analytics_consent_visible = false
+		_hide_popup_immediate(analytics_consent_panel)
+	if settings_visible:
+		_refresh_settings()
 	if privacy_visible:
 		_refresh_privacy_notice()
 
@@ -3375,6 +3408,8 @@ func _adjust_setting(setting_id: String, direction: int) -> void:
 	if setting_id == "privacy":
 		show_privacy_notice()
 		return
+	if setting_id == "analytics_consent" and not analytics_available_in_build:
+		return
 	setting_adjusted.emit(setting_id, direction)
 
 
@@ -3388,8 +3423,10 @@ func _refresh_settings() -> void:
 		match setting_id:
 			"master", "music", "sfx":
 				value_text = "%d%%" % int(round(float(settings_values.get(setting_id, 1.0)) * 100.0))
-			"vibration", "hit_stop", "ink_art_cutins", "reduced_flashes", "analytics_consent":
+			"vibration", "hit_stop", "ink_art_cutins", "reduced_flashes":
 				value_text = Localization.text("ON" if bool(settings_values.get(setting_id, true)) else "OFF")
+			"analytics_consent":
+				value_text = Localization.text("ON" if bool(settings_values.get(setting_id, true)) else "OFF") if analytics_available_in_build else ("此版本未包含" if TranslationServer.get_locale().begins_with("zh") else "NOT INCLUDED")
 			"aim_assist":
 				var strength := float(settings_values.get(setting_id, 0.45))
 				value_text = Localization.text("STANDARD" if strength > 0.35 else ("GENTLE" if strength > 0.1 else "OFF"))

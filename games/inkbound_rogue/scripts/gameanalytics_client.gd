@@ -14,6 +14,7 @@ const MAX_QUEUED_EVENTS := 500
 const RETRY_MIN_SECONDS := 5.0
 const RETRY_MAX_SECONDS := 120.0
 const DEFAULT_STORAGE_ROOT := "user://gameanalytics"
+const DISABLED_BUILD_FEATURE := "no_gameanalytics"
 const EmbeddedCredentials = preload("res://scripts/gameanalytics_credentials.gd")
 const Content = preload("res://scripts/content_db.gd")
 
@@ -78,6 +79,10 @@ func _ready() -> void:
 
 func configure_from_environment(allow_collection: bool, runtime_test_mode: bool = false) -> void:
 	consented = allow_collection
+	if not collection_available_in_build():
+		_disable_and_clear()
+		status = "unavailable_in_build"
+		return
 	if runtime_test_mode:
 		_disable_runtime()
 		status = "test_mode"
@@ -249,11 +254,17 @@ func debug_snapshot() -> Dictionary:
 
 func build_credential_info() -> Dictionary:
 	return {
+		"available": collection_available_in_build(),
+		"status": status,
 		"embedded": bool(EmbeddedCredentials.EMBEDDED),
 		"environment": str(EmbeddedCredentials.ENVIRONMENT),
 		"credential_profile": str(EmbeddedCredentials.PROFILE),
 		"config_fingerprint": str(EmbeddedCredentials.CONFIG_FINGERPRINT),
 	}
+
+
+func collection_available_in_build() -> bool:
+	return not OS.has_feature(DISABLED_BUILD_FEATURE)
 
 
 func debug_authorization(body: String, key_override: String = "") -> String:

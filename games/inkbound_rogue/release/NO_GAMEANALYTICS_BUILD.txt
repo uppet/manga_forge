@@ -1,0 +1,8 @@
+Last Inkwarden / 墨卫残章
+Windows x86_64 — No GameAnalytics build
+
+GameAnalytics is disabled by the no_gameanalytics export feature. This build has
+no embedded Game Key or Secret Key and refuses environment-provided GA credentials.
+
+The optional Start-Recorded-Playtest.cmd launcher is local-only and never uploads
+records automatically. See PRIVACY_NOTICE.txt for the bilingual details.

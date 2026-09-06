@@ -1,0 +1,217 @@
+name: Build Windows release (No GameAnalytics)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v[0-9]*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-no-ga-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: "4.5.2"
+  GODOT_TAG: "4.5.2-stable"
+  GODOT_EDITOR_SHA256: "3766090865330ab2a0ed33594520394b711c620b1378f9223904faeef60f2f14"
+  GODOT_TEMPLATES_SHA256: "ea50e5183f057d42b22120d0d0340205b98f51f8ff13c33c70fd4ac9077d2019"
+  GAME_ROOT: games/inkbound_rogue
+
+jobs:
+  build-windows-no-ga:
+    name: Windows x86_64 no-GA release
+    runs-on: windows-2025
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out the source revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Read and validate release identity
+        id: identity
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $release = Get-Content "$env:GAME_ROOT/release/version.json" -Raw | ConvertFrom-Json
+          $version = [string]$release.version
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            throw "release/version.json does not contain a version"
+          }
+          if ($env:GITHUB_REF_TYPE -eq "tag" -and $env:GITHUB_REF_NAME -ne "v$version") {
+            throw "Tag $env:GITHUB_REF_NAME does not match release version v$version"
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "artifact_name=LastInkwarden-$version-windows-no-ga" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Restore pinned Godot editor and Windows templates
+        id: godot-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            .ci/godot
+            ~\AppData\Roaming\Godot\export_templates\4.5.2.stable
+          key: godot-4.5.2-windows-x86_64-no-ga-v1
+
+      - name: Install Godot from the official release
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $editorName = "Godot_v{0}_win64.exe.zip" -f $env:GODOT_TAG
+          $templateName = "Godot_v{0}_export_templates.tpz" -f $env:GODOT_TAG
+          $editorArchive = Join-Path $env:RUNNER_TEMP $editorName
+          $templateArchive = Join-Path $env:RUNNER_TEMP $templateName
+          $releaseBase = "https://github.com/godotengine/godot/releases/download/$env:GODOT_TAG"
+
+          & curl.exe -fL --retry 5 --retry-all-errors --output $editorArchive "$releaseBase/$editorName"
+          if ($LASTEXITCODE -ne 0) { throw "Godot editor download failed" }
+          & curl.exe -fL --retry 5 --retry-all-errors --output $templateArchive "$releaseBase/$templateName"
+          if ($LASTEXITCODE -ne 0) { throw "Godot export-template download failed" }
+
+          $editorHash = (Get-FileHash $editorArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+          $templateHash = (Get-FileHash $templateArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($editorHash -ne $env:GODOT_EDITOR_SHA256) { throw "Godot editor SHA-256 mismatch" }
+          if ($templateHash -ne $env:GODOT_TEMPLATES_SHA256) { throw "Godot templates SHA-256 mismatch" }
+
+          $editorRoot = Join-Path $env:GITHUB_WORKSPACE ".ci/godot"
+          New-Item -ItemType Directory -Force -Path $editorRoot | Out-Null
+          Expand-Archive -Path $editorArchive -DestinationPath $editorRoot -Force
+
+          $templateRoot = Join-Path $env:APPDATA "Godot/export_templates/$env:GODOT_VERSION.stable"
+          New-Item -ItemType Directory -Force -Path $templateRoot | Out-Null
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($templateArchive)
+          try {
+            foreach ($name in @(
+              "templates/version.txt",
+              "templates/windows_release_x86_64.exe",
+              "templates/windows_release_x86_64_console.exe"
+            )) {
+              $entry = $archive.GetEntry($name)
+              if ($null -eq $entry) { throw "Missing export template entry: $name" }
+              $destination = Join-Path $templateRoot ([System.IO.Path]::GetFileName($name))
+              [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destination, $true)
+            }
+          }
+          finally {
+            $archive.Dispose()
+          }
+
+      - name: Verify pinned Godot installation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $godotName = "Godot_v{0}_win64.exe" -f $env:GODOT_TAG
+          $godot = Join-Path $env:GITHUB_WORKSPACE ".ci/godot/$godotName"
+          $templateRoot = Join-Path $env:APPDATA "Godot/export_templates/$env:GODOT_VERSION.stable"
+          foreach ($required in @(
+            $godot,
+            (Join-Path $templateRoot "version.txt"),
+            (Join-Path $templateRoot "windows_release_x86_64.exe"),
+            (Join-Path $templateRoot "windows_release_x86_64_console.exe")
+          )) {
+            if (-not (Test-Path $required -PathType Leaf)) { throw "Godot install is incomplete: $required" }
+          }
+          $reportedVersion = (& $godot --version | Out-String).Trim()
+          if (-not $reportedVersion.StartsWith("$env:GODOT_VERSION.stable")) {
+            throw "Unexpected Godot version: $reportedVersion"
+          }
+          "GODOT_EXE=$godot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Using Godot $reportedVersion"
+
+      - name: Audit source and release tooling
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (git ls-files --error-unmatch tools/windows/gameanalytics.local.json 2>$null) {
+            throw "A local GameAnalytics credential file is tracked"
+          }
+          python tools/game/generate_validation_assets.py --check
+          if ($LASTEXITCODE -ne 0) { throw "Asset validation failed" }
+          python tools/game/release_audit.py --game-root $env:GAME_ROOT
+          if ($LASTEXITCODE -ne 0) { throw "Release source audit failed" }
+          python -m unittest discover -s tools/game/tests -p "test_*.py"
+          if ($LASTEXITCODE -ne 0) { throw "Game release-tool tests failed" }
+          python -m unittest discover -s tools/windows/tests -p "test_*.py"
+          if ($LASTEXITCODE -ne 0) { throw "Windows release-tool tests failed" }
+
+      - name: Import resources and run release gates
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          & $env:GODOT_EXE --headless --path $env:GAME_ROOT --editor --quit
+          if ($LASTEXITCODE -ne 0) { throw "Godot resource import failed" }
+          foreach ($test in @(
+            "res://tests/smoke_test.gd",
+            "res://tests/gameanalytics_test.gd",
+            "res://tests/privacy_consent_test.gd"
+          )) {
+            & $env:GODOT_EXE --headless --path $env:GAME_ROOT --script $test
+            if ($LASTEXITCODE -ne 0) { throw "Godot release gate failed: $test" }
+          }
+
+      - name: Export native Windows no-GA executable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $outputRoot = Join-Path (Resolve-Path $env:GAME_ROOT) "build/no-ga-windows"
+          New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
+          $executable = Join-Path $outputRoot "LastInkwarden.exe"
+          & $env:GODOT_EXE --headless --path $env:GAME_ROOT --export-release "Windows Desktop No GA" $executable
+          if ($LASTEXITCODE -ne 0) { throw "Godot Windows export failed" }
+          if (-not (Test-Path $executable -PathType Leaf)) { throw "Exported EXE is missing" }
+          $signature = [System.IO.File]::ReadAllBytes($executable)[0..1]
+          if ($signature[0] -ne 0x4d -or $signature[1] -ne 0x5a) { throw "Export is not a Windows PE executable" }
+
+      - name: Boot the exact exported EXE and prove GA is unavailable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $outputRoot = Join-Path (Resolve-Path $env:GAME_ROOT) "build/no-ga-windows"
+          $executable = Join-Path $outputRoot "LastInkwarden.exe"
+          $stdout = Join-Path $outputRoot "ci-boot.stdout.log"
+          $stderr = Join-Path $outputRoot "ci-boot.stderr.log"
+          $env:INKBOUND_BOOT_SMOKE = "1"
+          $env:INKBOUND_GA_GAME_KEY = "0123456789abcdef0123456789abcdef"
+          $env:INKBOUND_GA_SECRET_KEY = "0123456789abcdef0123456789abcdef01234567"
+          $env:INKBOUND_GA_ENVIRONMENT = "production"
+          $process = Start-Process -FilePath $executable -ArgumentList "--headless" -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          if (-not $process.WaitForExit(30000)) {
+            Stop-Process -Id $process.Id -Force
+            throw "Exported EXE did not finish its boot probe within 30 seconds"
+          }
+          $bootLog = ((Get-Content $stdout -Raw -ErrorAction SilentlyContinue) + (Get-Content $stderr -Raw -ErrorAction SilentlyContinue))
+          Write-Host $bootLog
+          if ($process.ExitCode -ne 0) { throw "Exported EXE boot failed with exit code $($process.ExitCode)" }
+          if ($bootLog -notmatch "analytics_embedded=false analytics_profile=none analytics_config=none analytics_available=false analytics_status=unavailable_in_build") {
+            throw "Exported EXE did not prove the no-GameAnalytics build contract"
+          }
+          Remove-Item Env:INKBOUND_GA_GAME_KEY, Env:INKBOUND_GA_SECRET_KEY, Env:INKBOUND_GA_ENVIRONMENT -ErrorAction SilentlyContinue
+
+      - name: Package the audited public download
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $game = (Resolve-Path $env:GAME_ROOT).Path
+          python tools/game/package_no_ga_release.py `
+            --game-root $game `
+            --executable (Join-Path $game "build/no-ga-windows/LastInkwarden.exe") `
+            --output-root (Join-Path $game "build/no-ga-release") `
+            --godot-version "$env:GODOT_VERSION.stable" `
+            --source-revision $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "No-GA packaging failed" }
+
+      - name: Upload releasable Windows artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.identity.outputs.artifact_name }}
+          path: |
+            games/inkbound_rogue/build/no-ga-release/*.zip
+            games/inkbound_rogue/build/no-ga-release/*.sha256
+            games/inkbound_rogue/build/no-ga-release/no-ga-build.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30

@@ -159,6 +159,28 @@ def audit_source(repo_root: Path, game_root: Path) -> tuple[list[str], dict[str,
     for exclusion in ("build/**", "tests/**", "design/**", "release/**", "asset-manifest.json", "assets/**/*.md"):
         if exclusion not in export_text:
             errors.append(f"export preset does not exclude development material: {exclusion}")
+    no_ga_preset = re.search(
+        r'\[preset\.\d+\]\s*name="Windows Desktop No GA"(?P<body>.*?)(?=\n\[preset\.|\Z)',
+        export_text,
+        re.DOTALL,
+    )
+    if no_ga_preset is None:
+        errors.append("dedicated Windows no-GameAnalytics export preset is missing")
+    elif 'custom_features="no_gameanalytics"' not in no_ga_preset.group("body"):
+        errors.append("Windows no-GameAnalytics export preset lacks its hard-disable feature")
+
+    credentials_text = (game_root / "scripts" / "gameanalytics_credentials.gd").read_text(encoding="utf-8")
+    for safe_marker in (
+        "const EMBEDDED := false",
+        'const GAME_KEY := ""',
+        'const SECRET_KEY := ""',
+        'const PROFILE := "none"',
+    ):
+        if safe_marker not in credentials_text:
+            errors.append(f"tracked GameAnalytics placeholder is unsafe or drifted: {safe_marker}")
+    for release_notice in ("NO_GAMEANALYTICS_BUILD.txt", "PRIVACY_NOTICE_NO_GA.txt"):
+        if not (game_root / "release" / release_notice).is_file():
+            errors.append(f"no-GameAnalytics release notice is missing: {release_notice}")
 
     version_data = _read_json(game_root / "release" / "version.json", errors)
     version = str(version_data.get("version", ""))

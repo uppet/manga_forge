@@ -419,6 +419,7 @@ func _ready() -> void:
 	hud.set_build(player.get_build_summary())
 	_on_ink_art_changed(str(player.ink_art_profile().get("name", "INK ART")), player.ink_art_cooldown, player.ink_art_cooldown_total())
 	hud.set_settings(settings)
+	hud.set_analytics_available_in_build(_analytics_available_in_build())
 	hud.set_bindings(_binding_snapshot())
 	_apply_meta_progression()
 	_evaluate_achievements(false)
@@ -463,7 +464,7 @@ func _ready() -> void:
 			hud.show_device_notice("DAMAGED ARCHIVE PRESERVED  ·  NEW PROFILE")
 		if startup_state_requested and not startup_state_errors.is_empty():
 			hud.show_device_notice("DEBUG STATE REJECTED  ·  SEE CONSOLE")
-		if not bool(settings.get("analytics_consent_decided", false)):
+		if _analytics_available_in_build() and not bool(settings.get("analytics_consent_decided", false)):
 			hud.show_analytics_consent_required()
 	var recorder := _playtest_recorder()
 	if recorder != null:
@@ -699,6 +700,11 @@ func _playtest_recorder() -> Node:
 
 func _gameanalytics_client() -> Node:
 	return get_node_or_null("/root/GameAnalyticsClient")
+
+
+func _analytics_available_in_build() -> bool:
+	var analytics := _gameanalytics_client()
+	return analytics != null and bool(analytics.collection_available_in_build())
 
 
 func _configure_gameanalytics() -> String:
@@ -2756,6 +2762,8 @@ func _on_meta_upgrade_requested(upgrade_id: String) -> void:
 
 func _on_setting_adjusted(setting_id: String, direction: int) -> void:
 	if setting_id not in settings:
+		return
+	if setting_id == "analytics_consent" and not _analytics_available_in_build():
 		return
 	match setting_id:
 		"master", "music", "sfx":

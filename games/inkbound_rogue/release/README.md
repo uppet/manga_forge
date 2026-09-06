@@ -1,5 +1,33 @@
 # Windows and Steam release staging
 
+## GitHub-built Windows edition without GameAnalytics
+
+`.github/workflows/windows-no-ga-release.yml` produces the shareable Windows
+x86_64 package without accepting any GA secret. Run **Build Windows release
+(No GameAnalytics)** from the repository's Actions page, or push a version tag
+that exactly matches `v<release/version.json version>`.
+
+The workflow uses the dedicated `Windows Desktop No GA` preset. Its
+`no_gameanalytics` feature hard-disables remote statistics before environment
+or embedded credentials are considered, suppresses the first-run analytics
+prompt, and reports `analytics_available=false` plus
+`analytics_status=unavailable_in_build` in the native exported-EXE boot probe.
+The probe deliberately supplies valid-looking environment credentials; the
+build must still refuse them. The official Godot 4.5.2 editor and templates are
+SHA-256 pinned, and GitHub-hosted dependencies are commit pinned.
+
+Download the Actions artifact named
+`LastInkwarden-<version>-windows-no-ga`. The actual public payload inside it is
+`LastInkwarden-<version>-windows-no-ga.zip`; publish that inner ZIP rather than
+the Actions wrapper. Its `.sha256` file and `no-ga-build.json` manifest are
+provided alongside it. The EXE is currently unsigned, so Windows SmartScreen
+may show an unknown-publisher warning until a code-signing certificate is added.
+
+The no-GA ZIP has an exact six-file allowlist: the EXE, version and third-party
+notices, a no-GA build marker, the local-only recorded-playtest launcher, and a
+bilingual no-GA privacy notice. It does not reuse the GA-enabled Public Beta
+privacy text.
+
 `host_game.py export` creates the runnable build in `build/windows/` and copies
 the exact Steam payload into the isolated `build/steam-depot/` directory:
 

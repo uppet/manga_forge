@@ -1,0 +1,34 @@
+Last Inkwarden / 墨卫残章 — No-GameAnalytics Build Notice
+Version 1.0 · 2026-09-06
+
+中文
+====
+
+本版本在构建时禁用了 GameAnalytics。可执行文件不包含 GameAnalytics Game Key
+或 Secret Key；即使设置相关环境变量，也不会启用或发送远程使用统计。
+
+随游戏提供的 Start-Recorded-Playtest.cmd 是一套独立的本地试玩记录器。只有玩家
+主动使用该启动器时，它才会把匿名事件写入游戏目录下的 playtest-logs 文件夹；记录
+不会自动上传。玩家可查看、打包或删除这些文件，只有主动提交给项目维护者后，维护者
+才会收到它们。直接运行 LastInkwarden.exe 不会启用本地试玩记录。
+
+本免费 Beta 由 Joyer Huang / Last Inkwarden 项目维护。如有问题，请使用游戏官方
+itch.io 页面列出的反馈/联系渠道。
+
+
+English
+-------
+
+GameAnalytics is disabled at build time in this edition. The executable contains
+no GameAnalytics Game Key or Secret Key. Remote usage statistics cannot be enabled
+or sent, even if related environment variables are set.
+
+Start-Recorded-Playtest.cmd is a separate local playtest recorder. It writes
+anonymous events to the playtest-logs folder beside the game only when a player
+deliberately uses that launcher. Those records are never uploaded automatically.
+Players can inspect, archive, or delete them; the maintainer receives them only
+after a player deliberately submits them. Running LastInkwarden.exe directly does
+not enable local playtest recording.
+
+This free Beta is maintained by Joyer Huang / the Last Inkwarden project. Use the
+feedback/contact route on the official itch.io page for questions.
