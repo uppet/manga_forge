@@ -25,6 +25,7 @@ class GameAnalyticsBuildCredentialsTest(unittest.TestCase):
             self.assertIsNone(host_game.load_gameanalytics_build_credentials("inkbound_rogue", missing))
             rendered = host_game.render_gameanalytics_credentials(None)
             self.assertIn("const EMBEDDED := false", rendered)
+            self.assertIn('const PROFILE := "none"', rendered)
             self.assertIn('const CONFIG_FINGERPRINT := "none"', rendered)
 
     def test_valid_config_is_injected_only_into_runtime(self) -> None:
@@ -37,6 +38,8 @@ class GameAnalyticsBuildCredentialsTest(unittest.TestCase):
                 json.dumps(
                     {
                         "inkbound_rogue": {
+                            "profile": "public_beta",
+                            "project": "Last Inkwarden - Public Beta",
                             "game_key": game_key,
                             "secret_key": secret_key,
                             "environment": "production",
@@ -54,6 +57,8 @@ class GameAnalyticsBuildCredentialsTest(unittest.TestCase):
             manifest = root / "runtime" / "games" / "inkbound_rogue" / "build" / "windows" / "gameanalytics-build.json"
             self.assertTrue(metadata["embedded"])
             self.assertEqual(metadata["environment"], "production")
+            self.assertEqual(metadata["credential_profile"], "public_beta")
+            self.assertEqual(metadata["analytics_project"], "Last Inkwarden - Public Beta")
             self.assertEqual(len(metadata["config_fingerprint"]), 16)
             self.assertIn(game_key, generated.read_text(encoding="utf-8"))
             self.assertIn(secret_key, generated.read_text(encoding="utf-8"))
@@ -77,6 +82,8 @@ class GameAnalyticsBuildCredentialsTest(unittest.TestCase):
                 json.dumps(
                     {
                         "inkbound_rogue": {
+                            "profile": "public_beta",
+                            "project": "Last Inkwarden - Public Beta",
                             "game_key": "a" * 32,
                             "secret_key": "do-not-echo-this-value",
                             "environment": "production",
@@ -88,6 +95,46 @@ class GameAnalyticsBuildCredentialsTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "secret_key must be exactly 40 hexadecimal characters") as raised:
                 host_game.load_gameanalytics_build_credentials("inkbound_rogue", config_path)
             self.assertNotIn("do-not-echo-this-value", str(raised.exception))
+
+    def test_public_beta_rejects_unlabelled_or_reused_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            config_path = Path(temporary) / "gameanalytics.local.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "inkbound_rogue": {
+                            "profile": "development",
+                            "project": "Last Inkwarden - Development",
+                            "game_key": "a" * 32,
+                            "secret_key": "b" * 40,
+                            "environment": "production",
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "profile=public_beta"):
+                host_game.load_gameanalytics_build_credentials("inkbound_rogue", config_path)
+
+    def test_public_beta_rejects_wrong_project_label(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            config_path = Path(temporary) / "gameanalytics.local.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "inkbound_rogue": {
+                            "profile": "public_beta",
+                            "project": "Last Inkwarden - Development",
+                            "game_key": "a" * 32,
+                            "secret_key": "b" * 40,
+                            "environment": "production",
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "Last Inkwarden - Public Beta"):
+                host_game.load_gameanalytics_build_credentials("inkbound_rogue", config_path)
 
 
 if __name__ == "__main__":

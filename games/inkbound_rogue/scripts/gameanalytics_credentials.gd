@@ -7,4 +7,5 @@ const EMBEDDED := false
 const GAME_KEY := ""
 const SECRET_KEY := ""
 const ENVIRONMENT := "production"
+const PROFILE := "none"
 const CONFIG_FINGERPRINT := "none"

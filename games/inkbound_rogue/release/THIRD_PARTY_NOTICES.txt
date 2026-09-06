@@ -26,7 +26,7 @@ Production credits
 
 Creator, creative direction, and asset production: Joyer Huang.
 Development collaboration, code, and tooling: OpenAI Codex (GPT-5).
-Engine and pipeline tools: Godot Engine 4.2.2, Manga Forge, Python 3, and
+Engine and pipeline tools: Godot Engine 4.5.2, Manga Forge, Python 3, and
 FFmpeg 4.4.2. Additional visual-production and previsualization tools credited
 by the project owner: ComfyUI, Stable Diffusion, and MiniMax H3.
 

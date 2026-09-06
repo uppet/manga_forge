@@ -65,8 +65,9 @@ replays unlocked cinematics without applying run or ending side effects.
 Victory then runs a nine-page result-and-credits carousel. It names the creator,
 development collaborator, engine, production pipeline, media tools, every
 credited generative model/platform used in the resource-production workflow,
-open-source contributors, and playtesters before stopping on a bilingual player
-thank-you page; any keyboard, mouse, or controller button returns to the title.
+open-source contributors, and named playtester Andrew Huang before stopping on
+a bilingual player thank-you page; any keyboard, mouse, or controller button
+returns to the title.
 
 ## Validation content
 

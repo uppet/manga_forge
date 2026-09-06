@@ -14,7 +14,13 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_GAME_ROOT = REPO_ROOT / "games" / "inkbound_rogue"
 RUNTIME_SUFFIXES = {".png", ".wav", ".ogg"}
-DEPOT_ALLOWLIST = {"LastInkwarden.exe", "THIRD_PARTY_NOTICES.txt", "version.json"}
+EXPECTED_GODOT_FEATURE = "4.5"
+DEPOT_ALLOWLIST = {
+    "LastInkwarden.exe",
+    "THIRD_PARTY_NOTICES.txt",
+    "PRIVACY_NOTICE.txt",
+    "version.json",
+}
 ITCH_ALLOWLIST = DEPOT_ALLOWLIST | {"Start-Recorded-Playtest.cmd"}
 REQUIRED_ASSET_FIELDS = {
     "id",
@@ -51,6 +57,18 @@ def _read_json(path: Path, errors: list[str]) -> dict[str, Any]:
         errors.append(f"JSON root is not an object: {path}")
         return {}
     return value
+
+
+def _windows_numeric_version(version: str) -> str | None:
+    """Map the release identity to Windows' required four-number version."""
+    match = re.fullmatch(
+        r"(\d+)\.(\d+)\.(\d+)(?:-(?:alpha|beta|rc)(?:\.(\d+))?)?",
+        version,
+    )
+    if match is None:
+        return None
+    major, minor, patch, prerelease_number = match.groups()
+    return f"{major}.{minor}.{patch}.{prerelease_number or '0'}"
 
 
 def audit_source(repo_root: Path, game_root: Path) -> tuple[list[str], dict[str, Any]]:
@@ -123,8 +141,21 @@ def audit_source(repo_root: Path, game_root: Path) -> tuple[list[str], dict[str,
     export_text = (game_root / "export_presets.cfg").read_text(encoding="utf-8")
     if 'renderer/rendering_method="gl_compatibility"' not in project_text:
         errors.append("Windows baseline is not pinned to the GL Compatibility renderer")
-    if 'config/features=PackedStringArray("4.2", "GL Compatibility")' not in project_text:
-        errors.append("project feature identity does not declare GL Compatibility")
+    feature_match = re.search(
+        r'^config/features=PackedStringArray\(([^)]*)\)$',
+        project_text,
+        re.MULTILINE,
+    )
+    feature_values = (
+        set(re.findall(r'"([^"]+)"', feature_match.group(1)))
+        if feature_match
+        else set()
+    )
+    if EXPECTED_GODOT_FEATURE not in feature_values or "GL Compatibility" not in feature_values:
+        errors.append(
+            "project feature identity must declare "
+            f"Godot {EXPECTED_GODOT_FEATURE} and GL Compatibility"
+        )
     for exclusion in ("build/**", "tests/**", "design/**", "release/**", "asset-manifest.json", "assets/**/*.md"):
         if exclusion not in export_text:
             errors.append(f"export preset does not exclude development material: {exclusion}")
@@ -138,9 +169,14 @@ def audit_source(repo_root: Path, game_root: Path) -> tuple[list[str], dict[str,
         errors.append("project.godot version does not match release/version.json")
     if not product_match or product_match.group(1) != version:
         errors.append("Windows product version does not match release/version.json")
-    numeric_version = version.removesuffix("-alpha") + ".0"
-    if not file_match or file_match.group(1) != numeric_version:
-        errors.append("Windows numeric file version does not match the alpha version")
+    numeric_version = _windows_numeric_version(version)
+    if numeric_version is None:
+        errors.append(f"release version is not supported for Windows metadata: {version!r}")
+    elif not file_match or file_match.group(1) != numeric_version:
+        errors.append(
+            "Windows numeric file version does not match the release version "
+            f"(expected {numeric_version})"
+        )
 
     app_vdf = (game_root / "release" / "steam_app_build.vdf.example").read_text(encoding="utf-8")
     depot_vdf = (game_root / "release" / "steam_depot_build.vdf.example").read_text(encoding="utf-8")

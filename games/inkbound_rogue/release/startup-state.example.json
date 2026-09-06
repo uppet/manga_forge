@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "enabled": true,
+  "profile": "page-8-binder-repro",
+  "seed": 8082026,
+  "settings": {
+    "language": "zh_CN",
+    "ink_art_cutins": true,
+    "hit_stop": true,
+    "reduced_flashes": false
+  },
+  "run": {
+    "page": 8,
+    "page_progress": 0.05,
+    "difficulty": "standard",
+    "contract": "open-draft",
+    "proof_depth": 0,
+    "starting_weapon": "marginalia",
+    "route": "chain-vault",
+    "spawn_page_content": true,
+    "ambient_spawning": true,
+    "page_timer": true,
+    "clear_existing_enemies": true,
+    "boss": "auto",
+    "boss_intro": true,
+    "boss_position": [150, 0],
+    "memory": 0,
+    "kills": 0
+  },
+  "player": {
+    "level": 12,
+    "xp": 0,
+    "health_ratio": 1.0,
+    "guard": 2,
+    "ink_art_ready": true,
+    "position": [0, 0],
+    "upgrades": [
+      {
+        "id": "wide-panel",
+        "stacks": 2
+      },
+      "ink-wave"
+    ],
+    "random_upgrades": {
+      "count": 8,
+      "max_stacks_per_upgrade": 2,
+      "allow_weapon_forms": false,
+      "tags": [],
+      "exclude": []
+    },
+    "relics": [
+      "black-tea"
+    ],
+    "random_relics": {
+      "count": 2,
+      "exclude": [
+        "iori-ribbon"
+      ]
+    }
+  },
+  "enemies": []
+}

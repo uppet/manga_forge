@@ -6,6 +6,19 @@ Simplified Chinese product name: **墨卫残章**
 
 Promotional line: **Blade of the Blank Page / 空白页之刃**
 
+## Current distribution status
+
+The project is preparing a **free public Windows Beta** for identical
+distribution through itch.io and a Quark Drive mirror while feedback is
+collected. The public candidate still requires final packaging, rights review,
+and download-link replacement. It is not a finished Steam release.
+
+- itch.io: <https://your-itch-username.itch.io/last-inkwarden> (replace before publication)
+- Quark Drive mirror: <https://pan.quark.cn/s/REPLACE_ME> (replace before publication)
+- Player-facing page copy: `itch-description.md`
+- Cover-art candidate: `cover-art-v2.png` (project-owner approval pending; the
+  rejected v1 bitmap is not retained)
+
 ## Short description
 
 Cut through a living manuscript in a manga-pixel action roguelike. Forge a
@@ -72,7 +85,7 @@ decide which ending the Grand Archive deserves.
 Action Roguelike, Roguelite, Pixel Graphics, 2D, Hack and Slash, Bullet Hell,
 Story Rich, Comic Book, Controller, Singleplayer.
 
-## Provisional Windows requirements for P1
+## Provisional Windows requirements for the free Beta
 
 - Windows 10/11 64-bit
 - OpenGL 3.3-capable graphics
@@ -80,14 +93,14 @@ Story Rich, Comic Book, Controller, Singleplayer.
 - 200 MB available storage
 - Keyboard/mouse or compatible XInput/SDL controller
 
-These are private-playtest targets, not final store minimum specifications.
+These are public-Beta targets, not final store minimum specifications.
 The integrated/older-GPU row in `p1-compatibility-matrix.md` must receive a real
 hardware pass before publishing final requirements.
 
 ## Generative AI disclosure draft
 
 Pre-generated AI-assisted content and development assistance are present.
-OpenAI image generation produced two character atlases, seven unlettered story
+OpenAI image generation produced this storefront cover, two character atlases, seven unlettered story
 backgrounds, and ten Ink Art cinematic images. OpenAI Realtime
 `gpt-realtime-2.1` and a local IndexTTS 2.5 pipeline produced the shipped
 Japanese combat voices. 海绵音乐 / Hai Mian Music produced five AIGC soundtrack

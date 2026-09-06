@@ -2,9 +2,10 @@ extends Node
 
 signal shutdown_finished(queue_flushed: bool)
 
-# Godot 4.2-compatible GameAnalytics Collection API v2 client. The current
-# official GDExtension requires a newer Godot runtime, so this deliberately
-# small adapter keeps analytics optional and isolated from gameplay.
+# Minimal GameAnalytics Collection API v2 client retained after the Godot 4.5
+# upgrade. Its small, allowlisted surface keeps consent, offline deletion, and
+# the public-Beta event contract testable without coupling gameplay to a native
+# extension. Re-evaluate the official SDK independently of the engine upgrade.
 
 const SDK_VERSION := "rest api v2"
 const FLUSH_INTERVAL_SECONDS := 20.0
@@ -14,6 +15,26 @@ const RETRY_MIN_SECONDS := 5.0
 const RETRY_MAX_SECONDS := 120.0
 const DEFAULT_STORAGE_ROOT := "user://gameanalytics"
 const EmbeddedCredentials = preload("res://scripts/gameanalytics_credentials.gd")
+const Content = preload("res://scripts/content_db.gd")
+
+# Public-Beta remote event dictionary. record_game_event() drops every local
+# recorder event not listed here; content-bearing segments are additionally
+# resolved against Content so malformed values collapse to "other" rather than
+# creating unbounded dashboard cardinality.
+const EVENT_DICTIONARY := {
+	"run_started": {"category": "progression", "frequency": "once_per_run"},
+	"run_continued": {"category": "progression", "frequency": "once_per_continue"},
+	"page_started": {"category": "design", "frequency": "once_per_page"},
+	"boss_page_started": {"category": "design", "frequency": "once_per_boss_page"},
+	"route_selected": {"category": "design", "frequency": "up_to_three_per_run"},
+	"event_selected": {"category": "design", "frequency": "up_to_three_per_run"},
+	"upgrade_selected": {"category": "design", "frequency": "once_per_upgrade"},
+	"relic_selected": {"category": "design", "frequency": "once_per_relic"},
+	"story_choice": {"category": "design", "frequency": "ending_choice_only"},
+	"save_return": {"category": "design", "frequency": "once_per_save_return"},
+	"manual_visibility": {"category": "design", "frequency": "open_only"},
+	"run_finalized": {"category": "summary", "frequency": "once_per_run"},
+}
 
 var consented := false
 var active := false
@@ -117,55 +138,70 @@ func debug_configure(test_storage_root: String, maximum_events: int = MAX_QUEUED
 func record_game_event(kind: String, data: Dictionary = {}) -> void:
 	if not active or session_ended:
 		return
+	if not EVENT_DICTIONARY.has(kind):
+		return
 	match kind:
 		"run_started":
 			if not current_progression_path.is_empty():
 				_add_progression("Fail", current_progression_path)
-			var difficulty := _segment(data.get("difficulty", "standard"))
-			var contract := _segment("daily" if bool(data.get("daily", false)) else data.get("contract", "open-draft"))
+			var difficulty := _fixed_segment(data.get("difficulty", "standard"), ["story", "standard", "redline"])
+			var contract := "daily" if bool(data.get("daily", false)) else _content_id(data.get("contract", "open-draft"), Content.CONTRACTS)
 			current_progression_path = "Run:%s:%s" % [difficulty, contract]
 			_add_progression("Start", current_progression_path)
-			_add_design(["run", "loadout", data.get("starting_weapon", "marginalia")], float(data.get("proof_depth", 0)))
+			_add_design(["run", "loadout", _content_id(data.get("starting_weapon", "marginalia"), Content.STARTING_WEAPONS)], clampf(float(data.get("proof_depth", 0)), 0.0, 10.0))
 		"run_continued":
-			var difficulty := _segment(data.get("difficulty", "standard"))
-			var contract := _segment(data.get("contract", "continued"))
+			var difficulty := _fixed_segment(data.get("difficulty", "standard"), ["story", "standard", "redline"])
+			var contract := _content_id(data.get("contract", "open-draft"), Content.CONTRACTS)
 			var continued_path := "Run:%s:%s" % [difficulty, contract]
 			if current_progression_path != continued_path:
 				current_progression_path = continued_path
 				_add_progression("Start", current_progression_path)
-			_add_design(["run", "continued"], float(data.get("page", 1)))
+			_add_design(["run", "continued"], float(clampi(int(data.get("page", 1)), 1, 12)))
 		"page_started":
-			_add_design(["run", "page", str(clampi(int(data.get("page", 1)), 1, 99))], float(data.get("health", 0.0)))
+			_add_design(["run", "page", str(clampi(int(data.get("page", 1)), 1, 12))], clampf(float(data.get("health", 0.0)), 0.0, 100.0))
 		"boss_page_started":
-			_add_design(["run", "boss_page", str(clampi(int(data.get("page", 1)), 1, 99))])
+			_add_design(["run", "boss_page", str(clampi(int(data.get("page", 1)), 1, 12))])
 		"route_selected":
-			_add_design(["choice", "route", data.get("route", "unknown")], float(data.get("chapter", 0)))
+			_add_design(["choice", "route", _content_id(data.get("route", ""), Content.ROUTES)], float(clampi(int(data.get("chapter", 0)), 1, 3)))
 		"event_selected":
-			_add_design(["choice", "event", data.get("event", "unknown"), data.get("effect", "unknown")], float(data.get("index", 0)))
+			_add_design(["choice", "event", _event_id(data.get("event", "")), _event_effect(data.get("effect", ""))], float(clampi(int(data.get("index", 0)), 0, 3)))
 		"upgrade_selected":
-			_add_design(["choice", "upgrade", data.get("upgrade", "unknown")], float(data.get("level", 0)))
+			_add_design(["choice", "upgrade", _content_id(data.get("upgrade", ""), Content.UPGRADES)], float(clampi(int(data.get("level", 0)), 1, 100)))
 		"relic_selected":
-			_add_design(["choice", "relic", data.get("relic", "unknown")], float(data.get("page", 0)))
+			_add_design(["choice", "relic", _content_id(data.get("relic", ""), Content.RELICS)], float(clampi(int(data.get("page", 0)), 1, 12)))
 		"story_choice":
 			if not bool(data.get("replay", false)):
-				_add_design(["story", "choice", data.get("sequence", "unknown"), data.get("choice", "unknown")])
+				_add_design(["story", "choice", _story_id(data.get("sequence", "")), _fixed_segment(data.get("choice", ""), ["keep", "rewrite"])])
 		"save_return":
-			_add_design(["run", "save_return"], float(data.get("page", 0)))
+			_add_design(["run", "save_return"], float(clampi(int(data.get("page", 0)), 1, 12)))
 		"manual_visibility":
 			if bool(data.get("visible", false)):
 				_add_design(["ui", "field_manual", "opened"], float(data.get("page", 0)))
 		"run_finalized":
 			var path := current_progression_path
 			if path.is_empty():
-				path = "Run:%s:%s" % [_segment(data.get("difficulty", "standard")), _segment(data.get("contract", "unknown"))]
+				path = "Run:%s:%s" % [
+					_fixed_segment(data.get("difficulty", "standard"), ["story", "standard", "redline"]),
+					_content_id(data.get("contract", "open-draft"), Content.CONTRACTS),
+				]
 			_add_progression("Complete" if bool(data.get("won", false)) else "Fail", path, int(data.get("score", 0)))
 			var memory_earned := float(data.get("memory_earned", 0.0))
 			if memory_earned > 0.0:
 				_add_resource("Source:Memory:run:completion", memory_earned)
-			if bool(data.get("won", false)):
-				_add_design(["run", "ending", data.get("ending", "unknown")], float(data.get("duration_seconds", 0)))
+			var won := bool(data.get("won", false))
+			_add_design(["run", "result", "complete" if won else "fail"], float(clampi(int(data.get("duration_seconds", 0)), 0, 172800)))
+			_add_design(["run", "page_reached", str(clampi(int(data.get("wave", 1)), 1, 12))], float(clampi(int(data.get("level", 1)), 1, 100)))
+			_add_design(["run", "final_weapon", _content_id(data.get("weapon_form", data.get("starting_weapon", "marginalia")), Content.STARTING_WEAPONS)], float(clampi(int(data.get("kills", 0)), 0, 1000000)))
+			if won:
+				_add_design(["run", "ending", _fixed_segment(data.get("ending", ""), ["keep", "rewrite"])], float(clampi(int(data.get("duration_seconds", 0)), 0, 172800)))
+			else:
+				_add_design(["run", "death", _death_source_category(data.get("death_source", "unknown"))], float(clampi(int(data.get("wave", 1)), 1, 12)))
 			current_progression_path = ""
 			flush_now()
+
+
+func event_dictionary() -> Dictionary:
+	return EVENT_DICTIONARY.duplicate(true)
 
 
 func flush_now() -> void:
@@ -215,6 +251,7 @@ func build_credential_info() -> Dictionary:
 	return {
 		"embedded": bool(EmbeddedCredentials.EMBEDDED),
 		"environment": str(EmbeddedCredentials.ENVIRONMENT),
+		"credential_profile": str(EmbeddedCredentials.PROFILE),
 		"config_fingerprint": str(EmbeddedCredentials.CONFIG_FINGERPRINT),
 	}
 
@@ -575,7 +612,7 @@ func _os_version() -> String:
 
 func _engine_version() -> String:
 	var info := Engine.get_version_info()
-	return "godot %d.%d.%d" % [int(info.get("major", 4)), int(info.get("minor", 2)), int(info.get("patch", 0))]
+	return "godot %d.%d.%d" % [int(info.get("major", 4)), int(info.get("minor", 5)), int(info.get("patch", 0))]
 
 
 func _build_version() -> String:
@@ -585,6 +622,52 @@ func _build_version() -> String:
 func _device_name() -> String:
 	var model := OS.get_model_name().strip_edges()
 	return ("unknown" if model.is_empty() or model.to_lower() == "genericdevice" else model).left(64)
+
+
+func _fixed_segment(value: Variant, allowed: Array, fallback: String = "other") -> String:
+	var candidate := str(value).strip_edges().to_lower()
+	return candidate if candidate in allowed else fallback
+
+
+func _content_id(value: Variant, definitions: Array) -> String:
+	var candidate := str(value).strip_edges().to_lower()
+	for definition_value in definitions:
+		if definition_value is Dictionary and str(definition_value.get("id", "")).to_lower() == candidate:
+			return candidate
+	return "other"
+
+
+func _story_id(value: Variant) -> String:
+	var candidate := str(value).strip_edges().to_lower()
+	return candidate if Content.STORY.has(candidate) else "other"
+
+
+func _event_id(value: Variant) -> String:
+	var candidate := str(value).strip_edges().to_lower()
+	if candidate in ["route-chapter-1", "route-chapter-2", "route-chapter-3"]:
+		return candidate
+	return _content_id(candidate, Content.EVENTS)
+
+
+func _event_effect(value: Variant) -> String:
+	var candidate := str(value).strip_edges().to_lower()
+	if candidate == "route":
+		return candidate
+	for event_value in Content.EVENTS:
+		if not (event_value is Dictionary):
+			continue
+		for option_value in event_value.get("options", []):
+			if option_value is Dictionary and str(option_value.get("effect", "")).to_lower() == candidate:
+				return candidate
+	return "other"
+
+
+func _death_source_category(value: Variant) -> String:
+	var candidate := str(value).strip_edges().to_lower()
+	for prefix in ["contact", "projectile", "hazard", "elite"]:
+		if candidate == prefix or candidate.begins_with(prefix + ":"):
+			return prefix
+	return "other"
 
 
 func _segment(value: Variant) -> String:

@@ -49,7 +49,7 @@ cd story-forge
 The installed Codex skill should contain runtime files only:
 
 ```text
-C:\Users\lenny\.codex\skills\story-forge
+C:\Users\YOUR_USERNAME\.codex\skills\story-forge
 ```
 
 Runtime files are:
@@ -67,7 +67,7 @@ Do not treat the installed Codex directory as the main Git repo. Keep commits an
 ## Create a Novel Project Workspace
 
 ```powershell
-python scripts/create_novel_project.py --title "失名之城" --out "C:\Users\lenny\OneDrive\Desktop"
+python scripts/create_novel_project.py --title "失名之城" --out "C:\Users\YOUR_USERNAME\OneDrive\Desktop"
 ```
 
 This creates:

@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = Path(__file__).resolve().parent
 DEFAULT_GAME = "inkbound_rogue"
 GAMEANALYTICS_LOCAL_CONFIG = CONFIG_DIR / "gameanalytics.local.json"
+PUBLIC_BETA_ANALYTICS_PROFILE = "public_beta"
+PUBLIC_BETA_ANALYTICS_PROJECT = "Last Inkwarden - Public Beta"
+PUBLIC_BETA_FILES = {
+    "LastInkwarden.exe",
+    "PRIVACY_NOTICE.txt",
+    "Start-Recorded-Playtest.cmd",
+    "THIRD_PARTY_NOTICES.txt",
+    "version.json",
+}
 
 
 def load_config() -> dict[str, Any]:
@@ -29,7 +39,11 @@ def load_config() -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def load_gameanalytics_build_credentials(game: str, path: Path = GAMEANALYTICS_LOCAL_CONFIG) -> dict[str, str] | None:
+def load_gameanalytics_build_credentials(
+    game: str,
+    path: Path = GAMEANALYTICS_LOCAL_CONFIG,
+    required_profile: str = PUBLIC_BETA_ANALYTICS_PROFILE,
+) -> dict[str, str] | None:
     if not path.exists():
         return None
     try:
@@ -39,6 +53,18 @@ def load_gameanalytics_build_credentials(game: str, path: Path = GAMEANALYTICS_L
     if not isinstance(document, dict) or not isinstance(document.get(game), dict):
         raise ValueError(f"GameAnalytics local config has no object for game: {game}")
     entry = document[game]
+    profile = str(entry.get("profile", "")).strip().lower()
+    if profile != required_profile:
+        raise ValueError(
+            f"GameAnalytics credentials for {game} must declare profile={required_profile}; "
+            "do not reuse development or release credentials for a public Beta"
+        )
+    project = str(entry.get("project", "")).strip()
+    if project != PUBLIC_BETA_ANALYTICS_PROJECT:
+        raise ValueError(
+            f"GameAnalytics credentials for {game} must declare "
+            f"project={PUBLIC_BETA_ANALYTICS_PROJECT!r}"
+        )
     game_key = str(entry.get("game_key", "")).strip().lower()
     secret_key = str(entry.get("secret_key", "")).strip().lower()
     environment = str(entry.get("environment", "production")).strip().lower()
@@ -48,11 +74,15 @@ def load_gameanalytics_build_credentials(game: str, path: Path = GAMEANALYTICS_L
         raise ValueError("GameAnalytics secret_key must be exactly 40 hexadecimal characters")
     if environment not in {"sandbox", "production"}:
         raise ValueError("GameAnalytics environment must be sandbox or production")
-    fingerprint = hashlib.sha256(f"{environment}:{game_key}:{secret_key}".encode("ascii")).hexdigest()[:16]
+    fingerprint = hashlib.sha256(
+        f"{profile}:{project}:{environment}:{game_key}:{secret_key}".encode("ascii")
+    ).hexdigest()[:16]
     return {
         "game_key": game_key,
         "secret_key": secret_key,
         "environment": environment,
+        "profile": profile,
+        "project": project,
         "fingerprint": fingerprint,
     }
 
@@ -63,12 +93,14 @@ def render_gameanalytics_credentials(credentials: dict[str, str] | None) -> str:
         game_key = ""
         secret_key = ""
         environment = "production"
+        profile = "none"
         fingerprint = "none"
     else:
         embedded = "true"
         game_key = credentials["game_key"]
         secret_key = credentials["secret_key"]
         environment = credentials["environment"]
+        profile = credentials["profile"]
         fingerprint = credentials["fingerprint"]
     return "\n".join(
         [
@@ -80,6 +112,7 @@ def render_gameanalytics_credentials(credentials: dict[str, str] | None) -> str:
             f"const GAME_KEY := {json.dumps(game_key)}",
             f"const SECRET_KEY := {json.dumps(secret_key)}",
             f"const ENVIRONMENT := {json.dumps(environment)}",
+            f"const PROFILE := {json.dumps(profile)}",
             f"const CONFIG_FINGERPRINT := {json.dumps(fingerprint)}",
             "",
         ]
@@ -99,6 +132,8 @@ def inject_gameanalytics_build_credentials(
     metadata: dict[str, Any] = {
         "embedded": credentials is not None,
         "environment": credentials["environment"] if credentials is not None else "none",
+        "credential_profile": credentials["profile"] if credentials is not None else "none",
+        "analytics_project": credentials["project"] if credentials is not None else "none",
         "config_fingerprint": credentials["fingerprint"] if credentials is not None else "none",
         "source": "tools/windows/gameanalytics.local.json",
     }
@@ -111,7 +146,12 @@ def inject_gameanalytics_build_credentials(
     )
     print(
         "gameanalytics_build_credentials="
-        + (f"embedded environment={metadata['environment']} fingerprint={metadata['config_fingerprint']}" if metadata["embedded"] else "not_embedded")
+        + (
+            f"embedded project={metadata['analytics_project']!r} "
+            f"environment={metadata['environment']} fingerprint={metadata['config_fingerprint']}"
+            if metadata["embedded"]
+            else "not_embedded"
+        )
     )
     return metadata
 
@@ -123,19 +163,125 @@ def scrub_gameanalytics_runtime_credentials(config: dict[str, Any], game: str) -
         print("gameanalytics_runtime_credentials=scrubbed")
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def create_public_beta_archive(
+    config: dict[str, Any],
+    game: str,
+    analytics_build: dict[str, Any],
+) -> dict[str, Any]:
+    if bool(analytics_build.get("embedded", False)) and str(
+        analytics_build.get("credential_profile", "")
+    ) != PUBLIC_BETA_ANALYTICS_PROFILE:
+        raise ValueError("embedded public Beta analytics must use credential_profile=public_beta")
+    if bool(analytics_build.get("embedded", False)) and str(
+        analytics_build.get("analytics_project", "")
+    ) != PUBLIC_BETA_ANALYTICS_PROJECT:
+        raise ValueError(
+            f"embedded public Beta analytics must use project={PUBLIC_BETA_ANALYTICS_PROJECT!r}"
+        )
+    runtime_game_root = Path(config["wsl_runtime_root"]) / "games" / game
+    source_root = runtime_game_root / "build" / "itch-windows"
+    source_files = {path.name for path in source_root.iterdir() if path.is_file()}
+    source_directories = [path.name for path in source_root.iterdir() if path.is_dir()]
+    if source_files != PUBLIC_BETA_FILES or source_directories:
+        raise ValueError(
+            "public Beta source differs from the five-file allowlist: "
+            f"files={sorted(source_files)} dirs={sorted(source_directories)}"
+        )
+
+    release_identity = json.loads((source_root / "version.json").read_text(encoding="utf-8"))
+    version = str(release_identity.get("version", "")).strip()
+    channel = str(release_identity.get("channel", "")).strip()
+    if not version or channel != "beta":
+        raise ValueError("public Beta archive requires a version and channel=beta")
+
+    output_root = runtime_game_root / "build" / "public-beta"
+    output_root.mkdir(parents=True, exist_ok=True)
+    archive_stem = f"LastInkwarden-{version}-windows-beta"
+    archive_path = Path(
+        shutil.make_archive(
+            str(output_root / archive_stem),
+            "zip",
+            root_dir=source_root,
+        )
+    )
+    with zipfile.ZipFile(archive_path, "r") as archive:
+        archived_files = {
+            Path(name).name
+            for name in archive.namelist()
+            if name and not name.endswith("/")
+        }
+        archived_directories = [name for name in archive.namelist() if name.endswith("/")]
+    if archived_files != PUBLIC_BETA_FILES or archived_directories:
+        raise ValueError(
+            "public Beta ZIP differs from the five-file allowlist: "
+            f"files={sorted(archived_files)} dirs={sorted(archived_directories)}"
+        )
+
+    archive_sha256 = sha256_file(archive_path)
+    checksum_path = output_root / f"{archive_path.name}.sha256"
+    checksum_path.write_text(f"{archive_sha256}  {archive_path.name}\n", encoding="ascii", newline="\n")
+    metadata: dict[str, Any] = {
+        "product": release_identity.get("product", "Last Inkwarden"),
+        "localized_product": release_identity.get("localized_product", "墨卫残章"),
+        "version": version,
+        "channel": channel,
+        "archive": archive_path.name,
+        "archive_bytes": archive_path.stat().st_size,
+        "archive_sha256": archive_sha256,
+        "files": sorted(PUBLIC_BETA_FILES),
+        "gameanalytics_embedded": bool(analytics_build.get("embedded", False)),
+        "gameanalytics_environment": str(analytics_build.get("environment", "none")),
+        "gameanalytics_credential_profile": str(analytics_build.get("credential_profile", "none")),
+        "gameanalytics_project": str(analytics_build.get("analytics_project", "none")),
+        "gameanalytics_config_fingerprint": str(analytics_build.get("config_fingerprint", "none")),
+    }
+    manifest_path = output_root / "public-beta-build.json"
+    manifest_path.write_text(
+        json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    print(
+        "public_beta_archive="
+        f"{archive_path} bytes={metadata['archive_bytes']} sha256={archive_sha256} "
+        f"analytics_embedded={str(metadata['gameanalytics_embedded']).lower()}"
+    )
+    return metadata
+
+
 def posix_game_root(config: dict[str, Any], game: str) -> str:
     return config["windows_runtime_root"].replace("\\", "/").replace("S:", "/s") + f"/games/{game}"
 
 
 def godot_resolver(config: dict[str, Any]) -> str:
     quoted = " ".join(f"'{candidate}'" for candidate in config["godot_candidates"])
+    version_prefix = str(config.get("godot_version_prefix", "")).strip()
     return f"""
+EXPECTED_GODOT='{version_prefix}'
 resolve_godot() {{
   for candidate in {quoted}; do
-    if [ -x \"$candidate\" ]; then printf '%s' \"$candidate\"; return 0; fi
+    if [ -x \"$candidate\" ]; then
+      version=$(\"$candidate\" --version 2>/dev/null | tr -d '\\r' | head -1)
+      if [ -z \"$EXPECTED_GODOT\" ] || [[ \"$version\" == \"$EXPECTED_GODOT\"* ]]; then
+        printf '%s' \"$candidate\"; return 0
+      fi
+    fi
   done
   candidate=$(find /c/Users/Joyer/AppData/Local/Microsoft/WinGet/Packages -maxdepth 4 -type f -iname 'Godot*_win64.exe' 2>/dev/null | sort -Vr | head -1)
-  if [ -n \"$candidate\" ]; then printf '%s' \"$candidate\"; return 0; fi
+  if [ -n \"$candidate\" ]; then
+    version=$(\"$candidate\" --version 2>/dev/null | tr -d '\\r' | head -1)
+    if [ -z \"$EXPECTED_GODOT\" ] || [[ \"$version\" == \"$EXPECTED_GODOT\"* ]]; then
+      printf '%s' \"$candidate\"; return 0
+    fi
+  fi
   return 1
 }}
 GODOT=$(resolve_godot) || {{ echo 'Godot executable not found' >&2; exit 12; }}
@@ -321,6 +467,7 @@ def p1_suite(config: dict[str, Any], game: str) -> None:
         ("audio", "audio_system_test.gd", "headless", 120),
         ("combat-feel", "combat_feel_test.gd", "headless", 120),
         ("boss-intro", "boss_intro_test.gd", "headless", 120),
+        ("startup-state", "startup_state_test.gd", "headless", 120),
         ("accessibility", "accessibility_test.gd", "headless", 120),
         ("restoration", "restoration_board_test.gd", "headless", 120),
         ("proof", "proof_depth_test.gd", "headless", 120),
@@ -331,6 +478,7 @@ def p1_suite(config: dict[str, Any], game: str) -> None:
         ("personas", "player_persona_test.gd", "headless", 240),
         ("recorder", "playtest_recorder_test.gd", "headless", 120),
         ("gameanalytics", "gameanalytics_test.gd", "headless", 120),
+        ("privacy-consent", "privacy_consent_test.gd", "headless", 120),
         ("soak", "soak_test.gd", "headless", 180),
     ]
     invocations = "\n".join(
@@ -551,6 +699,15 @@ timeout 120s "$GODOT" --headless --path "$GAME" --script res://tests/boss_intro_
     remote(config, command, 180)
 
 
+def startup_state_test(config: dict[str, Any], game: str) -> None:
+    game_root = posix_game_root(config, game)
+    command = godot_resolver(config) + f"""
+GAME='{game_root}'
+timeout 120s "$GODOT" --headless --path "$GAME" --script res://tests/startup_state_test.gd
+"""
+    remote(config, command, 180)
+
+
 def accessibility_test(config: dict[str, Any], game: str) -> None:
     game_root = posix_game_root(config, game)
     command = godot_resolver(config) + f"""
@@ -724,6 +881,15 @@ timeout 120s "$GODOT" --headless --path "$GAME" --script res://tests/gameanalyti
     remote(config, command, 180)
 
 
+def privacy_test(config: dict[str, Any], game: str) -> None:
+    game_root = posix_game_root(config, game)
+    command = godot_resolver(config) + f"""
+GAME='{game_root}'
+timeout 120s "$GODOT" --headless --path "$GAME" --script res://tests/privacy_consent_test.gd
+"""
+    remote(config, command, 180)
+
+
 def gameanalytics_build_test() -> None:
     subprocess.run(
         [sys.executable, str(CONFIG_DIR / "tests" / "test_gameanalytics_build.py")],
@@ -754,6 +920,7 @@ def export(config: dict[str, Any], game: str) -> None:
     sync(config, game)
     analytics_build = inject_gameanalytics_build_credentials(config, game)
     expected_analytics_embedded = "true" if analytics_build["embedded"] else "false"
+    expected_analytics_profile = analytics_build["credential_profile"]
     expected_analytics_fingerprint = analytics_build["config_fingerprint"]
     game_root = posix_game_root(config, game)
     command = godot_resolver(config) + f"""
@@ -764,24 +931,31 @@ rm -f \"$GAME/build/windows/LastInkwarden.exe\" \"$GAME/build/windows/LastInkwar
 \"$GODOT\" --headless --path \"$GAME\" --export-release 'Windows Desktop' \"$GAME/build/windows/LastInkwarden.exe\"
 test -s \"$GAME/build/windows/LastInkwarden.exe\"
 cp \"$GAME/release/THIRD_PARTY_NOTICES.txt\" \"$GAME/build/windows/THIRD_PARTY_NOTICES.txt\"
+cp \"$GAME/release/PRIVACY_NOTICE.txt\" \"$GAME/build/windows/PRIVACY_NOTICE.txt\"
 cp \"$GAME/release/version.json\" \"$GAME/build/windows/version.json\"
 cp \"$GAME/release/Start-Recorded-Playtest.cmd\" \"$GAME/build/windows/Start-Recorded-Playtest.cmd\"
+cp \"$GAME/release/Start-Debug-State.cmd\" \"$GAME/build/windows/Start-Debug-State.cmd\"
+cp \"$GAME/release/startup-state.example.json\" \"$GAME/build/windows/startup-state.example.json\"
+if [ ! -e \"$GAME/build/windows/startup-state.json\" ]; then cp \"$GAME/release/startup-state.example.json\" \"$GAME/build/windows/startup-state.json\"; fi
 test \"$(tr -cd '\\r' < \"$GAME/build/windows/Start-Recorded-Playtest.cmd\" | wc -c)\" -gt 20
+test \"$(tr -cd '\\r' < \"$GAME/build/windows/Start-Debug-State.cmd\" | wc -c)\" -gt 20
 ITCH=\"$GAME/build/itch-windows\"
 mkdir -p \"$ITCH\"
 rm -f \"$ITCH/InkboundRogue.exe\" \"$ITCH/LastInkwarden.exe\"
 cp \"$GAME/build/windows/LastInkwarden.exe\" \"$ITCH/LastInkwarden.exe\"
 cp \"$GAME/build/windows/THIRD_PARTY_NOTICES.txt\" \"$ITCH/THIRD_PARTY_NOTICES.txt\"
+cp \"$GAME/build/windows/PRIVACY_NOTICE.txt\" \"$ITCH/PRIVACY_NOTICE.txt\"
 cp \"$GAME/build/windows/version.json\" \"$ITCH/version.json\"
 cp \"$GAME/build/windows/Start-Recorded-Playtest.cmd\" \"$ITCH/Start-Recorded-Playtest.cmd\"
-test \"$(find \"$ITCH\" -mindepth 1 -maxdepth 1 | wc -l)\" -eq 4
+test \"$(find \"$ITCH\" -mindepth 1 -maxdepth 1 | wc -l)\" -eq 5
 DEPOT=\"$GAME/build/steam-depot\"
 mkdir -p \"$DEPOT\"
-rm -f \"$DEPOT/InkboundRogue.exe\" \"$DEPOT/LastInkwarden.exe\" \"$DEPOT/THIRD_PARTY_NOTICES.txt\" \"$DEPOT/version.json\"
+rm -f \"$DEPOT/InkboundRogue.exe\" \"$DEPOT/LastInkwarden.exe\" \"$DEPOT/THIRD_PARTY_NOTICES.txt\" \"$DEPOT/PRIVACY_NOTICE.txt\" \"$DEPOT/version.json\"
 cp \"$GAME/build/windows/LastInkwarden.exe\" \"$DEPOT/LastInkwarden.exe\"
 cp \"$GAME/build/windows/THIRD_PARTY_NOTICES.txt\" \"$DEPOT/THIRD_PARTY_NOTICES.txt\"
+cp \"$GAME/build/windows/PRIVACY_NOTICE.txt\" \"$DEPOT/PRIVACY_NOTICE.txt\"
 cp \"$GAME/build/windows/version.json\" \"$DEPOT/version.json\"
-test \"$(find \"$DEPOT\" -mindepth 1 -maxdepth 1 | wc -l)\" -eq 3
+test \"$(find \"$DEPOT\" -mindepth 1 -maxdepth 1 | wc -l)\" -eq 4
 BOOT_STATUS=0
 export INKBOUND_BOOT_SMOKE=1
 export INKBOUND_GA_ENABLED=0
@@ -790,7 +964,7 @@ timeout 30s \"$GAME/build/windows/LastInkwarden.exe\" > \"$BOOT_LOG\" 2>&1 || BO
 cat \"$BOOT_LOG\"
 echo "export_boot_status=$BOOT_STATUS"
 test "$BOOT_STATUS" -eq 0
-grep -F \"analytics_embedded={expected_analytics_embedded} analytics_config={expected_analytics_fingerprint}\" \"$BOOT_LOG\"
+grep -F \"analytics_embedded={expected_analytics_embedded} analytics_profile={expected_analytics_profile} analytics_config={expected_analytics_fingerprint}\" \"$BOOT_LOG\"
 """
     try:
         remote(config, command, 1200)
@@ -812,6 +986,7 @@ grep -F \"analytics_embedded={expected_analytics_embedded} analytics_config={exp
         check=True,
         cwd=REPO_ROOT,
     )
+    create_public_beta_archive(config, game, analytics_build)
 
 
 def release_audit(config: dict[str, Any], game: str) -> None:
@@ -849,6 +1024,52 @@ echo "export_boot_status=$BOOT_STATUS"
 test "$BOOT_STATUS" -eq 0
 """
     remote(config, command, 120)
+
+
+def startup_state_export_test(config: dict[str, Any], game: str) -> None:
+    game_root = posix_game_root(config, game)
+    command = godot_resolver(config) + f"""
+set -e
+GAME='{game_root}'
+TARGET="$GAME/build/windows/LastInkwarden.exe"
+STATE="$GAME/build/windows/startup-state.example.json"
+LOG="$GAME/build/windows/startup-state-boot.log"
+test -s "$TARGET"
+test -s "$STATE"
+export INKBOUND_BOOT_SMOKE=1
+export INKBOUND_GA_ENABLED=0
+export INKBOUND_STARTUP_STATE=$(cygpath -w "$STATE")
+timeout 30s "$TARGET" > "$LOG" 2>&1
+cat "$LOG"
+grep -F 'INKBOUND_STARTUP_STATE_OK' "$LOG"
+grep -F 'page=8 level=12' "$LOG"
+grep -F 'saves=false analytics=false' "$LOG"
+echo 'INKBOUND_STARTUP_STATE_EXPORT_OK page=8 level=12 saves=false analytics=false'
+"""
+    remote(config, command, 120)
+    process_status(config)
+
+
+def startup_state_launcher_test(config: dict[str, Any], game: str) -> None:
+    game_root = posix_game_root(config, game)
+    command = f"""
+set -e
+GAME='{game_root}'
+LAUNCHER="$GAME/build/windows/Start-Debug-State.cmd"
+TARGET="$GAME/build/windows/LastInkwarden.exe"
+STATE="$GAME/build/windows/startup-state.json"
+test -s "$LAUNCHER"
+test -s "$TARGET"
+test -s "$STATE"
+export INKBOUND_DEBUG_LAUNCHER_NO_PAUSE=1
+export INKBOUND_BOOT_SMOKE=1
+export INKBOUND_GA_ENABLED=0
+export INKBOUND_DEBUG_LAUNCHER_PATH=$(cygpath -w "$LAUNCHER")
+powershell.exe -NoProfile -Command '& $env:INKBOUND_DEBUG_LAUNCHER_PATH; exit $LASTEXITCODE'
+echo 'INKBOUND_STARTUP_STATE_LAUNCHER_OK config=startup-state.json'
+"""
+    remote(config, command, 120)
+    process_status(config)
 
 
 def run(config: dict[str, Any], game: str) -> None:
@@ -992,7 +1213,7 @@ echo "gracefully restarted $TARGET"
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "p1-suite", "test", "save-test", "pause-test", "quit-test", "defeat-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "boss-intro-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "gameanalytics-test", "gameanalytics-build-test", "recorded-launcher-test", "capture-session", "capture-ink-art", "capture-upgrades", "capture-boss-intro", "capture-enemy-attacks", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-credits", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
+    parser.add_argument("command", choices=("probe", "process-status", "cleanup-tests", "sync", "p1-suite", "test", "save-test", "pause-test", "quit-test", "defeat-test", "session-test", "supply-test", "art-test", "encounter-test", "hazard-test", "loadout-test", "relic-test", "cutscene-test", "manual-test", "localization-test", "cast-test", "audio-test", "combat-feel-test", "boss-intro-test", "startup-state-test", "startup-state-export-test", "startup-state-launcher-test", "accessibility-test", "restoration-test", "proof-test", "daily-test", "persona-test", "playtest-recorder-test", "gameanalytics-test", "privacy-test", "gameanalytics-build-test", "recorded-launcher-test", "capture-session", "capture-ink-art", "capture-upgrades", "capture-boss-intro", "capture-enemy-attacks", "capture-restoration", "capture-proof", "capture-daily", "capture-cutscenes", "capture-manual", "capture-credits", "capture-localization", "balance", "progression", "routes", "soak", "recorded-soak", "release-audit", "export-smoke", "export", "playtest", "playtest-report", "restart", "run"))
     parser.add_argument("--game", default=DEFAULT_GAME)
     parser.add_argument("--participant", default="anonymous", help="anonymous facilitator-assigned playtest code")
     parser.add_argument("--reuse-build", action="store_true", help="launch the existing exported build without sync/export")
@@ -1046,6 +1267,12 @@ def main() -> int:
         combat_feel_test(config, args.game)
     elif args.command == "boss-intro-test":
         boss_intro_test(config, args.game)
+    elif args.command == "startup-state-test":
+        startup_state_test(config, args.game)
+    elif args.command == "startup-state-export-test":
+        startup_state_export_test(config, args.game)
+    elif args.command == "startup-state-launcher-test":
+        startup_state_launcher_test(config, args.game)
     elif args.command == "accessibility-test":
         accessibility_test(config, args.game)
     elif args.command == "restoration-test":
@@ -1058,6 +1285,8 @@ def main() -> int:
         persona_test(config, args.game)
     elif args.command == "gameanalytics-test":
         gameanalytics_test(config, args.game)
+    elif args.command == "privacy-test":
+        privacy_test(config, args.game)
     elif args.command == "gameanalytics-build-test":
         gameanalytics_build_test()
     elif args.command == "playtest-recorder-test":

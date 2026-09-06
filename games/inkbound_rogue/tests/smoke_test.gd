@@ -129,7 +129,7 @@ func _run_smoke_test() -> void:
 	if not game.manual_open or not game.hud.manual_visible or not paused or game.hud.FIELD_MANUAL_PAGES.size() != 5:
 		_fail("Field Manual did not enter its paused five-page modal state")
 		return
-	if game.hud.manual_body_label.text.find("JOYER HUANG") < 0 or game.hud.manual_body_label.text.find("OPENAI CODEX") < 0 or game.hud.manual_body_label.text.find("COMFYUI") < 0 or game.hud.manual_body_label.text.find("STABLE DIFFUSION") < 0 or game.hud.manual_body_label.text.find("MINIMAX H3") < 0 or game.hud.manual_body_label.text.find("GPT-REALTIME-2.1") < 0 or game.hud.manual_body_label.text.find("INDEXTTS 2.5") < 0 or game.hud.manual_body_label.text.find("HAI MIAN MUSIC") < 0 or game.hud.manual_body_label.text.find("THIRD_PARTY_NOTICES.TXT") < 0:
+	if game.hud.manual_body_label.text.find("JOYER HUANG") < 0 or game.hud.manual_body_label.text.find("OPENAI CODEX") < 0 or game.hud.manual_body_label.text.find("ANDREW HUANG") < 0 or game.hud.manual_body_label.text.find("COMFYUI") < 0 or game.hud.manual_body_label.text.find("STABLE DIFFUSION") < 0 or game.hud.manual_body_label.text.find("MINIMAX H3") < 0 or game.hud.manual_body_label.text.find("GPT-REALTIME-2.1") < 0 or game.hud.manual_body_label.text.find("INDEXTTS 2.5") < 0 or game.hud.manual_body_label.text.find("HAI MIAN MUSIC") < 0 or game.hud.manual_body_label.text.find("THIRD_PARTY_NOTICES.TXT") < 0:
 		_fail("in-game credits and legal summary are missing")
 		return
 	game.hud.hide_manual()
@@ -242,8 +242,8 @@ func _run_smoke_test() -> void:
 	var version_file := FileAccess.open("res://release/version.json", FileAccess.READ)
 	var version_data = JSON.parse_string(version_file.get_as_text()) if version_file != null else null
 	var project_version := str(ProjectSettings.get_setting("application/config/version", ""))
-	if not (version_data is Dictionary) or str(version_data.get("version", "")) != project_version or int(version_data.get("save_schema", -1)) != game.SAVE_SCHEMA or int(version_data.get("checkpoint_schema", -1)) != game.CHECKPOINT_SCHEMA:
-		_fail("project, release, and save-schema version identities do not match")
+	if not (version_data is Dictionary) or str(version_data.get("version", "")) != project_version or str(version_data.get("channel", "")) != "beta" or int(version_data.get("save_schema", -1)) != game.SAVE_SCHEMA or int(version_data.get("checkpoint_schema", -1)) != game.CHECKPOINT_SCHEMA:
+		_fail("project, beta channel, release, and save-schema identities do not match")
 		return
 	var export_file := FileAccess.open("res://export_presets.cfg", FileAccess.READ)
 	var export_text := export_file.get_as_text() if export_file != null else ""
@@ -355,7 +355,7 @@ func _run_smoke_test() -> void:
 	var credit_copy := ""
 	for credit_page in game.hud.victory_credit_pages:
 		credit_copy += "%s\n%s\n" % [str(credit_page.get("title", "")), str(credit_page.get("body", ""))]
-	for required_credit in ["JOYER HUANG", "OPENAI CODEX", "GODOT ENGINE 4.2.2", "MANGA FORGE", "PYTHON 3", "FFMPEG 4.4.2", "COMFYUI", "STABLE DIFFUSION", "MINIMAX H3", "OPENAI IMAGE GENERATION", "GPT-REALTIME-2.1", "INDEXTTS 2.5", "HAI MIAN MUSIC"]:
+	for required_credit in ["JOYER HUANG", "OPENAI CODEX", "ANDREW HUANG", "GODOT ENGINE 4.5.2", "MANGA FORGE", "PYTHON 3", "FFMPEG 4.4.2", "COMFYUI", "STABLE DIFFUSION", "MINIMAX H3", "OPENAI IMAGE GENERATION", "GPT-REALTIME-2.1", "INDEXTTS 2.5", "HAI MIAN MUSIC"]:
 		if credit_copy.find(required_credit) < 0:
 			_fail("victory credits omitted production credit: %s" % required_credit)
 			return

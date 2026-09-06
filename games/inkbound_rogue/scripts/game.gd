@@ -11,6 +11,7 @@ const HudScript = preload("res://scripts/hud.gd")
 const CutsceneScript = preload("res://scripts/cutscene.gd")
 const InkArtCinematicScript = preload("res://scripts/ink_art_cinematic.gd")
 const BossIntroCinematicScript = preload("res://scripts/boss_intro_cinematic.gd")
+const StartupState = preload("res://scripts/startup_state.gd")
 const DirectiveZoneScript = preload("res://scripts/directive_zone.gd")
 const RouteHazardScript = preload("res://scripts/route_hazard.gd")
 const Content = preload("res://scripts/content_db.gd")
@@ -274,6 +275,7 @@ var settings: Dictionary = {
 	"fullscreen": false,
 	"language": Localization.LANGUAGE_AUTO,
 	"analytics_consent": false,
+	"analytics_consent_decided": false,
 }
 var custom_bindings: Dictionary = {}
 var default_binding_events: Dictionary = {}
@@ -317,6 +319,18 @@ var best_directives_completed := 0
 var directive_score_bonus := 0
 var directive_zone_position := Vector2.ZERO
 var directive_zone: InkboundDirectiveZone
+var startup_state_requested := false
+var startup_state_active := false
+var startup_state_source := ""
+var startup_state_config: Dictionary = {}
+var startup_state_errors: Array[String] = []
+var startup_state_warnings: Array[String] = []
+var startup_state_page_timer_enabled := true
+var startup_state_ambient_spawning := true
+var startup_state_boss_intro_enabled := true
+var startup_state_spawning_exact_fixture := false
+var startup_state_applied_upgrades: Array[String] = []
+var startup_state_applied_relics: Array[String] = []
 
 
 func _ready() -> void:
@@ -332,9 +346,17 @@ func _ready() -> void:
 	if not Input.joy_connection_changed.is_connected(_on_joy_connection_changed):
 		Input.joy_connection_changed.connect(_on_joy_connection_changed)
 	rng.randomize()
-	_load_save()
+	_prepare_startup_state()
+	if startup_state_active:
+		# Use an isolated namespace as a second line of defence. Debug-state runs
+		# also reject every save/checkpoint write below.
+		debug_set_save_namespace("startup_state_" + str(startup_state_config.get("profile", "debug")))
+	else:
+		_load_save()
+	_apply_startup_state_settings()
 	_apply_language_setting()
-	_load_checkpoint()
+	if not startup_state_active:
+		_load_checkpoint()
 	_apply_custom_bindings()
 	music_player = AudioStreamPlayer.new()
 	music_player.process_mode = Node.PROCESS_MODE_ALWAYS
@@ -384,6 +406,7 @@ func _ready() -> void:
 	hud.story_requested.connect(_on_story_replay_requested)
 	hud.meta_upgrade_requested.connect(_on_meta_upgrade_requested)
 	hud.setting_adjusted.connect(_on_setting_adjusted)
+	hud.analytics_consent_decided.connect(_on_analytics_consent_decided)
 	hud.binding_changed.connect(_on_binding_changed)
 	hud.bindings_reset_requested.connect(_on_bindings_reset_requested)
 	hud.manual_visibility_changed.connect(_on_manual_visibility_changed)
@@ -422,7 +445,9 @@ func _ready() -> void:
 
 	for i in range(3):
 		spawn_enemy("mask", Vector2.from_angle(TAU * float(i) / 3.0) * 130.0)
-	if test_mode:
+	if startup_state_active:
+		_launch_startup_state()
+	elif test_mode:
 		run_started = true
 	else:
 		hud.show_title(_meta_snapshot())
@@ -436,10 +461,236 @@ func _ready() -> void:
 			hud.show_device_notice("ARCHIVE REQUIRES A NEWER GAME VERSION")
 		elif save_corrupt_detected:
 			hud.show_device_notice("DAMAGED ARCHIVE PRESERVED  ·  NEW PROFILE")
+		if startup_state_requested and not startup_state_errors.is_empty():
+			hud.show_device_notice("DEBUG STATE REJECTED  ·  SEE CONSOLE")
+		if not bool(settings.get("analytics_consent_decided", false)):
+			hud.show_analytics_consent_required()
 	var recorder := _playtest_recorder()
 	if recorder != null:
 		recorder.attach_game(self)
 	_sync_pause_state()
+
+
+func _prepare_startup_state() -> void:
+	if not startup_state_config.is_empty():
+		return
+	var result := StartupState.load_requested()
+	startup_state_requested = bool(result.get("requested", false))
+	startup_state_active = bool(result.get("active", false))
+	startup_state_source = str(result.get("source", ""))
+	startup_state_config = result.get("config", {}).duplicate(true)
+	startup_state_errors.clear()
+	for message in result.get("errors", []):
+		startup_state_errors.append(str(message))
+	startup_state_warnings.clear()
+	for message in result.get("warnings", []):
+		startup_state_warnings.append(str(message))
+	for message in startup_state_errors:
+		push_error("INKBOUND_STARTUP_STATE_ERROR source=%s message=%s" % [startup_state_source, message])
+	for message in startup_state_warnings:
+		push_warning("INKBOUND_STARTUP_STATE_WARNING source=%s message=%s" % [startup_state_source, message])
+
+
+func _apply_startup_state_settings() -> void:
+	if not startup_state_active:
+		return
+	var configured: Dictionary = startup_state_config.get("settings", {})
+	for key in ["language", "ink_art_cutins", "hit_stop", "reduced_flashes"]:
+		if configured.has(key):
+			settings[key] = configured[key]
+	_sanitize_settings()
+
+
+func _launch_startup_state() -> void:
+	var run: Dictionary = startup_state_config.get("run", {})
+	field_manual_seen = true
+	onboarding_pending = false
+	hud.hide_title()
+	debug_set_rng_seed(int(startup_state_config.get("seed", 424242)))
+	_on_start_requested(
+		str(run.get("difficulty", "standard")),
+		str(run.get("contract", "open-draft")),
+		str(run.get("starting_weapon", "marginalia")),
+		int(run.get("proof_depth", 0))
+	)
+
+
+func _apply_startup_state_run() -> void:
+	var run: Dictionary = startup_state_config.get("run", {})
+	var player_state: Dictionary = startup_state_config.get("player", {})
+	startup_state_page_timer_enabled = bool(run.get("page_timer", true))
+	startup_state_ambient_spawning = bool(run.get("ambient_spawning", true))
+	startup_state_boss_intro_enabled = bool(run.get("boss_intro", true))
+	startup_state_applied_upgrades.clear()
+	startup_state_applied_relics.clear()
+
+	var configured_level := int(player_state.get("level", 1))
+	player.level = clampi(configured_level, 1, 100)
+	player.xp_needed = 5 if player.level == 1 else 4 + player.level * 3
+	player.xp = clampi(int(player_state.get("xp", 0)), 0, player.xp_needed - 1)
+	for entry in player_state.get("upgrades", []):
+		for _stack in range(int(entry.get("stacks", 1))):
+			_apply_startup_upgrade(str(entry.get("id", "")))
+	_fill_startup_random_upgrades(player_state.get("random_upgrades", {}))
+	for relic_id in player_state.get("relics", []):
+		_apply_startup_relic(str(relic_id))
+	_fill_startup_random_relics(player_state.get("random_relics", {}))
+
+	var position_data: Array = player_state.get("position", [0.0, 0.0])
+	player.global_position = clamp_to_arena(Vector2(float(position_data[0]), float(position_data[1])), 22.0)
+	var page := clampi(int(run.get("page", 1)), 1, 12)
+	wave = page
+	var page_duration := contract_wave_duration * proof_wave_duration
+	elapsed = (float(page - 1) + float(run.get("page_progress", 0.04))) * page_duration
+	kills = maxi(0, int(run.get("kills", 0)))
+	run_shards = maxi(0, int(run.get("memory", 0)))
+	if is_instance_valid(arena):
+		arena.set_chapter(_chapter_for_page(page))
+	var route_id := str(run.get("route", ""))
+	if not route_id.is_empty():
+		_activate_route(route_id)
+
+	if bool(run.get("clear_existing_enemies", true)):
+		for existing_enemy in get_tree().get_nodes_in_group("enemies"):
+			if is_instance_valid(existing_enemy) and existing_enemy.get_parent() == self:
+				existing_enemy.free()
+	_expire_page_directive()
+	encounter_started_wave = 0
+	pending_page_encounter = false
+	if bool(run.get("spawn_page_content", true)):
+		_start_page_encounter(page)
+	for enemy_state in startup_state_config.get("enemies", []):
+		_spawn_startup_enemy(enemy_state)
+	var boss_id := str(run.get("boss", "auto"))
+	if boss_id == "auto":
+		boss_id = str({4: "editor", 8: "binder", 12: "author"}.get(page, ""))
+	if boss_id != "none" and not boss_id.is_empty() and get_tree().get_nodes_in_group("bosses").is_empty():
+		var boss_position: Array = run.get("boss_position", [150.0, 0.0])
+		spawn_enemy(boss_id, clamp_to_arena(player.global_position + Vector2(float(boss_position[0]), float(boss_position[1])), 24.0))
+
+	player.health = clampf(player.max_health * float(player_state.get("health_ratio", 1.0)), 0.25, player.max_health)
+	player.guard = clampf(float(player_state.get("guard", 0.0)), 0.0, 100.0)
+	if bool(player_state.get("ink_art_ready", true)):
+		player.ink_art_cooldown = 0.0
+	player.health_changed.emit(player.health, player.max_health)
+	player.xp_changed.emit(player.xp, player.xp_needed, player.level)
+	player.build_changed.emit(player.get_build_summary())
+	player._notify_ink_art_changed(true)
+	hud.set_run_stats(wave, score, true)
+	hud.set_shards(run_shards)
+	hud.set_relics(relic_ids)
+	_refresh_run_objective()
+	var warning_count := startup_state_warnings.size()
+	var notice := "调试状态 · 第 %d 页 · 等级 %d · 存档/统计关闭" if TranslationServer.get_locale().begins_with("zh") else "DEBUG STATE · PAGE %d · LEVEL %d · SAVE/ANALYTICS OFF"
+	hud.show_device_notice(notice % [wave, player.level])
+	record_playtest_event("startup_state_applied", _startup_state_snapshot())
+	print("INKBOUND_STARTUP_STATE_OK source=%s profile=%s seed=%d page=%d level=%d upgrades=%d relics=%d enemies=%d warnings=%d saves=false analytics=false" % [
+		startup_state_source,
+		str(startup_state_config.get("profile", "debug")),
+		int(startup_state_config.get("seed", 0)),
+		wave,
+		player.level,
+		startup_state_applied_upgrades.size(),
+		startup_state_applied_relics.size(),
+		get_tree().get_nodes_in_group("enemies").size(),
+		warning_count,
+	])
+	_sync_pause_state()
+
+
+func _apply_startup_upgrade(upgrade_id: String) -> bool:
+	if Content.upgrade(upgrade_id).is_empty():
+		return false
+	player.apply_upgrade(upgrade_id)
+	startup_state_applied_upgrades.append(upgrade_id)
+	_record_upgrade(upgrade_id)
+	return true
+
+
+func _fill_startup_random_upgrades(configuration: Dictionary) -> void:
+	var requested := maxi(0, int(configuration.get("count", 0)))
+	var maximum_per_upgrade := clampi(int(configuration.get("max_stacks_per_upgrade", 2)), 1, 6)
+	var allowed_tags: Array = configuration.get("tags", [])
+	var excluded: Array = configuration.get("exclude", [])
+	var allow_weapon_forms := bool(configuration.get("allow_weapon_forms", false))
+	var all_weapon_forms: Array[String] = ["greatbrush", "needlepoint", "seal-caster", "twin-stroke"]
+	var granted := 0
+	while granted < requested:
+		var candidates: Array[Dictionary] = []
+		for definition in Content.available_upgrades(player.upgrade_stacks, player.level, all_weapon_forms):
+			var upgrade_id := str(definition.get("id", ""))
+			if upgrade_id in excluded or int(player.upgrade_stacks.get(upgrade_id, 0)) >= maximum_per_upgrade:
+				continue
+			if not allow_weapon_forms and "weapon" in definition.get("tags", []):
+				continue
+			if not allowed_tags.is_empty() and not _startup_upgrade_matches_any_tag(definition, allowed_tags):
+				continue
+			candidates.append(definition)
+		if candidates.is_empty():
+			startup_state_warnings.append("random upgrade pool exhausted after %d/%d stacks" % [granted, requested])
+			break
+		var selected: Dictionary = candidates[rng.randi_range(0, candidates.size() - 1)]
+		if _apply_startup_upgrade(str(selected.get("id", ""))):
+			granted += 1
+
+
+func _startup_upgrade_matches_any_tag(definition: Dictionary, allowed_tags: Array) -> bool:
+	for tag in allowed_tags:
+		if tag in definition.get("tags", []):
+			return true
+	return false
+
+
+func _apply_startup_relic(relic_id: String) -> bool:
+	if Content.relic(relic_id).is_empty() or relic_id in relic_ids:
+		return false
+	relic_ids.append(relic_id)
+	discovered_relics.append(relic_id)
+	player.apply_relic(relic_id)
+	startup_state_applied_relics.append(relic_id)
+	return true
+
+
+func _fill_startup_random_relics(configuration: Dictionary) -> void:
+	var requested := maxi(0, int(configuration.get("count", 0)))
+	var excluded: Array = configuration.get("exclude", [])
+	for _index in range(requested):
+		var candidates: Array[String] = []
+		for definition in Content.RELICS:
+			var relic_id := str(definition.get("id", ""))
+			if relic_id not in relic_ids and relic_id not in excluded:
+				candidates.append(relic_id)
+		if candidates.is_empty():
+			startup_state_warnings.append("random relic pool exhausted")
+			break
+		_apply_startup_relic(candidates[rng.randi_range(0, candidates.size() - 1)])
+
+
+func _spawn_startup_enemy(enemy_state: Dictionary) -> void:
+	var position_data: Array = enemy_state.get("position", [100.0, 0.0])
+	var position := Vector2(float(position_data[0]), float(position_data[1]))
+	if bool(enemy_state.get("relative_to_player", true)):
+		position += player.global_position
+	startup_state_spawning_exact_fixture = true
+	var enemy := spawn_enemy(str(enemy_state.get("kind", "mask")), clamp_to_arena(position, 24.0))
+	startup_state_spawning_exact_fixture = false
+	if bool(enemy_state.get("elite", false)) and not enemy.is_elite and enemy.enemy_kind not in BOSS_KINDS:
+		enemy.promote_to_elite()
+	enemy.health = maxf(0.1, enemy.max_health * float(enemy_state.get("health_ratio", 1.0)))
+
+
+func _startup_state_snapshot() -> Dictionary:
+	return {
+		"profile": str(startup_state_config.get("profile", "debug")),
+		"seed": int(startup_state_config.get("seed", 0)),
+		"page": wave,
+		"level": player.level if is_instance_valid(player) else 0,
+		"upgrade_stacks": startup_state_applied_upgrades.size(),
+		"relics": startup_state_applied_relics.size(),
+		"source": startup_state_source,
+		"save_writes": false,
+		"analytics": false,
+	}
 
 
 func _playtest_recorder() -> Node:
@@ -450,10 +701,15 @@ func _gameanalytics_client() -> Node:
 	return get_node_or_null("/root/GameAnalyticsClient")
 
 
-func _configure_gameanalytics() -> void:
+func _configure_gameanalytics() -> String:
 	var analytics := _gameanalytics_client()
 	if analytics != null:
-		analytics.configure_from_environment(bool(settings.get("analytics_consent", false)), test_mode)
+		analytics.configure_from_environment(bool(settings.get("analytics_consent", false)), test_mode or startup_state_active)
+		var snapshot: Dictionary = analytics.debug_snapshot()
+		var collection_status := str(snapshot.get("status", "disabled"))
+		hud.set_analytics_privacy_identity(str(snapshot.get("user_id", "")), collection_status)
+		return collection_status
+	return "unavailable"
 
 
 func uses_deterministic_simulation() -> bool:
@@ -599,7 +855,8 @@ func _finish_quit() -> void:
 func _process(delta: float) -> void:
 	if not run_started or game_over or choosing_upgrade or choosing_relic or choosing_event or manually_paused or manual_open or run_won:
 		return
-	elapsed += delta
+	var page_delta := delta if not startup_state_active or startup_state_page_timer_enabled else 0.0
+	elapsed += page_delta
 	var new_wave := 1 + int(elapsed / (contract_wave_duration * proof_wave_duration))
 	if new_wave > wave:
 		_expire_page_directive()
@@ -631,8 +888,9 @@ func _process(delta: float) -> void:
 		if not choosing_event and not (is_instance_valid(cutscene) and cutscene.active):
 			_save_checkpoint("page-%d" % wave)
 
-	spawn_timer -= delta
-	if spawn_timer <= 0.0:
+	if not startup_state_active or startup_state_ambient_spawning:
+		spawn_timer -= delta
+	if (not startup_state_active or startup_state_ambient_spawning) and spawn_timer <= 0.0:
 		spawn_timer = maxf(0.18, (1.35 - elapsed * 0.008) * contract_spawn_interval * route_spawn_interval * proof_spawn_interval)
 		var cap := mini(72, int(round(float(10 + wave * 4) * contract_enemy_cap * route_enemy_cap * proof_enemy_cap)))
 		if get_tree().get_nodes_in_group("enemies").size() < cap:
@@ -915,7 +1173,7 @@ func spawn_enemy(kind: String = "mask", at: Vector2 = Vector2.INF) -> InkboundEn
 	var enemy: InkboundEnemy = EnemyScript.new().configure(kind, player, wave)
 	enemy_spawn_serial += 1
 	enemy.simulation_order = enemy_spawn_serial
-	if not restoring_checkpoint and kind not in BOSS_KINDS and not enemy.is_elite and rng.randf() < contract_elite_bonus + route_elite_bonus + proof_elite_bonus:
+	if not restoring_checkpoint and not startup_state_spawning_exact_fixture and kind not in BOSS_KINDS and not enemy.is_elite and rng.randf() < contract_elite_bonus + route_elite_bonus + proof_elite_bonus:
 		enemy.promote_to_elite()
 	enemy.max_health *= difficulty_health * contract_enemy_health * route_enemy_health * proof_enemy_health * (proof_boss_health if kind in BOSS_KINDS else 1.0)
 	enemy.health = enemy.max_health
@@ -930,7 +1188,7 @@ func spawn_enemy(kind: String = "mask", at: Vector2 = Vector2.INF) -> InkboundEn
 		play_sound("boss_warning")
 		play_music("battle")
 		record_playtest_event("boss_started", {"boss": kind, "page": wave, "health": enemy.max_health})
-		if not restoring_checkpoint and run_started and not test_mode:
+		if not restoring_checkpoint and run_started and not test_mode and (not startup_state_active or startup_state_boss_intro_enabled):
 			_start_boss_intro_cinematic(kind)
 	enemy.died.connect(_on_enemy_died)
 	return enemy
@@ -2075,16 +2333,16 @@ func _on_start_requested(selected_difficulty: String, selected_contract: String 
 	heal_drops_spawned = 0
 	combat_drops_spawned = 0
 	var unlocked_difficulties := _unlocked_content_ids("difficulty")
-	difficulty_id = "standard" if daily_run else (selected_difficulty if selected_difficulty in unlocked_difficulties else "standard")
+	difficulty_id = "standard" if daily_run else (selected_difficulty if startup_state_active or selected_difficulty in unlocked_difficulties else "standard")
 	var unlocked_contracts := _unlocked_content_ids("contract")
-	_configure_contract(selected_contract if daily_run or selected_contract in unlocked_contracts else "open-draft")
+	_configure_contract(selected_contract if startup_state_active or daily_run or selected_contract in unlocked_contracts else "open-draft")
 	run_start_unlock_ids = _unlocked_content_ids()
 	_configure_difficulty(difficulty_id)
-	_configure_proof(0 if daily_run else selected_proof_depth)
+	_configure_proof(0 if daily_run else selected_proof_depth, startup_state_active)
 	preferred_proof_depth = proof_depth
 	var unlocked_weapons := _unlocked_content_ids("weapon")
 	starting_weapon_id = "marginalia" if daily_run else (selected_weapon if not Content.starting_weapon(selected_weapon).is_empty() else "marginalia")
-	if starting_weapon_id != "marginalia" and starting_weapon_id not in unlocked_weapons:
+	if not startup_state_active and starting_weapon_id != "marginalia" and starting_weapon_id not in unlocked_weapons:
 		starting_weapon_id = "marginalia"
 	if daily_run:
 		_seal_meta_progression_for_daily()
@@ -2118,6 +2376,9 @@ func _on_start_requested(selected_difficulty: String, selected_contract: String 
 		"seed": run_seed,
 	})
 	_refresh_run_objective()
+	if startup_state_active:
+		_apply_startup_state_run()
+		return
 	if test_mode:
 		_start_page_encounter(1)
 		hud.show_run_intro()
@@ -2239,9 +2500,11 @@ func _refresh_run_objective() -> void:
 	var primary_name := Localization.text(route_data.get("short", route_data.get("name", Content.contract(contract_id).get("name", "OPEN DRAFT"))))
 	var hazard_name := Localization.text(route_data.get("hazard_name", "LIVING MARGIN"))
 	if TranslationServer.get_locale().begins_with("zh"):
-		hud.set_objective("每日 %s · %s · %s" % [daily_id, hazard_name, goal] if daily_run else "%s · %s · 校样 %d · %s" % [primary_name, hazard_name, proof_depth, goal])
+		var objective := "每日 %s · %s · %s" % [daily_id, hazard_name, goal] if daily_run else "%s · %s · 校样 %d · %s" % [primary_name, hazard_name, proof_depth, goal]
+		hud.set_objective("[调试] " + objective if startup_state_active else objective)
 	else:
-		hud.set_objective("DAILY %s · %s · %s" % [daily_id, hazard_name, goal] if daily_run else "%s · %s · PROOF %d · %s" % [primary_name, hazard_name, proof_depth, goal])
+		var objective := "DAILY %s · %s · %s" % [daily_id, hazard_name, goal] if daily_run else "%s · %s · PROOF %d · %s" % [primary_name, hazard_name, proof_depth, goal]
+		hud.set_objective("[DEBUG] " + objective if startup_state_active else objective)
 
 
 func _configure_proof(selected_depth: int, allow_locked: bool = false) -> void:
@@ -2516,12 +2779,15 @@ func _on_setting_adjusted(setting_id: String, direction: int) -> void:
 			if current_language < 0:
 				current_language = 0
 			settings[setting_id] = Localization.LANGUAGE_CHOICES[posmod(current_language + signi(direction), Localization.LANGUAGE_CHOICES.size())]
-	_apply_settings()
 	if setting_id == "analytics_consent":
-		_configure_gameanalytics()
+		settings["analytics_consent_decided"] = true
+	_apply_settings()
+	var analytics_status := "disabled"
+	if setting_id == "analytics_consent":
+		analytics_status = _configure_gameanalytics()
 		hud.show_device_notice(Localization.text(
-			"ANONYMOUS ANALYTICS ENABLED · GAMEPLAY EVENTS ONLY" if bool(settings[setting_id])
-			else "ANONYMOUS ANALYTICS DISABLED · LOCAL QUEUE ERASED"
+			("OPTIONAL USAGE STATISTICS ENABLED · LIMITED GAMEPLAY EVENTS" if analytics_status in ["initializing", "ready", "retrying"] else "OPTIONAL USAGE STATISTICS UNAVAILABLE IN THIS BUILD") if bool(settings[setting_id])
+			else "OPTIONAL USAGE STATISTICS DISABLED · LOCAL QUEUE ERASED"
 		))
 	hud.set_settings(settings)
 	record_playtest_event("setting_changed", {"setting": setting_id, "value": settings.get(setting_id), "direction": signi(direction)})
@@ -2529,6 +2795,20 @@ func _on_setting_adjusted(setting_id: String, direction: int) -> void:
 	hud.refresh_localization()
 	if is_instance_valid(cutscene):
 		cutscene.refresh_localization()
+	if not test_mode:
+		_save_run()
+
+
+func _on_analytics_consent_decided(allowed: bool) -> void:
+	settings["analytics_consent"] = allowed
+	settings["analytics_consent_decided"] = true
+	_apply_settings()
+	var analytics_status := _configure_gameanalytics()
+	hud.set_settings(settings)
+	hud.show_device_notice(Localization.text(
+		("OPTIONAL USAGE STATISTICS ENABLED · LIMITED GAMEPLAY EVENTS" if analytics_status in ["initializing", "ready", "retrying"] else "OPTIONAL USAGE STATISTICS UNAVAILABLE IN THIS BUILD") if allowed
+		else "OPTIONAL USAGE STATISTICS DISABLED · LOCAL QUEUE ERASED"
+	))
 	if not test_mode:
 		_save_run()
 
@@ -2557,7 +2837,10 @@ func _sanitize_settings() -> void:
 	settings["ink_art_cutins"] = bool(settings.get("ink_art_cutins", true))
 	settings["reduced_flashes"] = bool(settings.get("reduced_flashes", false))
 	settings["fullscreen"] = bool(settings.get("fullscreen", false))
+	settings["analytics_consent_decided"] = bool(settings.get("analytics_consent_decided", false))
 	settings["analytics_consent"] = bool(settings.get("analytics_consent", false))
+	if not bool(settings["analytics_consent_decided"]):
+		settings["analytics_consent"] = false
 	var assist := float(settings.get("aim_assist", 0.45))
 	settings["aim_assist"] = 0.0 if assist < 0.125 else (0.25 if assist < 0.35 else 0.45)
 	var language := str(settings.get("language", Localization.LANGUAGE_AUTO))
@@ -3011,6 +3294,7 @@ func _finalize_run() -> void:
 		"daily_streak": daily_current_streak,
 		"starting_weapon": starting_weapon_id,
 		"weapon_form": player.weapon_form,
+		"death_source": "none" if run_won else player.last_damage_source_id,
 		"relic_ids": relic_ids.duplicate(),
 		"relic_count": relic_ids.size(),
 		"route_ids": chosen_routes.duplicate(),
@@ -3458,7 +3742,7 @@ func _load_checkpoint() -> void:
 
 
 func _save_checkpoint(reason: String = "auto") -> bool:
-	if not run_started or game_over or run_won or choosing_upgrade or choosing_relic or choosing_event or not pending_relic_sources.is_empty() or replaying_story:
+	if startup_state_active or not run_started or game_over or run_won or choosing_upgrade or choosing_relic or choosing_event or not pending_relic_sources.is_empty() or replaying_story:
 		return false
 	var payload := _checkpoint_payload(reason)
 	var temp := FileAccess.open(temp_checkpoint_path, FileAccess.WRITE)
@@ -3950,6 +4234,11 @@ func _apply_save_payload(parsed: Dictionary) -> void:
 	for setting_id in settings:
 		if saved_settings.has(setting_id):
 			settings[setting_id] = saved_settings[setting_id]
+	# Older alpha saves only persisted the Boolean toggle. Preserve an explicit
+	# prior opt-in, while asking previously-default-off players once under the
+	# clearer public-Beta disclosure.
+	if not saved_settings.has("analytics_consent_decided"):
+		settings["analytics_consent_decided"] = bool(saved_settings.get("analytics_consent", false))
 	_sanitize_settings()
 
 
@@ -3994,7 +4283,7 @@ func _save_payload(generation: int) -> Dictionary:
 
 
 func _save_run() -> bool:
-	if save_incompatible:
+	if startup_state_active or save_incompatible:
 		return false
 	var next_generation := save_generation + 1
 	var payload := _save_payload(next_generation)
@@ -4074,6 +4363,21 @@ func debug_set_save_namespace(profile_name: String) -> void:
 	corrupt_checkpoint_path = checkpoint_prefix + ".corrupt.json"
 	corrupt_backup_checkpoint_path = checkpoint_prefix + ".backup.corrupt.json"
 	temp_checkpoint_path = checkpoint_prefix + ".tmp.json"
+
+
+func debug_set_startup_state_document(document: Dictionary, source: String = "<test>") -> Dictionary:
+	var result := StartupState.parse_document(document, source)
+	startup_state_requested = true
+	startup_state_active = bool(result.get("active", false))
+	startup_state_source = str(result.get("source", source))
+	startup_state_config = result.get("config", {}).duplicate(true)
+	startup_state_errors.clear()
+	for message in result.get("errors", []):
+		startup_state_errors.append(str(message))
+	startup_state_warnings.clear()
+	for message in result.get("warnings", []):
+		startup_state_warnings.append(str(message))
+	return result
 
 
 func debug_clear_save_files() -> void:

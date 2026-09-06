@@ -8,6 +8,14 @@ dist/
 *.log
 host_config.json
 *.local.json
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.key
+*.tk
 
 # Local audition/cinematic review media. Keep the small Markdown production
 # records in Git; approved runtime derivatives live under assets/.

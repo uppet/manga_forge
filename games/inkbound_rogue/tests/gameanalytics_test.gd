@@ -11,10 +11,13 @@ func _initialize() -> void:
 	analytics = AnalyticsScript.new()
 	root.add_child(analytics)
 	var build_info: Dictionary = analytics.build_credential_info()
-	if bool(build_info.get("embedded", true)) or str(build_info.get("config_fingerprint", "")) != "none":
+	if bool(build_info.get("embedded", true)) or str(build_info.get("credential_profile", "")) != "none" or str(build_info.get("config_fingerprint", "")) != "none":
 		return _fail("Git-safe source placeholder unexpectedly contains embedded credentials")
+	var dictionary: Dictionary = analytics.event_dictionary()
+	if dictionary.size() != 12 or dictionary.has("attack") or dictionary.has("player_damaged") or not dictionary.has("run_finalized"):
+		return _fail("public-Beta remote event dictionary is not the fixed low-frequency contract")
 	storage_root = "res://build/gameanalytics-test/%d" % Time.get_ticks_msec()
-	analytics.debug_configure(storage_root, 12)
+	analytics.debug_configure(storage_root, 24)
 	var initial: Dictionary = analytics.debug_snapshot()
 	if not bool(initial.get("active", false)) or not bool(initial.get("consented", false)) or not bool(initial.get("dry_run", false)):
 		return _fail("dry-run analytics client did not become active")
@@ -49,38 +52,47 @@ func _initialize() -> void:
 	if _count_event_id(analytics.debug_snapshot().get("queue", []), "Start:Run:standard:open-draft") != 1:
 		return _fail("continuing the current draft duplicated its progression start")
 	analytics.record_game_event("page_started", {"page": 3, "health": 5.5, "position": Vector2(77, 91)})
-	analytics.record_game_event("upgrade_selected", {"upgrade": "arc-sweep", "level": 4})
-	analytics.record_game_event("relic_selected", {"relic": "red-thread", "page": 4})
-	analytics.record_game_event("story_choice", {"sequence": "act1_arrival", "choice": "keep", "replay": false})
+	analytics.record_game_event("upgrade_selected", {"upgrade": "wide-panel", "level": 4})
+	analytics.record_game_event("relic_selected", {"relic": "broken-mask", "page": 4})
+	analytics.record_game_event("story_choice", {"sequence": "ending_choice", "choice": "keep", "replay": false})
+	analytics.record_game_event("route_selected", {"route": "not-a-real-route-987654321", "chapter": 99})
 	analytics.record_game_event("run_finalized", {
 		"won": true,
 		"ending": "keep",
 		"score": 4200,
 		"memory_earned": 14,
 		"duration_seconds": 390,
+		"wave": 12,
+		"level": 9,
+		"kills": 88,
+		"weapon_form": "greatbrush",
 	})
 	var mapped_queue: Array = analytics.debug_snapshot().get("queue", [])
 	for expected in [
 		"Start:Run:standard:open-draft",
 		"run:page:3",
-		"choice:upgrade:arc-sweep",
-		"choice:relic:red-thread",
-		"story:choice:act1_arrival:keep",
+		"choice:upgrade:wide-panel",
+		"choice:relic:broken-mask",
+		"story:choice:ending_choice:keep",
+		"choice:route:other",
 		"Complete:Run:standard:open-draft",
 		"Source:Memory:run:completion",
+		"run:result:complete",
+		"run:page_reached:12",
+		"run:final_weapon:greatbrush",
 		"run:ending:keep",
 	]:
 		if not _contains_event_id(mapped_queue, expected):
 			return _fail("semantic event mapping is missing " + expected)
 	var serialized := JSON.stringify(mapped_queue)
-	for forbidden in ["987654321", "controller-axis", "position", "raw_input", "participant", "account", "email"]:
+	for forbidden in ["987654321", "not-a-real-route", "controller-axis", "position", "raw_input", "participant", "account", "email"]:
 		if serialized.find(forbidden) >= 0:
 			return _fail("privacy-sensitive or high-cardinality field leaked: " + forbidden)
 
 	for page in range(1, 30):
 		analytics.record_game_event("page_started", {"page": page, "health": 4.0})
 	var trimmed_queue: Array = analytics.debug_snapshot().get("queue", [])
-	if trimmed_queue.size() != 12:
+	if trimmed_queue.size() != 24:
 		return _fail("offline queue did not enforce its configured cap")
 	if not _contains_category(trimmed_queue, "user"):
 		return _fail("queue trimming removed the current session-start event")

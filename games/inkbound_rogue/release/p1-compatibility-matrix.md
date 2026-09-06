@@ -1,27 +1,29 @@
-# P1 Windows compatibility matrix
+# Free Beta Windows compatibility matrix
 
-The P1 target is a private, small-scale Windows playtest, not a claim of final
-minimum specifications. Automated evidence and manual hardware evidence remain
-separate so a pass on the development PC cannot masquerade as low-end coverage.
+The current target is a free public Windows Beta, not a claim of final minimum
+specifications or Steam release readiness. `P1` remains the internal name of
+the automated gate and evidence directories. Automated evidence and manual
+hardware evidence remain separate so a pass on the development PC cannot
+masquerade as low-end coverage.
 
 ## Fixed technical baseline
 
-- Windows x86_64 export, Godot 4.2, GL Compatibility renderer (OpenGL 3.3).
+- Windows x86_64 export, Godot 4.5.2, GL Compatibility renderer (OpenGL 3.3).
 - 480×270 logical canvas, nearest-neighbour pixel textures, default 960×540
   window, runtime windowed/fullscreen switch.
 - 60 Hz physics; no network, online account, Steam client, microphone, camera,
   or live AI dependency.
-- Provisional P1 floor: Windows 10/11 64-bit, OpenGL 3.3-capable GPU, 4 GB RAM,
+- Provisional free-Beta floor: Windows 10/11 64-bit, OpenGL 3.3-capable GPU, 4 GB RAM,
   200 MB free storage, keyboard/mouse or compatible XInput/SDL gamepad.
 
-## Automated on every P1 candidate
+## Automated on every free-Beta candidate
 
 | Gate | Pass condition |
 | --- | --- |
 | Source/release audit | 113/113 runtime assets hashed; 49 pre-generated AI, 64 procedural, zero live AI; inert Steam IDs |
 | Stress soak | 1,200 accelerated frames, final act reached, ≤1,000 nodes, ≤256 MiB static memory, ≥90 processing fps |
 | Recorded stress soak | Same budget with the opt-in local recorder writing event/performance streams |
-| Serial regression | 30 gameplay/save/UI/balance/persona/recorder/stress gates in one non-overlapping delegate session, including boss-introduction coverage, with timestamped per-gate evidence |
+| Serial regression | 31 gameplay/save/UI/balance/persona/recorder/stress gates in one non-overlapping delegate session, including boss-introduction and external startup-state coverage, with timestamped per-gate evidence |
 | Export boot | Exact embedded-PCK `LastInkwarden.exe` opens with the Windows GL renderer for 120 frames and exits cleanly |
 | Depot isolation | Exactly EXE, notices, and version JSON; no logs, captures, save data, source, tests, or credentials |
 | UI renderer | English/Chinese title, settings, upgrades, story, credits, and combat HUD render through Windows GL Compatibility |
@@ -39,7 +41,8 @@ locale, result, and session ID. A blank row is **not tested**, not a pass.
 | Nintendo layout | Switch Pro-compatible SDL controller | — | Not tested |
 | Keyboard-only | No controller attached, English and Chinese | — | Not tested |
 
-The private P1 invite should state the provisional requirements and ask testers
-to attach the anonymous session ID plus hardware summary to any performance or
-controller report. Final store minimum specifications require at least one real
-pass on the provisional-minimum row; renderer selection alone is not evidence.
+The itch.io page and Quark download notice must state the provisional
+requirements and ask testers to attach the anonymous session ID plus hardware
+summary to any performance or controller report. Final store minimum
+specifications require at least one real pass on the provisional-minimum row;
+renderer selection alone is not evidence.

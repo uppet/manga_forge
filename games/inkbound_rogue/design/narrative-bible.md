@@ -16,9 +16,11 @@ That discarded obsession became the final antagonist.
 
 ## Principal cast
 
-- **Nara:** Practical, angry, and deeply afraid that recovering the truth will make
-  her resemble the people she fights. Her arc is accepting that an imperfect
-  memory still belongs to the person who lived it.
+- **Nara:** An adult young woman and the last Ink Warden. She is practical,
+  angry, and deeply afraid that recovering the truth will make her resemble
+  the people she fights. Her arc is accepting that an imperfect memory still
+  belongs to the person who lived it. Every future visual and voice brief must
+  preserve her female identity without sexualizing or weakening her.
 - **Iori:** An apprentice archivist able to hear the people inside redacted pages.
   Her discovery of the Archive's original draft caused the Editors to erase her.
 - **Morrow / Marginalia:** The remorseful half of the First Author, living as

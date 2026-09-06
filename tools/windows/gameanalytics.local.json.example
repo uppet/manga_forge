@@ -1,5 +1,7 @@
 {
   "inkbound_rogue": {
+    "profile": "public_beta",
+    "project": "Last Inkwarden - Public Beta",
     "game_key": "PASTE_32_CHARACTER_GAME_KEY",
     "secret_key": "PASTE_40_CHARACTER_SECRET_KEY",
     "environment": "production"

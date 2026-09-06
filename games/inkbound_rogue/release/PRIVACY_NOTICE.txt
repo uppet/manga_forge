@@ -1,0 +1,101 @@
+Last Inkwarden / 墨卫残章 — Public Beta Privacy Notice
+Version 1.0 · 2026-09-05
+
+中文
+====
+
+数据控制者
+----------
+本免费 Public Beta 由 Joyer Huang / Last Inkwarden 项目维护。隐私、撤回或删除请求，
+请通过本游戏官方 itch.io 下载页面列出的反馈/联系渠道提交。夸克网盘仅作为同一构建的
+镜像，不作为独立的数据收集方。
+
+可选 GameAnalytics 使用统计
+----------------------------
+首次启动时，游戏会在发送任何远程统计前询问玩家。拒绝不会影响游戏功能；同意后也可
+随时在“选项 → 可选使用统计”中关闭。
+
+同意后可能发送：随机生成并持久保存的安装标识、会话标识与会话序号；游戏版本、引擎
+版本、操作系统与设备类型；语言和输入方式；开局/续局、到达页章、构筑选择、路线、
+剧情选择、结算结果、得分、击杀、时长和概括后的死亡来源。GameAnalytics 的网络服务
+可能处理请求 IP，以推断大致国家或地区。
+
+不会发送：姓名、邮箱、Steam ID、试玩玩家代号、存档内容、自由文本、调查备注、截图、
+麦克风或摄像头内容、随机种子、精确世界坐标、逐帧输入、每次攻击、每颗子弹、每次受伤、
+每次击杀或每个掉落物。
+
+处理目的仅限于分析 Public Beta 的稳定性、关卡难度、操作体验、构筑选择和完成率。
+GameAnalytics 作为统计处理服务提供方处理这些数据。数据可能在玩家所在地区之外处理；
+跨境处理仅在玩家明确同意后开始。Beta 原始统计最多保留至公开测试结束后 12 个月，
+之后删除对应项目数据或仅保留无法关联到随机玩家标识的汇总结果，但法律要求另有规定的
+情况除外。
+
+关闭统计会立即停止新事件提交，取消在途请求，并删除本机 user://gameanalytics 下的待发
+队列和随机统计标识。已经送达 GameAnalytics 的历史事件无法仅靠本机开关撤回；如需提出
+访问或删除请求，请在关闭前记下游戏内“数据与隐私”页面显示的“统计请求 ID”，并通过
+官方 itch.io 页面所列联系渠道提供游戏版本和该 ID。
+请不要发送真实姓名或其他无关身份信息。
+
+本地试玩记录器
+--------------
+Start-Recorded-Playtest.cmd 启动的是另一套本地记录工具。记录只保存在玩家电脑的
+playtest-logs 文件夹，不会自动上传。只有玩家主动打包并提交时，项目维护者才会收到。
+删除该会话文件夹即可删除本地记录。启用或关闭本地记录器不会改变 GameAnalytics 选择。
+
+本游戏并非面向儿童设计。若未达到所在地区数字同意年龄，请不要开启远程使用统计。
+
+
+English
+-------
+
+Controller and contact
+----------------------
+This free Public Beta is maintained by Joyer Huang / the Last Inkwarden project.
+For privacy, withdrawal, access, or deletion requests, use the feedback/contact
+route listed on the game's official itch.io download page. The Quark Drive copy
+is only a mirror of the same build and is not a separate analytics collector.
+
+Optional GameAnalytics usage statistics
+---------------------------------------
+On first launch, the game asks before sending any remote statistics. Refusing
+does not affect gameplay. Consent can later be withdrawn under Options →
+Optional Usage Statistics.
+
+With consent, the game may send: a persistent randomly generated installation
+ID, session ID and session number; game and engine build, operating system and
+device type; language and input mode; run start/continue, page progression,
+build, route and story choices, run result, score, kills, duration, and a
+coarsened death-source category. GameAnalytics network services may process the
+request IP to infer an approximate country or region.
+
+The game does not send names, email, Steam IDs, playtest participant codes, save
+contents, free text, survey notes, screenshots, microphone or camera content,
+random seeds, precise world coordinates, frame-by-frame input, individual
+attacks, bullets, damage events, kills, or pickups.
+
+Processing is limited to evaluating Public Beta stability, difficulty, control
+experience, build choices, and completion. GameAnalytics acts as the analytics
+processor. Processing may occur outside the player's region and starts only
+after affirmative consent. Raw Beta analytics will be retained for no more than
+12 months after the public test ends, then the corresponding project data will
+be deleted or retained only as aggregate results that cannot be linked to a
+random player ID, unless law requires otherwise.
+
+Disabling statistics immediately stops new submission, cancels an in-flight
+request, and deletes the pending queue and random analytics ID under
+user://gameanalytics. Events already received by GameAnalytics cannot be
+withdrawn only by changing the local switch. For access or deletion requests,
+note the “Statistics request ID” shown on the in-game Data & Privacy page before
+disabling, then use the official itch.io contact route and provide only that ID
+and the game build.
+
+Local playtest recorder
+-----------------------
+Start-Recorded-Playtest.cmd is a separate local recorder. Its playtest-logs stay
+on the player's computer and are never uploaded automatically. The maintainer
+receives them only if the player deliberately archives and submits a session.
+Deleting that session folder deletes the local record. This recorder and the
+GameAnalytics choice do not enable one another.
+
+The game is not directed at children. Players below the age of digital consent
+in their region should not enable remote usage statistics.

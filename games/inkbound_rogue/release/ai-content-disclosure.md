@@ -1,7 +1,14 @@
 # Pre-generated AI content worksheet
 
-Status date: 2026-09-04. This is a production inventory, not legal advice or a
+Status date: 2026-09-05. This is a production inventory, not legal advice or a
 substitute for publisher review.
+
+A zero-price public Beta is still public distribution. Before uploading the
+itch.io/Quark candidate, the owner must confirm the applicable generation-time
+account and tool terms, review the shipped assets for third-party IP or real
+person likeness concerns, and either approve or replace assets with unresolved
+rights records. Keeping this worksheet visible does not itself complete that
+review.
 
 Steamworks' current Content Survey treats player-consumed content made with AI
 help during development as **Pre-Generated** AI content, while content generated
@@ -11,7 +18,7 @@ during play is **Live-Generated** and requires additional guardrail disclosure:
 ## Product declaration draft
 
 **Pre-Generated AI: Yes.** OpenAI image generation was used under project
-direction to create one 16-character manga-pixel combat atlas, a derivative
+direction to create one storefront cover image, one 16-character manga-pixel combat atlas, a derivative
 four-frame protagonist slash atlas, seven unlettered manga cutscene
 backgrounds, ten weapon-specific Ink Art cut-in/startup images, two choice-icon
 atlases, and three identity-referenced boss-introduction portraits. OpenAI
@@ -40,6 +47,7 @@ not an AI service.
 
 | Class | Count | Prompt/provenance record | Commercial gate |
 | --- | ---: | --- | --- |
+| Store cover-art candidates | 2 generated / 1 retained | `release/cover-art-v2.provenance.md` records the rejected v1 hash/reason and the current v2 prompt, reference roles, hash, and review status; the incorrect v1 bitmap is not retained | Publish v2 only after project-owner approval and publisher rights/IP review |
 | Combat cast atlas | 1 | `assets/characters/combat-cast-atlas-v1.provenance.md`; exact original prompt not retained | Publisher rights/IP review or replacement |
 | Nara slash atlas | 1 | `assets/characters/nara-slash-atlas-v1.prompt.md`; full generation/edit trail retained | Publisher rights/IP review |
 | Narrative backgrounds | 7 | `assets/cutscenes/README.md`; shared constraints retained, exact per-image prompts not retained | Publisher rights/IP review or replacement |
@@ -56,7 +64,7 @@ covers every player-consumed PNG/WAV/OGG, records SHA-256, creation method,
 whether AI was involved, whether generation is live, provenance location,
 prompt-record status, human review, and rights-review status.
 
-## Required sign-off before a public Steam review
+## Required sign-off before a public Beta or Steam review
 
 - Confirm distribution rights against the originating OpenAI account and terms
   that applied when each image was created.

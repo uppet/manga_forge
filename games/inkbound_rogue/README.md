@@ -8,6 +8,12 @@ and two persistent endings. Completed runs continue as harder drafts.
 The public naming, localized-title usage, and legacy save/interface policy are
 defined in `design/branding.md`.
 
+Current status: **free public Windows Beta candidate**. The same audited build
+is intended for public distribution through itch.io and a Quark Drive mirror
+to collect gameplay, controller, compatibility, balance, and presentation
+feedback. This Beta status is not a claim of Steam release readiness. Draft
+download links and player-facing copy live in `release/itch-description.md`.
+
 ## Playable content
 
 - A project-bound 4×4 transparent combat-cast atlas replaces placeholder boxes
@@ -108,7 +114,8 @@ defined in `design/branding.md`.
   in-game credits and legal attribution. The ending carousel separately credits
   Joyer Huang, OpenAI Codex, Godot, Manga Forge, Python, FFmpeg, ComfyUI,
   Stable Diffusion, MiniMax H3, OpenAI image generation, OpenAI Realtime,
-  IndexTTS, Hai Mian Music, open-source contributors, and playtesters. Its
+  IndexTTS, Hai Mian Music, open-source contributors, and named playtester
+  Andrew Huang. Its
   completion state persists without
   invalidating older profiles. The authoritative shipped-resource credit list
   is `design/credits.md`.
@@ -210,6 +217,18 @@ pause in place until the player explicitly presses pause again. This prevents a
 controller shared with another Windows application from moving or confirming in
 the background.
 
+## Reproduction startup states
+
+Windows development exports include `Start-Debug-State.cmd` and an editable
+`startup-state.json`. The JSON can jump directly to Page 1–12, set level, XP,
+health, weapon, difficulty, contract, Proof, route, fixed/random techniques,
+fixed/random relics, boss, and exact enemy fixtures. It can also freeze page
+time and continuous spawning to isolate a combat problem. Double-click the CMD
+from `build/windows/`; a normal game launch ignores the file. Debug-state runs
+are visibly marked and cannot write normal saves/checkpoints or send
+GameAnalytics events. The complete schema and ID rules are documented in
+`design/startup-state.md`.
+
 Survive escalating manuscript waves, harvest red Ink, and choose techniques.
 Page 4 summons the Red Editor, Page 8 the Binder, and Page 12 the First Author.
 Pages 3, 7, and 10 interrupt the action with a randomized three-way event choice.
@@ -219,6 +238,9 @@ Defeated enemies recover Memory shards used for permanent upgrades on the title
 screen. The codex reveals each restored archetype and its lifetime defeat count.
 
 ## Local run
+
+Use Godot 4.5.2 stable. The Windows workflow rejects a different engine version
+and resolves the pinned host install under `S:\Apps\Godot\4.5.2`.
 
 ```bash
 python3 ../../tools/game/generate_validation_assets.py
@@ -268,16 +290,17 @@ The Windows host workflow exposes the same gates through `host_game.py test`,
 `host_game.py cutscene-test`, `host_game.py manual-test`, `host_game.py localization-test`, `host_game.py cast-test`,
 `host_game.py audio-test`, `host_game.py combat-feel-test`, `host_game.py accessibility-test`, `host_game.py restoration-test`, `host_game.py proof-test`,
 `host_game.py daily-test`, `host_game.py persona-test`, `host_game.py routes`,
-`host_game.py playtest-recorder-test`, `host_game.py gameanalytics-test`, `host_game.py soak`, and
+`host_game.py playtest-recorder-test`, `host_game.py gameanalytics-test`,
+`host_game.py privacy-test`, `host_game.py soak`, and
 `host_game.py recorded-soak`. `host_game.py release-audit` verifies complete
-asset provenance and, when present, the isolated three-file Steam depot and
-four-file itch.io recorded-playtest bundle.
+asset provenance and, when present, the isolated four-file Steam depot and
+five-file itch.io recorded-playtest bundle.
 All host-side timeouts escalate from termination to forced recovery after ten
 seconds so a failed Godot test cannot linger indefinitely. `host_game.py
 process-status` reports every game/Godot process with elapsed time, CPU, memory,
 and command line; `host_game.py cleanup-tests` terminates only this project's
 `res://tests/` processes and never matches an editor or exported game.
-`host_game.py p1-suite` first mirrors/imports current source, then runs 29 core
+`host_game.py p1-suite` first mirrors/imports current source, then runs 32 core
 gates serially in one delegate session and finishes with a zero-process check.
 It keeps a compact summary and one diagnostic log per gate under
 `build/p1-suite/<UTC timestamp>/`; `build/p1-suite/latest.txt` identifies the
@@ -337,8 +360,9 @@ Start-Recorded-Playtest.cmd P-001 "D:\\LastInkwardenPlaytestLogs"
 
 The launcher scopes all environment variables to itself and the child game; it
 does not modify the user's persistent Windows environment.
-The audited upload-ready bundle is `build/itch-windows/`; do not distribute the
-working `build/windows/` directory because it may retain internal captures.
+The audited public-Beta bundle is `build/itch-windows/`. Upload the identical
+bundle to itch.io and the Quark Drive mirror; do not distribute the working
+`build/windows/` directory because it may retain internal captures.
 
 During play, `F6` marks a bug, `F7` a confusing moment, `F8` an unfair moment,
 and `F9` a highlight. A mark stores the previous 30 seconds of gameplay events,
@@ -360,19 +384,23 @@ artifact layout, and interpretation limits.
 ## Optional GameAnalytics telemetry
 
 Remote analytics is disabled by default and is separate from the local
-playtest recorder. It becomes active only when valid local credentials are
-embedded at export time and the player turns on `ANONYMOUS ANALYTICS` in
-Options. Copy `tools/windows/gameanalytics.local.json.example` to
+playtest recorder. A first-run disclosure requires an explicit choice and
+defaults to `DON'T SEND`; no remote identity or request exists before consent.
+It becomes active only when dedicated public-Beta credentials are embedded at
+export time and the player allows `OPTIONAL USAGE STATISTICS`. Copy
+`tools/windows/gameanalytics.local.json.example` to
 `tools/windows/gameanalytics.local.json`, fill in the Windows game's keys, and
-run `host_game.py export`. The local JSON is ignored by Git and is never copied
-to the Windows runtime; only a generated credential resource is compiled into
-the executable's embedded PCK. The generated runtime source is scrubbed back to
-an empty placeholder after every successful or failed export.
+run `host_game.py export`. The build gate requires profile `public_beta` and
+project label `Last Inkwarden - Public Beta`. The local JSON is ignored by Git
+and is never copied to the Windows runtime; only a generated credential resource
+is compiled into the executable's embedded PCK. The generated runtime source is
+scrubbed back to an empty placeholder after every successful or failed export.
 
 The client queues a small semantic event set under `user://gameanalytics/` and
 never sends raw input, world positions, participant codes, notes, screenshots,
 or high-frequency combat events. Turning the option off immediately stops the
-client and erases its local identity and queue. Configuration, event taxonomy,
+client and erases its local identity and queue. A bilingual in-game Data &
+Privacy page and `PRIVACY_NOTICE.txt` explain the boundary. Configuration, event taxonomy,
 validation steps, and production caveats are in `design/gameanalytics.md`.
 Normal batches are sent during play; Quit to Desktop and intercepted window
 close requests save a safe draft and allow up to two seconds for the final

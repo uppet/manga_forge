@@ -87,6 +87,7 @@ var combo_timeout := 0.0
 var boss_damage_bonus := 0.0
 var last_word := false
 var death_save_available := false
+var last_damage_source_id := "unknown"
 var upgrade_choice_bonus := 0
 var guard := 0.0
 var binder_chain := false
@@ -587,6 +588,7 @@ func take_damage(amount: float, source_direction: Vector2 = Vector2.ZERO, source
 	if invulnerable_time > 0.0 or health <= 0.0:
 		return false
 	var health_before := health
+	last_damage_source_id = source_id.left(64)
 	var guard_before := guard
 	var incoming := amount * (1.0 - clampf(damage_reduction, 0.0, 0.72))
 	if guard > 0.0:
@@ -939,6 +941,7 @@ func get_session_state() -> Dictionary:
 		"boss_damage_bonus": boss_damage_bonus,
 		"last_word": last_word,
 		"death_save_available": death_save_available,
+		"last_damage_source_id": last_damage_source_id,
 		"upgrade_choice_bonus": upgrade_choice_bonus,
 		"guard": guard,
 		"binder_chain": binder_chain,
@@ -1017,6 +1020,7 @@ func apply_session_state(state: Dictionary) -> bool:
 	boss_damage_bonus = clampf(float(state.get("boss_damage_bonus", 0.0)), 0.0, 5.0)
 	last_word = bool(state.get("last_word", false))
 	death_save_available = bool(state.get("death_save_available", false))
+	last_damage_source_id = str(state.get("last_damage_source_id", "unknown")).left(64)
 	upgrade_choice_bonus = clampi(int(state.get("upgrade_choice_bonus", 0)), 0, 1)
 	guard = clampf(float(state.get("guard", 0.0)), 0.0, 100.0)
 	binder_chain = bool(state.get("binder_chain", false))

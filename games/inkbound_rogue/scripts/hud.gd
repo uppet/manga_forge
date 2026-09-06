@@ -18,6 +18,7 @@ signal save_return_requested
 signal story_requested(sequence_id: String)
 signal meta_upgrade_requested(upgrade_id: String)
 signal setting_adjusted(setting_id: String, direction: int)
+signal analytics_consent_decided(allowed: bool)
 signal binding_changed(action_id: String, device_type: String, binding: Dictionary)
 signal bindings_reset_requested
 signal manual_visibility_changed(visible: bool)
@@ -40,6 +41,7 @@ const POPUP_START_SCALE := Vector2(0.97, 0.97)
 const DEFEAT_FADE_DURATION := 1.25
 const DEFEAT_INPUT_DELAY_SECONDS := 1.5
 const DEFEAT_RELEASE_ACTIONS := ["restart", "attack", "dash", "special", "pause"]
+const PLAYTESTER_CREDITS := ["ANDREW HUANG"]
 
 var hp_bar: ColorRect
 var hp_bar_fill: ColorRect
@@ -230,6 +232,24 @@ var settings_buttons: Array[Button] = []
 var settings_values: Dictionary = {}
 var settings_visible := false
 var settings_selected := 0
+var analytics_consent_panel: ColorRect
+var analytics_consent_title: Label
+var analytics_consent_body: RichTextLabel
+var analytics_consent_deny_button: Button
+var analytics_consent_allow_button: Button
+var analytics_consent_visible := false
+var analytics_consent_required := false
+var analytics_consent_selected := 0
+var privacy_panel: ColorRect
+var privacy_title: Label
+var privacy_body: RichTextLabel
+var privacy_status_label: Label
+var privacy_deny_button: Button
+var privacy_allow_button: Button
+var privacy_visible := false
+var privacy_selected := 0
+var analytics_privacy_id := ""
+var analytics_collection_status := "disabled"
 var bindings_panel: ColorRect
 var binding_buttons: Array[Button] = []
 var binding_status_label: Label
@@ -277,7 +297,7 @@ const FIELD_MANUAL_PAGES := [
 	},
 	{
 		"title": "CREDITS & LEGAL",
-		"body": "JOYER HUANG · CREATOR / DIRECTION\nOPENAI CODEX (GPT-5) · DEVELOPMENT\n\nGODOT 4.2.2 · MANGA FORGE · PYTHON · FFMPEG 4.4.2\nCOMFYUI · STABLE DIFFUSION · MINIMAX H3\nOPENAI IMAGE GENERATION · REALTIME (GPT-REALTIME-2.1)\nINDEXTTS 2.5 · HAI MIAN MUSIC\nFULL: THIRD_PARTY_NOTICES.TXT",
+		"body": "JOYER HUANG · CREATOR / DIRECTION\nOPENAI CODEX (GPT-5) · DEVELOPMENT\nPLAYTESTER · {{PLAYTESTERS}}\n\nGODOT 4.5.2 · MANGA FORGE · PYTHON · FFMPEG 4.4.2\nCOMFYUI · STABLE DIFFUSION · MINIMAX H3\nOPENAI IMAGE GENERATION · REALTIME (GPT-REALTIME-2.1)\nINDEXTTS 2.5 · HAI MIAN MUSIC\nFULL: THIRD_PARTY_NOTICES.TXT",
 	},
 ]
 
@@ -293,7 +313,8 @@ const SETTINGS_ROWS := [
 	["reduced_flashes", "REDUCED FLASHES"],
 	["fullscreen", "DISPLAY MODE"],
 	["language", "LANGUAGE"],
-	["analytics_consent", "ANONYMOUS ANALYTICS"],
+	["analytics_consent", "OPTIONAL USAGE STATISTICS"],
+	["privacy", "DATA & PRIVACY"],
 	["controls", "CONTROL BINDINGS"],
 ]
 
@@ -338,6 +359,7 @@ func _ready() -> void:
 	_build_hud()
 	_build_manual()
 	_build_settings()
+	_build_privacy_ui()
 	_build_bindings()
 	_apply_ui_theme()
 	_wire_button_audio()
@@ -369,6 +391,11 @@ func _on_ui_button_down(button: Button) -> void:
 func _on_ui_button_hovered(button: Button) -> void:
 	if button.visible and not button.disabled and _button_is_in_active_modal(button):
 		ui_sound_requested.emit("ui_move")
+		var consent_index := [analytics_consent_deny_button, analytics_consent_allow_button].find(button)
+		if analytics_consent_visible and consent_index >= 0:
+			analytics_consent_selected = consent_index
+			_refresh_analytics_consent()
+			return
 		var quit_index := [quit_cancel_button, quit_confirm_button].find(button)
 		if quit_visible and quit_index >= 0:
 			quit_navigation_index = quit_index
@@ -386,7 +413,7 @@ func _on_ui_button_hovered(button: Button) -> void:
 
 
 func _emit_input_ui_sound(event: InputEvent) -> void:
-	var in_ui := title_visible or pause_panel.visible or quit_visible or settings_visible or bindings_visible or manual_visible or event_visible or relic_draft_visible or upgrade_visible or game_over_visible or victory_credits_visible
+	var in_ui := title_visible or pause_panel.visible or quit_visible or settings_visible or bindings_visible or manual_visible or event_visible or relic_draft_visible or upgrade_visible or game_over_visible or victory_credits_visible or analytics_consent_visible or privacy_visible
 	var gamepad_cancel: bool = event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B
 	if not in_ui:
 		if event.is_action_pressed("manual") or event.is_action_pressed("pause") or event.is_action_pressed("options") or event.is_action_pressed("restoration") or event.is_action_pressed("proof_ledger") or event.is_action_pressed("daily_chronicle"):
@@ -1350,6 +1377,7 @@ func _refresh_manual() -> void:
 	if manual_page == 0:
 		body = str(page_data.get("gamepad" if using_gamepad else "keyboard", ""))
 	elif manual_page == FIELD_MANUAL_PAGES.size() - 1:
+		body = body.replace("{{PLAYTESTERS}}", " · ".join(PLAYTESTER_CREDITS))
 		body += "\n\n%s %s" % [Localization.text("BUILD"), str(ProjectSettings.get_setting("application/config/version", "DEVELOPMENT"))]
 	manual_body_label.text = "[left]%s[/left]" % body
 	manual_prev_button.disabled = manual_page <= 0
@@ -1378,7 +1406,7 @@ func _build_settings() -> void:
 	for index in range(SETTINGS_ROWS.size()):
 		var button := Button.new()
 		button.position = Vector2(24, 35 + index * 15)
-		button.size = Vector2(360, 15)
+		button.size = Vector2(360, 14)
 		button.add_theme_font_size_override("font_size", 8)
 		button.add_theme_stylebox_override("normal", _compact_settings_button_style(Color(0.08, 0.065, 0.09, 0.58), Color(0.32, 0.27, 0.34, 0.72)))
 		button.add_theme_stylebox_override("hover", _compact_settings_button_style(Color(0.18, 0.125, 0.13, 0.82), GOLD.darkened(0.38)))
@@ -1387,13 +1415,168 @@ func _build_settings() -> void:
 		# Apply the authored compact size after the style overrides: assigning it
 		# against Godot's default Button style first would clamp every row to the
 		# default 32 px minimum before the compact style is installed.
-		button.size = Vector2(360, 15)
+		button.size = Vector2(360, 14)
 		button.focus_mode = Control.FOCUS_NONE
 		button.pressed.connect(_adjust_setting.bind(SETTINGS_ROWS[index][0], 1))
 		settings_panel.add_child(button)
 		settings_buttons.append(button)
 	var close := _make_child_label(settings_panel, "B/○  ·  START/ESC  BACK", Vector2(154, 248), Vector2(230, 14), 8, PAPER)
 	close.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+
+
+func _build_privacy_ui() -> void:
+	privacy_panel = ColorRect.new()
+	privacy_panel.position = Vector2(18, 10)
+	privacy_panel.size = Vector2(444, 250)
+	privacy_panel.color = Color(0.012, 0.009, 0.017, 0.998)
+	privacy_panel.visible = false
+	add_child(privacy_panel)
+	privacy_title = _make_child_label(privacy_panel, "DATA & PRIVACY", Vector2(14, 7), Vector2(416, 25), 17, WHITE)
+	privacy_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	privacy_body = _make_card_text(privacy_panel, "", Vector2(22, 38), Vector2(400, 137), 8, PAPER, true, false)
+	privacy_status_label = _make_child_label(privacy_panel, "", Vector2(22, 178), Vector2(400, 15), 8, GOLD)
+	privacy_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	privacy_deny_button = Button.new()
+	privacy_deny_button.position = Vector2(46, 197)
+	privacy_deny_button.size = Vector2(160, 25)
+	privacy_deny_button.text = "DON'T SEND"
+	privacy_deny_button.add_theme_font_size_override("font_size", 8)
+	privacy_deny_button.focus_mode = Control.FOCUS_NONE
+	privacy_deny_button.pressed.connect(_set_privacy_consent.bind(false))
+	privacy_panel.add_child(privacy_deny_button)
+	privacy_allow_button = Button.new()
+	privacy_allow_button.position = Vector2(238, 197)
+	privacy_allow_button.size = Vector2(160, 25)
+	privacy_allow_button.text = "ALLOW SEND"
+	privacy_allow_button.add_theme_font_size_override("font_size", 8)
+	privacy_allow_button.focus_mode = Control.FOCUS_NONE
+	privacy_allow_button.pressed.connect(_set_privacy_consent.bind(true))
+	privacy_panel.add_child(privacy_allow_button)
+	var privacy_close := _make_child_label(privacy_panel, "←/→ CHANGE  ·  A/ENTER CONFIRM  ·  B/ESC BACK", Vector2(22, 228), Vector2(400, 15), 8, GOLD)
+	privacy_close.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	analytics_consent_panel = ColorRect.new()
+	analytics_consent_panel.position = Vector2.ZERO
+	analytics_consent_panel.size = Vector2(480, 270)
+	analytics_consent_panel.color = Color(0.008, 0.006, 0.012, 1.0)
+	analytics_consent_panel.visible = false
+	add_child(analytics_consent_panel)
+	analytics_consent_title = _make_child_label(analytics_consent_panel, "OPTIONAL USAGE STATISTICS", Vector2(20, 18), Vector2(440, 30), 18, WHITE)
+	analytics_consent_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	analytics_consent_body = _make_card_text(analytics_consent_panel, "", Vector2(34, 55), Vector2(412, 134), 8, PAPER, true, false)
+	analytics_consent_deny_button = Button.new()
+	analytics_consent_deny_button.position = Vector2(52, 204)
+	analytics_consent_deny_button.size = Vector2(176, 36)
+	analytics_consent_deny_button.text = "DON'T SEND"
+	analytics_consent_deny_button.add_theme_font_size_override("font_size", 10)
+	analytics_consent_deny_button.focus_mode = Control.FOCUS_NONE
+	analytics_consent_deny_button.pressed.connect(_decide_analytics_consent.bind(false))
+	analytics_consent_panel.add_child(analytics_consent_deny_button)
+	analytics_consent_allow_button = Button.new()
+	analytics_consent_allow_button.position = Vector2(252, 204)
+	analytics_consent_allow_button.size = Vector2(176, 36)
+	analytics_consent_allow_button.text = "ALLOW"
+	analytics_consent_allow_button.add_theme_font_size_override("font_size", 10)
+	analytics_consent_allow_button.focus_mode = Control.FOCUS_NONE
+	analytics_consent_allow_button.pressed.connect(_decide_analytics_consent.bind(true))
+	analytics_consent_panel.add_child(analytics_consent_allow_button)
+	var consent_help := _make_child_label(analytics_consent_panel, "←/→ SELECT  ·  A/ENTER CONFIRM", Vector2(30, 246), Vector2(420, 15), 8, GOLD)
+	consent_help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+
+func show_analytics_consent_required() -> void:
+	if analytics_consent_visible or _popup_transition_active(analytics_consent_panel):
+		return
+	analytics_consent_required = true
+	analytics_consent_visible = true
+	analytics_consent_selected = 0
+	_refresh_analytics_consent()
+	_show_popup(analytics_consent_panel, false, 0.2)
+
+
+func _refresh_analytics_consent() -> void:
+	var chinese := TranslationServer.get_locale().begins_with("zh")
+	analytics_consent_title.text = "可选使用统计" if chinese else "OPTIONAL USAGE STATISTICS"
+	if chinese:
+		analytics_consent_body.text = "[left]帮助我们改进《墨卫残章》：可选择向 GameAnalytics 发送游戏版本、系统类型、语言/输入方式、关卡进度、构筑选择与一局结果。\n\n不发送姓名、邮箱、存档、自由文本、逐帧输入或精确位置。系统会创建随机持久标识；网络请求可能处理 IP 以推断大致地区。你可以拒绝且不影响游戏，并可随时在选项中关闭和清除待发送队列。完整说明见 PRIVACY_NOTICE.txt。[/left]"
+	else:
+		analytics_consent_body.text = "[left]Help improve Last Inkwarden by optionally sending the game build, system type, language/input mode, progression, build choices, and run results to GameAnalytics.\n\nNo name, email, save data, free text, frame-by-frame input, or precise position is sent. A persistent random ID is created; the request IP may be processed to infer an approximate region. Refusing does not affect the game, and you can disable collection and erase the pending queue at any time. See PRIVACY_NOTICE.txt. [/left]"
+	analytics_consent_deny_button.text = "不发送" if chinese else "DON'T SEND"
+	analytics_consent_allow_button.text = "允许发送" if chinese else "ALLOW"
+	analytics_consent_deny_button.modulate = GOLD if analytics_consent_selected == 0 else Color.WHITE
+	analytics_consent_allow_button.modulate = GOLD if analytics_consent_selected == 1 else Color.WHITE
+
+
+func _decide_analytics_consent(allowed: bool) -> void:
+	if not analytics_consent_visible or _popup_transition_active(analytics_consent_panel):
+		return
+	analytics_consent_required = false
+	analytics_consent_decided.emit(allowed)
+	_hide_popup(analytics_consent_panel, _finish_hide_analytics_consent, false)
+
+
+func _finish_hide_analytics_consent() -> void:
+	analytics_consent_visible = false
+	_refresh_title_navigation()
+
+
+func show_privacy_notice() -> void:
+	if privacy_visible or _popup_transition_active(privacy_panel):
+		return
+	privacy_visible = true
+	privacy_selected = 1 if bool(settings_values.get("analytics_consent", false)) else 0
+	_refresh_privacy_notice()
+	_show_popup(privacy_panel, false)
+
+
+func hide_privacy_notice() -> void:
+	if not privacy_visible or _popup_transition_active(privacy_panel):
+		return
+	_hide_popup(privacy_panel, _finish_hide_privacy_notice, false)
+
+
+func _finish_hide_privacy_notice() -> void:
+	privacy_visible = false
+	_refresh_settings()
+
+
+func _set_privacy_consent(allowed: bool) -> void:
+	if not privacy_visible or _popup_transition_active(privacy_panel):
+		return
+	privacy_selected = 1 if allowed else 0
+	if bool(settings_values.get("analytics_consent", false)) != allowed:
+		analytics_consent_decided.emit(allowed)
+	else:
+		_refresh_privacy_notice()
+
+
+func _refresh_privacy_notice() -> void:
+	var chinese := TranslationServer.get_locale().begins_with("zh")
+	privacy_title.text = "数据与隐私" if chinese else "DATA & PRIVACY"
+	var public_id := analytics_privacy_id if not analytics_privacy_id.is_empty() else ("未创建 / 已清除" if chinese else "NOT CREATED / ERASED")
+	if chinese:
+		privacy_body.text = "[left]远程统计完全可选，仅用于发现难度、稳定性与操作体验问题。GameAnalytics 接收随机安装/会话标识、版本和有限的玩法事件；不会收到姓名、邮箱、试玩代号、存档、自由文本、截图、随机种子、精确位置或高频战斗输入。\n\n关闭统计会立即停止提交，并删除本机 user://gameanalytics 中的待发送队列与随机标识。独立的本地试玩记录不会自动上传。数据处理方、跨境处理和联系/撤回方式见游戏目录 PRIVACY_NOTICE.txt。\n统计请求 ID：%s[/left]" % public_id
+		var chinese_status := "不发送"
+		if bool(settings_values.get("analytics_consent", false)):
+			chinese_status = "允许发送" if not analytics_privacy_id.is_empty() else "已允许 · 此构建不可用"
+		privacy_status_label.text = "当前状态：%s" % chinese_status
+	else:
+		privacy_body.text = "[left]Remote statistics are optional and used only to find difficulty, stability, and control-experience problems. GameAnalytics receives random install/session IDs, build information, and a limited gameplay-event set. It does not receive names, email, playtest codes, saves, free text, screenshots, random seeds, precise positions, or high-frequency combat input.\n\nDisabling statistics stops submission immediately and deletes the pending queue and random ID under user://gameanalytics. The separate local playtest recorder never uploads automatically. See PRIVACY_NOTICE.txt beside the game for the processor, international processing, contact, and withdrawal details.\nStatistics request ID: %s[/left]" % public_id
+		var english_status := "DO NOT SEND"
+		if bool(settings_values.get("analytics_consent", false)):
+			english_status = "SEND" if not analytics_privacy_id.is_empty() else "ALLOWED · UNAVAILABLE IN THIS BUILD"
+		privacy_status_label.text = "STATUS: %s" % english_status
+	privacy_deny_button.text = "不发送" if chinese else "DON'T SEND"
+	privacy_allow_button.text = "允许发送" if chinese else "ALLOW SEND"
+	privacy_deny_button.modulate = GOLD if privacy_selected == 0 else Color.WHITE
+	privacy_allow_button.modulate = GOLD if privacy_selected == 1 else Color.WHITE
+
+
+func set_analytics_privacy_identity(value: String, collection_status: String = "disabled") -> void:
+	analytics_privacy_id = value.strip_edges()
+	analytics_collection_status = collection_status
+	if privacy_visible:
+		_refresh_privacy_notice()
 
 
 func _compact_settings_button_style(background: Color, edge: Color) -> StyleBoxFlat:
@@ -2188,25 +2371,32 @@ func _victory_credit_page_data(summary: Dictionary) -> Array[Dictionary]:
 		return [
 			{"title": "此页铭记于心", "body": _run_result_text_zh(summary), "duration": 4.2},
 			{"title": "主创与协作", "body": "创作 · 创意指导 · 资源制作\nJOYER HUANG\n\n开发协作 · 程序 · 工具链\nOPENAI CODEX · GPT-5", "duration": 3.4},
-			{"title": "引擎与制作流水线", "body": "GODOT ENGINE 4.2.2\nMANGA FORGE\nPYTHON 3 资源工具\nFFMPEG 4.4.2", "duration": 3.2},
+			{"title": "引擎与制作流水线", "body": "GODOT ENGINE 4.5.2\nMANGA FORGE\nPYTHON 3 资源工具\nFFMPEG 4.4.2", "duration": 3.2},
 			{"title": "视觉生成", "body": "OPENAI 图像生成\nSTABLE DIFFUSION · COMFYUI\nMINIMAX H3\n角色 · 剧情 · 墨术 · 动态演出预览\n\n由 JOYER HUANG 指导、筛选与整合", "duration": 3.8},
 			{"title": "语音生成", "body": "OPENAI REALTIME\nGPT-REALTIME-2.1\n本地 INDEXTTS 2.5\n\n日文战斗反馈与墨术语音", "duration": 3.4},
 			{"title": "音乐", "body": "海绵音乐 · HAI MIAN MUSIC\n五首预生成 AIGC 配乐\n\n由 JOYER HUANG 指导、筛选与整合", "duration": 3.4},
 			{"title": "开源贡献", "body": "GODOT ENGINE\nJUAN LINIETSKY · ARIEL MANZUR\n以及所有开源贡献者\n\n完整声明见 THIRD_PARTY_NOTICES.TXT", "duration": 3.4},
-			{"title": "试玩玩家", "body": "感谢每一位在页边留下意见的玩家。\n你们发现的问题，让下一份草稿变得更好。", "duration": 3.0},
+			{"title": "试玩玩家", "body": _playtester_credit_body(true), "duration": 3.0},
 			{"title": "感谢游玩", "body": "NARA 的故事会在下一份草稿中继续。", "final": true},
 		]
 	return [
 		{"title": "THE PAGE REMEMBERS", "body": _run_result_text(summary), "duration": 4.2},
 		{"title": "CREATOR & COLLABORATOR", "body": "CREATION · CREATIVE DIRECTION · ASSET PRODUCTION\nJOYER HUANG\n\nDEVELOPMENT · CODE · TOOLING\nOPENAI CODEX · GPT-5", "duration": 3.4},
-		{"title": "ENGINE & PIPELINE", "body": "GODOT ENGINE 4.2.2\nMANGA FORGE\nPYTHON 3 ASSET TOOLING\nFFMPEG 4.4.2", "duration": 3.2},
+		{"title": "ENGINE & PIPELINE", "body": "GODOT ENGINE 4.5.2\nMANGA FORGE\nPYTHON 3 ASSET TOOLING\nFFMPEG 4.4.2", "duration": 3.2},
 		{"title": "VISUAL GENERATION", "body": "OPENAI IMAGE GENERATION\nSTABLE DIFFUSION · COMFYUI\nMINIMAX H3\nCHARACTERS · STORY · INK ART · MOTION PREVIS\n\nDIRECTED, SELECTED, AND INTEGRATED BY JOYER HUANG", "duration": 3.8},
 		{"title": "VOICE GENERATION", "body": "OPENAI REALTIME\nGPT-REALTIME-2.1\nLOCAL INDEXTTS 2.5\n\nJAPANESE COMBAT AND INK ART VOICES", "duration": 3.4},
 		{"title": "MUSIC", "body": "HAI MIAN MUSIC · 海绵音乐\nFIVE PRE-GENERATED AIGC TRACKS\n\nDIRECTED, SELECTED, AND INTEGRATED BY JOYER HUANG", "duration": 3.4},
 		{"title": "OPEN-SOURCE CONTRIBUTORS", "body": "GODOT ENGINE\nJUAN LINIETSKY · ARIEL MANZUR\nAND ALL OPEN-SOURCE CONTRIBUTORS\n\nFULL NOTICE: THIRD_PARTY_NOTICES.TXT", "duration": 3.4},
-		{"title": "PLAYTESTERS", "body": "THANK YOU TO EVERY PLAYER WHO LEFT A NOTE IN THE MARGIN.\nYOUR FEEDBACK MADE THE NEXT DRAFT BETTER.", "duration": 3.0},
+		{"title": "PLAYTESTERS", "body": _playtester_credit_body(false), "duration": 3.0},
 		{"title": "THANK YOU FOR PLAYING", "body": "NARA'S STORY CONTINUES IN THE NEXT DRAFT.", "final": true},
 	]
+
+
+func _playtester_credit_body(chinese: bool) -> String:
+	var names := "\n".join(PLAYTESTER_CREDITS)
+	if chinese:
+		return "%s\n\n感谢你在页边留下意见。\n你的反馈让下一份草稿变得更好。" % names
+	return "%s\n\nTHANK YOU FOR LEAVING NOTES IN THE MARGIN.\nYOUR FEEDBACK MADE THE NEXT DRAFT BETTER." % names
 
 
 func _show_victory_credit_page() -> void:
@@ -2554,6 +2744,11 @@ func hide_title() -> void:
 	_hide_popup_immediate(story_panel)
 	loadout_visible = false
 	_hide_popup_immediate(loadout_panel)
+	privacy_visible = false
+	_hide_popup_immediate(privacy_panel)
+	analytics_consent_visible = false
+	analytics_consent_required = false
+	_hide_popup_immediate(analytics_consent_panel)
 	title_navigation_cursor.visible = false
 
 
@@ -2617,7 +2812,7 @@ func _refresh_title() -> void:
 
 
 func _title_overlay_visible() -> bool:
-	return daily_visible or proof_visible or restoration_visible or loadout_visible or codex_visible or achievements_visible or history_visible or story_visible or settings_visible or bindings_visible or manual_visible or quit_visible
+	return daily_visible or proof_visible or restoration_visible or loadout_visible or codex_visible or achievements_visible or history_visible or story_visible or settings_visible or bindings_visible or manual_visible or quit_visible or analytics_consent_visible or privacy_visible
 
 
 func _refresh_title_navigation() -> void:
@@ -3114,12 +3309,16 @@ func _show_next_achievement() -> void:
 func set_settings(data: Dictionary) -> void:
 	settings_values = data.duplicate(true)
 	_refresh_settings()
+	if privacy_visible:
+		_refresh_privacy_notice()
 
 
 func refresh_localization() -> void:
 	_apply_ui_theme()
 	_refresh_manual()
 	_refresh_settings()
+	_refresh_analytics_consent()
+	_refresh_privacy_notice()
 	_refresh_bindings()
 	set_input_mode(using_gamepad)
 	set_shards(shard_amount)
@@ -3173,6 +3372,9 @@ func _adjust_setting(setting_id: String, direction: int) -> void:
 	if setting_id == "controls":
 		show_bindings()
 		return
+	if setting_id == "privacy":
+		show_privacy_notice()
+		return
 	setting_adjusted.emit(setting_id, direction)
 
 
@@ -3198,7 +3400,7 @@ func _refresh_settings() -> void:
 				value_text = Localization.text("FULLSCREEN" if bool(settings_values.get(setting_id, false)) else "WINDOWED")
 			"language":
 				value_text = Localization.language_display_name(str(settings_values.get(setting_id, Localization.LANGUAGE_AUTO)))
-			"controls":
+			"controls", "privacy":
 				value_text = Localization.text("OPEN")
 		settings_buttons[index].text = "‹   %s     %s   ›" % [label, value_text] if TranslationServer.get_locale().begins_with("zh") else "‹   %-24s %12s   ›" % [label, value_text]
 		settings_buttons[index].modulate = GOLD if index == settings_selected else Color.WHITE
@@ -3613,6 +3815,26 @@ func _unhandled_input(event: InputEvent) -> void:
 			_request_game_over_restart()
 		return
 	_emit_input_ui_sound(event)
+	if analytics_consent_visible:
+		if event.is_action_pressed("move_left") or event.is_action_pressed("move_up"):
+			analytics_consent_selected = 0
+			_refresh_analytics_consent()
+		elif event.is_action_pressed("move_right") or event.is_action_pressed("move_down"):
+			analytics_consent_selected = 1
+			_refresh_analytics_consent()
+		elif _title_accept_pressed(event):
+			_decide_analytics_consent(analytics_consent_selected == 1)
+		return
+	if privacy_visible:
+		if event.is_action_pressed("move_left") or event.is_action_pressed("move_up"):
+			_set_privacy_consent(false)
+		elif event.is_action_pressed("move_right") or event.is_action_pressed("move_down"):
+			_set_privacy_consent(true)
+		elif _title_accept_pressed(event):
+			_set_privacy_consent(privacy_selected == 1)
+		elif event.is_action_pressed("pause") or event.is_action_pressed("options") or event.is_action_pressed("upgrade_3") or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B):
+			hide_privacy_notice()
+		return
 	if quit_visible:
 		if quit_waiting:
 			return

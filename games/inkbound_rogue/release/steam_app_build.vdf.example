@@ -1,7 +1,7 @@
 "appbuild"
 {
     "appid" "REPLACE_WITH_STEAM_APP_ID"
-    "desc" "Last Inkwarden 0.24.0-alpha Windows playtest"
+    "desc" "Last Inkwarden 0.25.0-beta.1 Windows free beta"
     "buildoutput" "..\\build\\steam-output"
     "contentroot" "..\\build\\steam-depot"
     "setlive" ""

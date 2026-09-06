@@ -1,6 +1,6 @@
 # Last Inkwarden / 墨卫残章 — production credits
 
-Status date: 2026-09-04. This is the canonical human-readable credit roster for
+Status date: 2026-09-05. This is the canonical human-readable credit roster for
 tools and models used in the current game's resource-production workflow. It
 distinguishes manifest-mapped runtime assets from owner-confirmed production
 and previsualization tools whose file-level job records still need to be
@@ -14,13 +14,16 @@ records, and `release/ai-content-disclosure.md`.
 | --- | --- |
 | Joyer Huang | Creator; creative direction; game and narrative direction; prompt direction; asset selection, integration approval, and production |
 | OpenAI Codex (GPT-5) | AI development collaborator; game design, code, production tooling, documentation, validation, and asset-integration support |
-| Playtesters | Usability, balance, input, presentation, and defect feedback |
+| Andrew Huang | Playtester; usability, balance, input, presentation, and defect feedback |
+
+The named playtester roster is maintained here and is intended to grow as new
+players contribute feedback.
 
 ## Engine and production tools
 
 | Tool | Shipped use |
 | --- | --- |
-| Godot Engine 4.2.2 | Game runtime, editor, UI, input, audio, animation, and Windows export |
+| Godot Engine 4.5.2 | Game runtime, editor, UI, input, audio, animation, and Windows export |
 | Manga Forge | Project production pipeline and resource workflow |
 | Python 3 | Deterministic pixel-art/audio generation, manifests, build orchestration, validation, and playtest tooling |
 | FFmpeg 4.4.2 | Deterministic trimming, crossfading, transcoding, and runtime-audio preparation |

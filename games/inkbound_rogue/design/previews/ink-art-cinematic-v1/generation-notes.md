@@ -3,6 +3,12 @@
 This is a non-runtime visual prototype. No Godot scene, script, import, or
 shipping asset reference was changed.
 
+> Canon correction, 2026-09-06: Nara is an adult young woman. The historical
+> prompts below incorrectly use `swordsman` and `he/his`; they are retained
+> verbatim as provenance for the already-generated prototype and must not be
+> reused as character direction. Future briefs must follow
+> `design/narrative-bible.md` and use `woman warrior` plus `she/her`.
+
 ## Generated source art
 
 The two source images were generated with the built-in OpenAI image generation

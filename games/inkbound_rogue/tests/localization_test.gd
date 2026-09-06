@@ -72,7 +72,7 @@ func _validate_chinese_runtime() -> bool:
 	var chinese_credits := ""
 	for credit_page in game.hud._victory_credit_page_data({"won": true, "ending": "keep"}):
 		chinese_credits += "%s\n%s\n" % [str(credit_page.get("title", "")), str(credit_page.get("body", ""))]
-	for required_credit in ["JOYER HUANG", "OPENAI CODEX", "GODOT ENGINE 4.2.2", "MANGA FORGE", "PYTHON 3", "FFMPEG 4.4.2", "COMFYUI", "STABLE DIFFUSION", "MINIMAX H3", "OPENAI 图像生成", "GPT-REALTIME-2.1", "INDEXTTS 2.5", "海绵音乐"]:
+	for required_credit in ["JOYER HUANG", "OPENAI CODEX", "ANDREW HUANG", "GODOT ENGINE 4.5.2", "MANGA FORGE", "PYTHON 3", "FFMPEG 4.4.2", "COMFYUI", "STABLE DIFFUSION", "MINIMAX H3", "OPENAI 图像生成", "GPT-REALTIME-2.1", "INDEXTTS 2.5", "海绵音乐"]:
 		if chinese_credits.find(required_credit) < 0:
 			return _fail("Chinese credits omitted production credit: %s" % required_credit)
 	game.hud.show_victory({"won": true, "ending": "keep"})
@@ -126,12 +126,13 @@ func _validate_chinese_runtime() -> bool:
 		return _fail("Chinese language option is not visible in Settings")
 	var aim_row: int = game.hud.SETTINGS_ROWS.find(["aim_assist", "CONTROLLER AIM ASSIST"])
 	var flashes_row: int = game.hud.SETTINGS_ROWS.find(["reduced_flashes", "REDUCED FLASHES"])
-	var analytics_row: int = game.hud.SETTINGS_ROWS.find(["analytics_consent", "ANONYMOUS ANALYTICS"])
-	if aim_row < 0 or flashes_row < 0 or analytics_row < 0 or game.hud.settings_buttons[aim_row].text.find("手柄瞄准辅助") < 0 or game.hud.settings_buttons[flashes_row].text.find("减弱闪烁") < 0 or game.hud.settings_buttons[analytics_row].text.find("匿名使用数据") < 0:
+	var analytics_row: int = game.hud.SETTINGS_ROWS.find(["analytics_consent", "OPTIONAL USAGE STATISTICS"])
+	var privacy_row: int = game.hud.SETTINGS_ROWS.find(["privacy", "DATA & PRIVACY"])
+	if aim_row < 0 or flashes_row < 0 or analytics_row < 0 or privacy_row < 0 or game.hud.settings_buttons[aim_row].text.find("手柄瞄准辅助") < 0 or game.hud.settings_buttons[flashes_row].text.find("减弱闪烁") < 0 or game.hud.settings_buttons[analytics_row].text.find("可选使用统计") < 0 or game.hud.settings_buttons[privacy_row].text.find("数据与隐私") < 0:
 		return _fail("controller/accessibility settings are not visible in Chinese")
 	var last_button: Button = game.hud.settings_buttons[game.hud.settings_buttons.size() - 1]
 	if last_button.position.y + last_button.size.y > game.hud.settings_panel.size.y - 22.0:
-		return _fail("twelfth settings row overlaps the footer")
+		return _fail("expanded settings rows overlap the footer")
 
 	game.hud.hide_settings()
 	game.hud.debug_finish_popup_transition()

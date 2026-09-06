@@ -2,12 +2,14 @@
 
 ## Purpose
 
-The recorder turns a small Windows playtest into evidence without adding an
-account system, analytics vendor, network dependency, or Steam requirement. It
-answers four practical questions: where a run ended, what immediately preceded
-a reported problem, whether the build held frame rate under load, and how the
-player rated controls, readability, fairness, build clarity, sound, and music
-fatigue.
+The recorder turns an optional free-Beta Windows session into evidence without
+adding an account system, analytics vendor, network dependency, or Steam
+requirement. Public players can run the game normally; recording begins only
+when they choose the separate recorded-playtest launcher and consent locally.
+It answers four practical questions: where a run ended, what immediately
+preceded a reported problem, whether the build held frame rate under load, and
+how the player rated controls, readability, fairness, build clarity, sound, and
+music fatigue.
 
 This is diagnostic evidence, not a substitute for watching a player. A marker
 says *where* to investigate; the facilitator should still ask the player what
@@ -98,7 +100,7 @@ JSONL streams flush at least once per second, at 24 queued events, and on fatal
 damage, markers, or session boundaries. This bounds crash loss while avoiding a
 disk flush for every slash.
 
-## P1 review order
+## Public Beta review order
 
 Review individual marked screenshots and their context first; aggregate scores
 can hide a severe single-player failure. Then compare fatal damage sources,
@@ -106,7 +108,7 @@ furthest page, starting weapon, input mode, incomplete sessions, and survey
 ratings. Treat `music_fatigue` as a problem score: a higher number means more
 fatigue, unlike the other five ratings.
 
-Before inviting external players, the P1 gate is:
+Before publishing each public-Beta candidate, the internal P1 gate is:
 
 1. `playtest-recorder-test` passes on the Windows host.
 2. One internal exported-build session produces a screenshot marker, survey,

@@ -13,8 +13,9 @@ SHA-256 in `asset-manifest.json`, source commit, runtime crop map in
 `art-bible.yaml`, and capture/regression review are the evidence currently
 available.
 
-Before commercial submission, the publisher must confirm that the originating
-tool account and then-current terms permit distribution, review the image for
-recognizable third-party characters, logos, or artist imitation, and either
-sign off the asset in the rights ledger or replace it. This is a release gate,
-not a blocker for a private P1 usability playtest.
+Before any public Beta or commercial submission, the owner/publisher must
+confirm that the originating tool account and then-current terms permit the
+intended distribution, review the image for recognizable third-party
+characters, logos, real-person likeness, or artist imitation, and either sign
+off the asset in the rights ledger or replace it. This is now a public-Beta
+release gate; the earlier private-P1 exception no longer applies.

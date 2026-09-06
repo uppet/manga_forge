@@ -92,7 +92,7 @@ func _validate_output() -> void:
 		_fail("survey data was not preserved")
 		return
 	var events_text := _read_text(session_path.path_join("events.jsonl"))
-	if events_text.find("projectile:scribe") < 0 or events_text.find("[4,8]") < 0:
+	if not _has_normalized_event_data(events_text):
 		_fail("JSONL stream lost source or vector normalization")
 		return
 	for forbidden_key in ["username", "user_name", "account_id", "home_directory", "microphone_capture", "camera_capture"]:
@@ -101,6 +101,26 @@ func _validate_output() -> void:
 			return
 	print("INKBOUND_PLAYTEST_RECORDER_OK schema=1 events=ok markers=ok survey=ok performance=ok privacy=local")
 	quit(0)
+
+
+func _has_normalized_event_data(events_text: String) -> bool:
+	var found_source := false
+	var found_position := false
+	for line in events_text.split("\n", false):
+		var parsed: Variant = JSON.parse_string(line)
+		if not (parsed is Dictionary):
+			continue
+		var data: Variant = parsed.get("data", {})
+		if not (data is Dictionary):
+			continue
+		found_source = found_source or str(data.get("source", "")) == "projectile:scribe"
+		var position: Variant = data.get("position", [])
+		if position is Array and position.size() == 2:
+			found_position = found_position or (
+				is_equal_approx(float(position[0]), 4.0)
+				and is_equal_approx(float(position[1]), 8.0)
+			)
+	return found_source and found_position
 
 
 func _read_json(path: String) -> Dictionary:

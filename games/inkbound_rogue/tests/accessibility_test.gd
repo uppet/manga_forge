@@ -83,11 +83,11 @@ func _run_test() -> void:
 	var aim_row: int = game.hud.SETTINGS_ROWS.find(["aim_assist", "CONTROLLER AIM ASSIST"])
 	var flashes_row: int = game.hud.SETTINGS_ROWS.find(["reduced_flashes", "REDUCED FLASHES"])
 	var cutin_row: int = game.hud.SETTINGS_ROWS.find(["ink_art_cutins", "INK ART CUT-INS"])
-	var analytics_row: int = game.hud.SETTINGS_ROWS.find(["analytics_consent", "ANONYMOUS ANALYTICS"])
+	var analytics_row: int = game.hud.SETTINGS_ROWS.find(["analytics_consent", "OPTIONAL USAGE STATISTICS"])
 	if aim_row < 0 or flashes_row < 0 or cutin_row < 0 or analytics_row < 0:
 		_fail("accessibility options are absent from the controller-navigable Settings list")
 		return
-	if game.hud.settings_buttons[aim_row].text.find("手柄瞄准辅助") < 0 or game.hud.settings_buttons[flashes_row].text.find("减弱闪烁") < 0 or game.hud.settings_buttons[cutin_row].text.find("墨术全屏特写") < 0 or game.hud.settings_buttons[analytics_row].text.find("匿名使用数据") < 0:
+	if game.hud.settings_buttons[aim_row].text.find("手柄瞄准辅助") < 0 or game.hud.settings_buttons[flashes_row].text.find("减弱闪烁") < 0 or game.hud.settings_buttons[cutin_row].text.find("墨术全屏特写") < 0 or game.hud.settings_buttons[analytics_row].text.find("可选使用统计") < 0:
 		_fail("accessibility options are not translated into Simplified Chinese")
 		return
 	if not bool(game.settings.get("ink_art_cutins", false)):
