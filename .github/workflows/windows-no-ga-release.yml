@@ -142,8 +142,11 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          & $env:GODOT_EXE --headless --path $env:GAME_ROOT --editor --quit
-          if ($LASTEXITCODE -ne 0) { throw "Godot resource import failed" }
+          & $env:GODOT_EXE --headless --path $env:GAME_ROOT --import
+          $importExit = $LASTEXITCODE
+          # Godot 4.5.2 can return 1 after a successful first headless import on
+          # Windows. The following executable test gates are the strict check.
+          if ($importExit -notin @(0, 1)) { throw "Godot resource import failed with exit code $importExit" }
           foreach ($test in @(
             "res://tests/smoke_test.gd",
             "res://tests/gameanalytics_test.gd",
