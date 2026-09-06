@@ -104,7 +104,10 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $godotName = "Godot_v{0}_win64.exe" -f $env:GODOT_TAG
+          # The GUI-subsystem editor does not reliably set LASTEXITCODE when
+          # invoked by PowerShell. Its console twin is from the same archive
+          # and provides blocking process/exit semantics required by CI.
+          $godotName = "Godot_v{0}_win64_console.exe" -f $env:GODOT_TAG
           $godot = Join-Path $env:GITHUB_WORKSPACE ".ci/godot/$godotName"
           $templateRoot = Join-Path $env:APPDATA "Godot/export_templates/$env:GODOT_VERSION.stable"
           foreach ($required in @(
