@@ -81,6 +81,9 @@ class NoGameAnalyticsPackageTests(unittest.TestCase):
             manifest = (output / "no-ga-build.json").read_text(encoding="utf-8")
             self.assertNotIn("secret_key", manifest.lower())
             self.assertNotIn("game_key", manifest.lower())
+            self.assertNotIn(b"\r\n", (output / "no-ga-build.json").read_bytes())
+            checksum = output / f"{metadata['archive']}.sha256"
+            self.assertNotIn(b"\r\n", checksum.read_bytes())
 
     def test_archive_is_deterministic_for_identical_inputs(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

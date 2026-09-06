@@ -132,7 +132,7 @@ def package_no_ga_release(
     os.replace(temporary_archive, archive_path)
     archive_hash = sha256_file(archive_path)
     checksum_path = output_root / f"{archive_name}.sha256"
-    checksum_path.write_text(f"{archive_hash}  {archive_name}\n", encoding="ascii")
+    checksum_path.write_bytes(f"{archive_hash}  {archive_name}\n".encode("ascii"))
 
     metadata: dict[str, object] = {
         "product": str(version_data.get("product", "Last Inkwarden")),
@@ -150,9 +150,8 @@ def package_no_ga_release(
             for name in sorted(BUNDLE_FILES)
         },
     }
-    (output_root / "no-ga-build.json").write_text(
-        json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
+    (output_root / "no-ga-build.json").write_bytes(
+        (json.dumps(metadata, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     )
     return metadata
 
